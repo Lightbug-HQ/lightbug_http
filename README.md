@@ -29,11 +29,10 @@ Lightbug is a simple and sweet HTTP framework for Mojo that builds on best pract
 This is not production ready yet. We're aiming to keep up with new developments in Mojo, but it might take some time to get to a point when this is safe to use in real-world applications.
 
 Lightbug currently has the following features:
- - [x] Pure Mojo networking! No dependencies on Python by default
- - [x] TCP-based server and client implementation
- - [x] Assign your own custom handler to a route
- - [x] Craft HTTP requests and responses with built-in primitives
- - [x] Everything is fully typed, with no `def` functions used
+ - [x] Pure Mojo! No Python dependencies. Everything is fully typed, with no `def` functions used
+ - [x] HTTP Server and Client implementations
+ - [x] TCP and UDP support
+ - [x] Cookie support
 
  ### Check Out These Mojo Libraries:
 
@@ -126,12 +125,12 @@ Once you have a Mojo project set up locally,
     fn main() raises:
         var server = Server()
         var handler = Welcome()
-        server.listen_and_serve("0.0.0.0:8080", handler)
+        server.listen_and_serve("localhost:8080", handler)
     ```
 
 Feel free to change the settings in `listen_and_serve()` to serve on a particular host and port.
 
-Now send a request `0.0.0.0:8080`. You should see some details about the request printed out to the console.
+Now send a request `localhost:8080`. You should see some details about the request printed out to the console.
 
 Congrats 🥳 You're using Lightbug!
 
@@ -200,19 +199,15 @@ from lightbug_http import *
 from lightbug_http.client import Client
 
 fn test_request(mut client: Client) raises -> None:
-    var uri = URI.parse_raises("http://httpbin.org/status/404")
-    var headers = Header("Host", "httpbin.org")
-
+    var uri = URI.parse("google.com")
+    var headers = Headers(Header("Host", "google.com"))
     var request = HTTPRequest(uri, headers)
     var response = client.do(request^)
 
     # print status code
     print("Response:", response.status_code)
 
-    # print parsed headers (only some are parsed for now)
-    print("Content-Type:", response.headers["Content-Type"])
-    print("Content-Length", response.headers["Content-Length"])
-    print("Server:", to_string(response.headers["Server"]))
+    print(response.headers)
 
     print(
         "Is connection set to connection-close? ", response.connection_close()
@@ -232,16 +227,50 @@ fn main() -> None:
 
 Pure Mojo-based client is available by default. This client is also used internally for testing the server.
 
-## Switching between pure Mojo and Python implementations
+### UDP Support
+To get started with UDP, just use the `listen_udp` and `dial_udp` functions, along with `write_to` and `read_from` methods, like below.
 
-By default, Lightbug uses the pure Mojo implementation for networking. To use Python's `socket` library instead, just import the `PythonServer` instead of the `Server` with the following line:
-
+On the client:
 ```mojo
-from lightbug_http.python.server import PythonServer
+from lightbug_http.connection import dial_udp
+from lightbug_http.address import UDPAddr
+from utils import StringSlice
+
+alias test_string = "Hello, lightbug!"
+
+fn main() raises:
+    print("Dialing UDP server...")
+    alias host = "127.0.0.1"
+    alias port = 12000
+    var udp = dial_udp(host, port)
+
+    print("Sending " + str(len(test_string)) + " messages to the server...")
+    for i in range(len(test_string)):
+        _ = udp.write_to(str(test_string[i]).as_bytes(), host, port)
+
+        try:
+            response, _, _ = udp.read_from(16)
+            print("Response received:", StringSlice(unsafe_from_utf8=response))
+        except e:
+            if str(e) != str("EOF"):
+                raise e
+
 ```
 
-You can then use all the regular server commands in the same way as with the default server.
-Note: as of September, 2024, `PythonServer` and `PythonClient` throw a compilation error when starting. There's an open [issue](https://github.com/saviorand/lightbug_http/issues/41) to fix this - contributions welcome!
+On the server:
+```mojo
+fn main() raises:
+    var listener = listen_udp("127.0.0.1", 12000)
+
+    while True:
+        response, host, port = listener.read_from(16)
+        var message = StringSlice(unsafe_from_utf8=response)
+        print("Message received:", message)
+
+        # Response with the same message in uppercase
+        _ = listener.write_to(String.upper(message).as_bytes(), host, port)
+
+```
 
 <!-- ROADMAP -->
 ## Roadmap
@@ -252,19 +281,17 @@ Note: as of September, 2024, `PythonServer` and `PythonClient` throw a compilati
 
 We're working on support for the following (contributors welcome!):
 
--  [ ] [WebSocket Support](https://github.com/saviorand/lightbug_http/pull/57)
+ - [ ] [JSON support](https://github.com/saviorand/lightbug_http/issues/4)
+ - [ ] Complete HTTP/1.x support compliant with RFC 9110/9112 specs (see issues)
  - [ ] [SSL/HTTPS support](https://github.com/saviorand/lightbug_http/issues/20)
- - [ ] UDP support
- - [ ] [Better error handling](https://github.com/saviorand/lightbug_http/issues/3), [improved form/multipart and JSON support](https://github.com/saviorand/lightbug_http/issues/4)
  - [ ] [Multiple simultaneous connections](https://github.com/saviorand/lightbug_http/issues/5), [parallelization and performance optimizations](https://github.com/saviorand/lightbug_http/issues/6)
  - [ ] [HTTP 2.0/3.0 support](https://github.com/saviorand/lightbug_http/issues/8)
- - [ ] [ASGI spec conformance](https://github.com/saviorand/lightbug_http/issues/17)
 
 The plan is to get to a feature set similar to Python frameworks like [Starlette](https://github.com/encode/starlette), but with better performance.
 
 Our vision is to develop three libraries, with `lightbug_http` (this repo) as a starting point: 
- - `lightbug_http` - HTTP infrastructure and basic API development
- - `lightbug_api` - (coming later in 2024!) Tools to make great APIs fast, with support for OpenAPI spec and domain driven design
+ - `lightbug_http` - Lightweight and simple HTTP framework, basic networking primitives
+ - [`lightbug_api`](https://github.com/saviorand/lightbug_api) - Tools to make great APIs fast, with OpenAPI support and automated docs
  - `lightbug_web` - (release date TBD) Full-stack web framework for Mojo, similar to NextJS or SvelteKit
 
 The idea is to get to a point where the entire codebase of a simple modern web application can be written in Mojo. 

@@ -4,7 +4,7 @@ from builtin.value import StringableCollectionElement
 from memory import UnsafePointer, bitcast, memcpy
 from collections import Dict, Optional
 from collections.dict import RepresentableKeyElement
-from lightbug_http.net import create_connection, TCPConnection, Connection
+from lightbug_http.connection import create_connection, TCPConnection, Connection
 from lightbug_http._logger import logger
 from lightbug_http._owning_list import OwningList
 from lightbug_http.uri import Scheme

@@ -46,14 +46,14 @@ from lightbug_http._libc import (
 )
 from lightbug_http.io.bytes import Bytes
 from lightbug_http.strings import NetworkType
-from lightbug_http.net import (
+from lightbug_http.address import (
     Addr,
-    default_buffer_size,
     binary_port_to_int,
     binary_ip_to_string,
     addrinfo_macos,
     addrinfo_unix,
 )
+from lightbug_http.connection import default_buffer_size
 from lightbug_http._logger import logger
 
 
@@ -106,7 +106,6 @@ struct Socket[AddrType: Addr, address_family: Int = AF_INET](Representable, Stri
         """
         self.socket_type = socket_type
         self.protocol = protocol
-
         self.fd = socket(address_family, socket_type, 0)
         self._local_address = local_address
         self._remote_address = remote_address

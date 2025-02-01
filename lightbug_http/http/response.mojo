@@ -1,6 +1,9 @@
+from utils import StringSlice
+from collections import Optional
 from small_time.small_time import now
 from lightbug_http.uri import URI
 from lightbug_http.io.bytes import Bytes, bytes, byte, ByteReader, ByteWriter
+from lightbug_http.connection import TCPConnection, default_buffer_size
 from lightbug_http.strings import (
     strHttp11,
     strHttp,
@@ -11,9 +14,6 @@ from lightbug_http.strings import (
     lineBreak,
     to_string,
 )
-from collections import Optional
-from utils import StringSlice
-from lightbug_http.net import TCPConnection, default_buffer_size
 
 
 struct StatusCode:

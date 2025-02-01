@@ -1,7 +1,7 @@
 from utils import StringSlice
 from memory.span import Span, _SpanIter
 from lightbug_http.strings import BytesConstant
-from lightbug_http.net import default_buffer_size
+from lightbug_http.connection import default_buffer_size
 
 
 alias Bytes = List[Byte, True]

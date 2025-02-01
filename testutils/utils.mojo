@@ -3,7 +3,8 @@ from lightbug_http.io.bytes import Bytes
 from lightbug_http.error import ErrorHandler
 from lightbug_http.uri import URI
 from lightbug_http.http import HTTPRequest, HTTPResponse
-from lightbug_http.net import Listener, Addr, Connection, TCPAddr
+from lightbug_http.connection import Listener, Connection
+from lightbug_http.address import Addr, TCPAddr
 from lightbug_http.service import HTTPService, OK
 from lightbug_http.server import ServerTrait
 from lightbug_http.client import Client

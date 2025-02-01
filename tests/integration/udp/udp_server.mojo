@@ -1,4 +1,5 @@
-from lightbug_http.net import listen_udp, UDPAddr
+from lightbug_http.connection import listen_udp
+from lightbug_http.address import UDPAddr
 from utils import StringSlice
 
 
