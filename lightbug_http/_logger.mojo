@@ -57,7 +57,7 @@ struct Logger[level: Int]:
             @parameter
             if event_level < LogLevel.WARN:
                 # Write to stderr if FATAL or ERROR
-                print(message, file=Self.STDERR)
+                print(message, file=FileDescriptor(Self.STDERR))
             else:
                 print(message)
 

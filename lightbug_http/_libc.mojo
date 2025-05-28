@@ -592,7 +592,7 @@ fn inet_ntop[address_family: AddressFamily, address_length: AddressLength](ip_ad
         if result[i] == 0:
             break
         i += 1
-    dst._buffer._len = i + 1
+    dst._len_or_data = i + 1
 
     # `inet_ntop` returns NULL on error.
     if not result:

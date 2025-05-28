@@ -57,7 +57,7 @@ fn unquote[expand_plus: Bool = False](input_str: String, disallowed_escapes: Lis
 
         if len(str_bytes) > 0:
             str_bytes.append(0x00)
-            var sub_str_from_bytes = String(Bytes(str_bytes))
+            var sub_str_from_bytes = Bytes(str_bytes).__str__()
             for disallowed in disallowed_escapes:
                 sub_str_from_bytes = sub_str_from_bytes.replace(disallowed[], "")
             sub_strings.append(sub_str_from_bytes)

@@ -1,4 +1,3 @@
-from utils import StringSlice
 from memory import Span
 from lightbug_http.io.bytes import Bytes, bytes, byte
 
@@ -56,7 +55,7 @@ fn to_string(owned bytes: Bytes) -> String:
     """
     if bytes[-1] != 0:
         bytes.append(0)
-    return String(bytes^)
+    return bytes.__str__()
 
 
 fn find_all(s: String, sub_str: String) -> List[Int]:

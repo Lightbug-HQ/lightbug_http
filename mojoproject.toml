@@ -24,11 +24,11 @@ bench = { cmd = "magic run mojo -I . benchmark/bench.mojo" }
 bench_server = { cmd = "bash scripts/bench_server.sh" }
 
 [dependencies]
-max = ">=25.2.0,<25.3.0"
+max = ">=25.3.0,<25.4.0"
 
 [feature.integration-tests.dependencies]
 requests = ">=2.32.3,<3"
-fastapi = ">=0.115.8,<0.116"
+fastapi = ">=0.114.2,<0.115"
 
 [environments]
 default = { solve-group = "default" }

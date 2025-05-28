@@ -18,7 +18,7 @@ build:
 
 requirements:
   run:
-    - max >=25.2.0
+    - max >=25.3.0
 
 about:
   homepage: https://github.com/saviorand/lightbug_http
