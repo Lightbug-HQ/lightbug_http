@@ -60,7 +60,7 @@ Once you have a Mojo project set up locally,
 
    ```toml
    [dependencies]
-   lightbug_http = ">=0.1.19"
+   lightbug_http = ">=25.3.0"
    ```
 
 3. Run `magic install` at the root of your project, where `mojoproject.toml` is located

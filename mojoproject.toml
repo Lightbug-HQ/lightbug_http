@@ -4,7 +4,7 @@ channels = ["conda-forge", "https://conda.modular.com/max", "https://repo.prefix
 description = "Simple and fast HTTP framework for Mojo!"
 name = "lightbug_http"
 platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
-version = "0.1.19"
+version = "25.3.0"
 
 [tasks]
 build = { cmd = "rattler-build build --recipe recipes -c https://conda.modular.com/max -c conda-forge --skip-existing=all", env = {MODULAR_MOJO_IMPORT_PATH = "$CONDA_PREFIX/lib/mojo"} }
