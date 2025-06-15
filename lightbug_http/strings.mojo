@@ -66,7 +66,7 @@ fn validate_http_message_octets[origin: Origin](data: Span[UInt8, origin]) raise
     
     A recipient MUST parse an HTTP message as a sequence of octets in an encoding 
     that is a superset of US-ASCII. This function validates that the message can
-    be safely parsed as octets.
+    be safely parsed as octets and detects invalid multibyte UTF-8 sequences.
     
     Args:
         data: The raw bytes of the HTTP message.
@@ -76,17 +76,35 @@ fn validate_http_message_octets[origin: Origin](data: Span[UInt8, origin]) raise
         
     Raises:
         Error: If the data contains invalid multi-byte sequences that could
-               create security vulnerabilities.
+               create security vulnerabilities (like embedded LF in UTF-8).
     """
     for i in range(len(data)):
         var b = data[i]
         
-        if is_us_ascii_octet(b):
-            continue
-            
+        # Allow all ISO-8859-1 bytes (0x00-0xFF)
         if is_iso_8859_1_octet(b):
+            # Check for potential UTF-8 multibyte sequence vulnerabilities
+            if b >= 0x80:  # Non-ASCII byte
+                # Check if this looks like a UTF-8 start byte
+                if b >= 0xC0 and b <= 0xF7:  # UTF-8 start bytes
+                    # This could be start of multibyte sequence - check for embedded LF
+                    if i + 1 < len(data) and data[i + 1] == 0x0A:  # LF embedded in sequence
+                        raise Error(
+                            "RFC 9112 violation: LF (0x0A) embedded in potential multibyte sequence at position " + 
+                            String(i + 1) + ". This creates security vulnerabilities."
+                        )
+                elif b >= 0x80 and b <= 0xBF:  # UTF-8 continuation byte without proper start
+                    # Check if previous byte is valid UTF-8 start, if not this is invalid
+                    if i == 0 or (data[i - 1] < 0xC0):  # No proper UTF-8 start byte before
+                        # Check if this continuation byte contains control characters
+                        if i + 1 < len(data) and data[i + 1] == 0x0A:  # LF after invalid continuation
+                            raise Error(
+                                "RFC 9112 violation: LF (0x0A) after invalid UTF-8 continuation byte at position " + 
+                                String(i + 1) + ". This creates security vulnerabilities."
+                            )
             continue
             
+        # This should never happen since is_iso_8859_1_octet covers 0x00-0xFF
         raise Error(
             "RFC 9112 violation: Invalid octet 0x" + hex(Int(b)) + 
             " at position " + String(i) + 
@@ -137,7 +155,16 @@ fn percent_encode_invalid_octets[origin: Origin](data: Span[UInt8, origin]) -> S
         if is_us_ascii_octet(b) and b >= 0x20 and b != 0x25:  # Printable ASCII except %
             result += chr(Int(b))
         else:
-            result += "%" + hex(Int(b)).upper().rjust(2, "0")
+            # Fix hex formatting: ensure proper zero-padding
+            var hex_val = hex(Int(b)).upper()
+            # Remove "0X" prefix if present
+            if hex_val.startswith("0X"):
+                hex_val = hex_val[2:]
+            # Ensure two-digit hex format
+            if len(hex_val) == 1:
+                result += "%0" + hex_val
+            else:
+                result += "%" + hex_val
     
     return result
 

@@ -18,3 +18,4 @@ jobs:
           magic run integration_tests_py
           magic run integration_tests_external
           magic run integration_tests_udp
+          magic run rfc_tests
