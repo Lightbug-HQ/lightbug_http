@@ -33,7 +33,6 @@ struct BytesConstant:
     alias DOUBLE_CRLF = bytes(lineBreak + lineBreak)
 
 
-# RFC 9112 Section 2.2-2: US-ASCII character bounds
 alias US_ASCII_MAX = 0x7F
 alias ISO_8859_1_MAX = 0xFF
 
@@ -79,20 +78,15 @@ fn validate_http_message_octets[origin: Origin](data: Span[UInt8, origin]) raise
         Error: If the data contains invalid multi-byte sequences that could
                create security vulnerabilities.
     """
-    # Check each byte to ensure it's in a safe encoding superset of US-ASCII
     for i in range(len(data)):
         var b = data[i]
         
-        # Allow US-ASCII range (most common case)
         if is_us_ascii_octet(b):
             continue
             
-        # Allow ISO-8859-1 extended range (superset of US-ASCII)
         if is_iso_8859_1_octet(b):
             continue
             
-        # If we get here, we have a byte outside ISO-8859-1 range
-        # This could be part of a multi-byte UTF-8 sequence which is unsafe
         raise Error(
             "RFC 9112 violation: Invalid octet 0x" + hex(Int(b)) + 
             " at position " + String(i) + 
@@ -118,11 +112,8 @@ fn safe_to_string_rfc9112[origin: Origin](b: Span[UInt8, origin]) raises -> Stri
     Raises:
         Error: If the bytes contain invalid sequences for HTTP parsing.
     """
-    # Validate the octets first
     var validated_span = validate_http_message_octets(b)
     
-    # Create string treating bytes as ISO-8859-1 (safe superset of US-ASCII)
-    # Note: We use unsafe_from_utf8 here but we've validated the input is safe
     return String(StringSlice(unsafe_from_utf8=validated_span))
 
 
@@ -143,11 +134,9 @@ fn percent_encode_invalid_octets[origin: Origin](data: Span[UInt8, origin]) -> S
     for i in range(len(data)):
         var b = data[i]
         
-        # Safe US-ASCII characters can be added directly
         if is_us_ascii_octet(b) and b >= 0x20 and b != 0x25:  # Printable ASCII except %
             result += chr(Int(b))
         else:
-            # Percent-encode unsafe or non-printable octets
             result += "%" + hex(Int(b)).upper().rjust(2, "0")
     
     return result
