@@ -1,6 +1,6 @@
 from collections import Dict, Optional
 from lightbug_http.io.bytes import Bytes, ByteReader, ByteWriter, is_newline, is_space
-from lightbug_http.strings import BytesConstant
+from lightbug_http.strings import BytesConstant, to_string_rfc9112_safe
 from lightbug_http._logger import logger
 from lightbug_http.strings import rChar, nChar, lineBreak, to_string
 
@@ -102,13 +102,20 @@ struct Headers(Writable, Stringable):
                 r.increment()
             # TODO (bgreni): Handle possible trailing whitespace
             var value = r.read_line()
-            var k = String(key).lower()
+            
+            var k = to_string_rfc9112_safe(key._inner).lower()
             if k == HeaderKey.SET_COOKIE:
-                cookies.append(String(value))
+                cookies.append(to_string_rfc9112_safe(value._inner))
                 continue
 
-            self._inner[k] = String(value)
-        return (String(first), String(second), String(third), cookies)
+            self._inner[k] = to_string_rfc9112_safe(value._inner)
+            
+        return (
+            to_string_rfc9112_safe(first._inner), 
+            to_string_rfc9112_safe(second._inner), 
+            to_string_rfc9112_safe(third._inner), 
+            cookies
+        )
 
     fn write_to[T: Writer, //](self, mut writer: T):
         for header in self._inner.items():
