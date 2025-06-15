@@ -14,6 +14,7 @@ from lightbug_http.strings import (
     nChar,
     lineBreak,
     to_string,
+    to_bytes,
 )
 
 
@@ -36,8 +37,8 @@ struct HTTPRequest[origin: Origin](Writable, Stringable):
     var uri: URI
     var body_raw: Bytes
 
-    var method: ByteView[origin]
-    var protocol: ByteView[origin]
+    var method: Bytes
+    var protocol: Bytes
 
     var server_is_tls: Bool
     var timeout: Duration
@@ -46,9 +47,9 @@ struct HTTPRequest[origin: Origin](Writable, Stringable):
     fn from_bytes(addr: String, max_body_size: Int, b: Span[Byte]) raises -> HTTPRequest[origin]:
         var reader = ByteReader(b)
         var headers = Headers[origin]()
-        var method: ByteView[origin]
-        var protocol: ByteView[origin]
-        var uri: ByteView[origin]
+        var method: Bytes
+        var protocol: Bytes
+        var uri: Bytes
         try:
             var rest = headers.parse_raw(reader)
             var method = rest[0]
@@ -68,7 +69,7 @@ struct HTTPRequest[origin: Origin](Writable, Stringable):
             raise Error("HTTPRequest.from_bytes: Request body too large.")
 
         var request = HTTPRequest(
-            URI.parse(addr + String(uri)), headers=headers, method=String(method), protocol=String(protocol), cookies=cookies
+            URI.parse(addr + to_string(uri)), headers=headers, method=to_string(method), protocol=to_string(protocol), cookies=cookies
         )
 
         if content_length > 0:
@@ -93,8 +94,8 @@ struct HTTPRequest[origin: Origin](Writable, Stringable):
     ):
         self.headers = headers
         self.cookies = cookies
-        self.method = ByteView(method.as_bytes())
-        self.protocol = protocol
+        self.method = to_bytes(method)
+        self.protocol = to_bytes(protocol)
         self.uri = uri
         self.body_raw = body
         self.server_is_tls = server_is_tls
