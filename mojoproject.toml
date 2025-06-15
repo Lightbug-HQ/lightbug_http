@@ -19,6 +19,9 @@ integration_tests_py = { cmd = "bash scripts/integration_test.sh" }
 integration_tests_external = { cmd = "magic run mojo test -I . tests/integration" }
 integration_tests_udp = { cmd = "bash scripts/udp_test.sh" }
 
+[feature.rfc-tests.tasks]
+rfc_tests = { cmd = "magic run mojo test -I . tests/rfc" }
+
 [feature.bench.tasks]
 bench = { cmd = "magic run mojo -I . benchmark/bench.mojo" }
 bench_server = { cmd = "bash scripts/bench_server.sh" }
@@ -34,4 +37,5 @@ fastapi = ">=0.114.2,<0.115"
 default = { solve-group = "default" }
 unit-tests = { features = ["unit-tests"], solve-group = "default" }
 integration-tests = { features = ["integration-tests"], solve-group = "default" }
+rfc-tests = { features = ["rfc-tests"], solve-group = "default" }
 bench = { features = ["bench"], solve-group = "default" }

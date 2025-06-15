@@ -21,7 +21,8 @@ def test_parse_request_header():
     var protocol: String
     var uri: String
     var properties = header.parse_raw(reader)
-    method, uri, protocol = properties[0], properties[1], properties[2]
+    # Convert ByteView to String for comparison
+    method, uri, protocol = String(properties[0]), String(properties[1]), String(properties[2])
     assert_equal(uri, "/index.html")
     assert_equal(protocol, "HTTP/1.1")
     assert_equal(method, "GET")
@@ -40,7 +41,8 @@ def test_parse_response_header():
     var status_text: String
     var reader = ByteReader(headers_str.as_bytes())
     var properties = header.parse_raw(reader)
-    protocol, status_code, status_text = properties[0], properties[1], properties[2]
+    # Convert ByteView to String for comparison
+    protocol, status_code, status_text = String(properties[0]), String(properties[1]), String(properties[2])
     assert_equal(protocol, "HTTP/1.1")
     assert_equal(status_code, "200")
     assert_equal(status_text, "OK")

@@ -58,6 +58,10 @@ fn to_string(owned bytes: Bytes) -> String:
     return result^
 
 
+fn to_bytes(s: String) -> Bytes:
+    return Bytes(s.as_bytes())
+
+
 fn find_all(s: String, sub_str: String) -> List[Int]:
     match_idxs = List[Int]()
     var current_idx: Int = s.find(sub_str)
