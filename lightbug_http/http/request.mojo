@@ -1,5 +1,5 @@
 from memory import Span
-from lightbug_http.io.bytes import Bytes, bytes, ByteReader, ByteWriter
+from lightbug_http.io.bytes import Bytes, bytes, ByteReader, ByteWriter, ByteView
 from lightbug_http.header import Headers, HeaderKey, Header, write_header
 from lightbug_http.cookie import RequestCookieJar
 from lightbug_http.uri import URI
@@ -30,29 +30,30 @@ struct RequestMethod:
     alias options = RequestMethod("OPTIONS")
 
 
-@value
-struct HTTPRequest(Writable, Stringable):
-    var headers: Headers
+struct HTTPRequest[origin: Origin](Writable, Stringable):
+    var headers: Headers[origin]
     var cookies: RequestCookieJar
     var uri: URI
     var body_raw: Bytes
 
-    var method: String
-    var protocol: String
+    var method: ByteView[origin]
+    var protocol: ByteView[origin]
 
     var server_is_tls: Bool
     var timeout: Duration
 
     @staticmethod
-    fn from_bytes(addr: String, max_body_size: Int, b: Span[Byte]) raises -> HTTPRequest:
+    fn from_bytes(addr: String, max_body_size: Int, b: Span[Byte]) raises -> HTTPRequest[origin]:
         var reader = ByteReader(b)
-        var headers = Headers()
-        var method: String
-        var protocol: String
-        var uri: String
+        var headers = Headers[origin]()
+        var method: ByteView[origin]
+        var protocol: ByteView[origin]
+        var uri: ByteView[origin]
         try:
             var rest = headers.parse_raw(reader)
-            method, uri, protocol = rest[0], rest[1], rest[2]
+            var method = rest[0]
+            var uri = rest[1]
+            var protocol = rest[2]
         except e:
             raise Error("HTTPRequest.from_bytes: Failed to parse request headers: " + String(e))
 
@@ -67,7 +68,7 @@ struct HTTPRequest(Writable, Stringable):
             raise Error("HTTPRequest.from_bytes: Request body too large.")
 
         var request = HTTPRequest(
-            URI.parse(addr + uri), headers=headers, method=method, protocol=protocol, cookies=cookies
+            URI.parse(addr + String(uri)), headers=headers, method=String(method), protocol=String(protocol), cookies=cookies
         )
 
         if content_length > 0:
@@ -82,7 +83,7 @@ struct HTTPRequest(Writable, Stringable):
     fn __init__(
         out self,
         uri: URI,
-        headers: Headers = Headers(),
+        headers: Headers[origin] = Headers[origin](),
         cookies: RequestCookieJar = RequestCookieJar(),
         method: String = "GET",
         protocol: String = strHttp11,
@@ -92,7 +93,7 @@ struct HTTPRequest(Writable, Stringable):
     ):
         self.headers = headers
         self.cookies = cookies
-        self.method = method
+        self.method = ByteView(method.as_bytes())
         self.protocol = protocol
         self.uri = uri
         self.body_raw = body
@@ -108,6 +109,14 @@ struct HTTPRequest(Writable, Stringable):
             else:
                 self.headers[HeaderKey.HOST] = uri.host
 
+    fn __copyinit__(out self, existing: HTTPRequest[origin]):
+        self.headers = existing.headers
+        self.cookies = existing.cookies
+        self.uri = existing.uri
+        self.body_raw = existing.body_raw
+        self.method = existing.method
+        self.protocol = existing.protocol
+        
     fn get_body(self) -> StringSlice[__origin_of(self.body_raw)]:
         return StringSlice(unsafe_from_utf8=Span(self.body_raw))
 

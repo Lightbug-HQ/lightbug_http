@@ -26,6 +26,37 @@ fn is_space(b: Byte) -> Bool:
     return b == BytesConstant.whitespace
 
 
+fn bytes_equal_ignore_case(a: ByteView, b: String) -> Bool:
+    """Compare ByteView with String case-insensitively without creating intermediate strings."""
+    if len(a) != len(b):
+        return False
+    
+    for i in range(len(a)):
+        var byte_a = a[i]
+        var byte_b = ord(b[i])
+        
+        # Convert to lowercase for comparison
+        if byte_a >= ord('A') and byte_a <= ord('Z'):
+            byte_a = byte_a + 32  # Convert to lowercase
+        if byte_b >= ord('A') and byte_b <= ord('Z'):
+            byte_b = byte_b + 32  # Convert to lowercase
+            
+        if byte_a != byte_b:
+            return False
+    return True
+
+
+fn bytes_to_lower_string(b: ByteView) -> String:
+    """Convert ByteView to lowercase String."""
+    var result = Bytes()
+    for i in range(len(b)):
+        var byte_val = b[i]
+        if byte_val >= ord('A') and byte_val <= ord('Z'):
+            byte_val = byte_val + 32  # Convert to lowercase
+        result.append(byte_val)
+    return to_string(result^)
+
+
 struct ByteWriter(Writer):
     var _inner: Bytes
 
