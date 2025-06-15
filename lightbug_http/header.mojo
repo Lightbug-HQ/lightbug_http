@@ -1,5 +1,5 @@
 from collections import Dict, Optional
-from lightbug_http.io.bytes import Bytes, ByteReader, ByteWriter, is_newline, is_space
+from lightbug_http.io.bytes import Bytes, ByteReader, ByteWriter, is_newline, is_space, ByteView
 from lightbug_http.strings import BytesConstant
 from lightbug_http._logger import logger
 from lightbug_http.strings import rChar, nChar, lineBreak, to_string
@@ -37,22 +37,56 @@ fn write_header[T: Writer](mut writer: T, key: String, value: String):
     writer.write(key + ": ", value, lineBreak)
 
 
+fn bytes_equal_ignore_case(a: ByteView, b: String) -> Bool:
+    """Compare ByteView with String case-insensitively without creating intermediate strings."""
+    if len(a) != len(b):
+        return False
+    
+    for i in range(len(a)):
+        var byte_a = a[i]
+        var byte_b = ord(b[i])
+        
+        # Convert to lowercase for comparison
+        if byte_a >= ord('A') and byte_a <= ord('Z'):
+            byte_a = byte_a + 32  # Convert to lowercase
+        if byte_b >= ord('A') and byte_b <= ord('Z'):
+            byte_b = byte_b + 32  # Convert to lowercase
+            
+        if byte_a != byte_b:
+            return False
+    return True
+
+
+fn bytes_to_lower_string(b: ByteView) -> String:
+    """Convert ByteView to lowercase String."""
+    var result = Bytes()
+    for i in range(len(b)):
+        var byte_val = b[i]
+        if byte_val >= ord('A') and byte_val <= ord('Z'):
+            byte_val = byte_val + 32  # Convert to lowercase
+        result.append(byte_val)
+    return to_string(result^)
+
+
 @value
-struct Headers(Writable, Stringable):
+struct Headers[origin: Origin](Writable, Stringable):
     """Represents the header key/values in an http request/response.
 
-    Header keys are normalized to lowercase
+    Header keys are normalized to lowercase and stored as strings for efficient lookup,
+    while values are stored as bytes to comply with RFC requirements.
     """
 
-    var _inner: Dict[String, String]
+    var _inner: Dict[String, Bytes]
 
     fn __init__(out self):
-        self._inner = Dict[String, String]()
+        self._inner = Dict[String, Bytes]()
 
     fn __init__(out self, owned *headers: Header):
-        self._inner = Dict[String, String]()
+        self._inner = Dict[String, Bytes]()
         for header in headers:
-            self[header[].key.lower()] = header[].value
+            var key_lower = header[].key.lower()
+            var value_bytes = Bytes(header[].value.as_bytes())
+            self._inner[key_lower] = value_bytes
 
     @always_inline
     fn empty(self) -> Bool:
@@ -65,17 +99,22 @@ struct Headers(Writable, Stringable):
     @always_inline
     fn __getitem__(self, key: String) raises -> String:
         try:
-            return self._inner[key.lower()]
+            var value_bytes = self._inner[key.lower()]
+            return to_string(value_bytes)
         except:
             raise Error("KeyError: Key not found in headers: " + key)
 
     @always_inline
     fn get(self, key: String) -> Optional[String]:
-        return self._inner.get(key.lower())
+        var value_opt = self._inner.get(key.lower())
+        if value_opt:
+            return to_string(value_opt.value())
+        return None
 
     @always_inline
     fn __setitem__(mut self, key: String, value: String):
-        self._inner[key.lower()] = value
+        var value_bytes = Bytes(value.as_bytes())
+        self._inner[key.lower()] = value_bytes
 
     fn content_length(self) -> Int:
         try:
@@ -83,7 +122,7 @@ struct Headers(Writable, Stringable):
         except:
             return 0
 
-    fn parse_raw(mut self, mut r: ByteReader) raises -> (String, String, String, List[String]):
+    fn parse_raw[origin: Origin](mut self, mut r: ByteReader[origin]) raises -> (ByteView[origin], ByteView[origin], ByteView[origin], List[String]):
         var first_byte = r.peek()
         if not first_byte:
             raise Error("Headers.parse_raw: Failed to read first byte from response header")
@@ -102,17 +141,21 @@ struct Headers(Writable, Stringable):
                 r.increment()
             # TODO (bgreni): Handle possible trailing whitespace
             var value = r.read_line()
-            var k = String(key).lower()
-            if k == HeaderKey.SET_COOKIE:
+            
+            if bytes_equal_ignore_case(key, HeaderKey.SET_COOKIE):
                 cookies.append(String(value))
                 continue
 
-            self._inner[k] = String(value)
-        return (String(first), String(second), String(third), cookies)
+            var key_str = bytes_to_lower_string(key)
+            var value_bytes = value.to_bytes()
+            self._inner[key_str] = value_bytes
+            
+        return (first, second, third, cookies)
 
     fn write_to[T: Writer, //](self, mut writer: T):
         for header in self._inner.items():
-            write_header(writer, header[].key, header[].value)
+            var value_str = to_string(header[].value)
+            write_header(writer, header[].key, value_str)
 
     fn __str__(self) -> String:
         return String.write(self)
