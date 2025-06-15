@@ -60,7 +60,7 @@ fn to_string(b: Span[UInt8]) -> String:
 
 fn to_string_rfc9112_safe[origin: Origin](b: Span[UInt8, origin]) -> String:
     try:
-        var validated_span = validate_http_message_octets_rfc9112(b)
+        var validated_span = validate_message_octets_iso_8859_1(b)
         return String(StringSlice(unsafe_from_utf8=validated_span))
     except:
         return percent_encode_octets(b)
@@ -109,7 +109,7 @@ fn percent_encode_octets[origin: Origin](data: Span[UInt8, origin]) -> String:
     
     return result
 
-fn validate_http_message_octets_rfc9112[origin: Origin](data: Span[UInt8, origin]) raises -> Span[UInt8, origin]:
+fn validate_message_octets_iso_8859_1[origin: Origin](data: Span[UInt8, origin]) raises -> Span[UInt8, origin]:
     for i in range(len(data)):
         var b = data[i]
         
@@ -118,21 +118,19 @@ fn validate_http_message_octets_rfc9112[origin: Origin](data: Span[UInt8, origin
                 if b >= 0xC0 and b <= 0xF7:
                     if i + 1 < len(data) and data[i + 1] == 0x0A:
                         raise Error(
-                            "RFC 9112 violation: LF (0x0A) embedded in potential multibyte sequence at position " + 
-                            String(i + 1) + ". This creates security vulnerabilities."
+                            "."
                         )
                 elif b >= 0x80 and b <= 0xBF:
                     if i == 0 or (data[i - 1] < 0xC0):
                         if i + 1 < len(data) and data[i + 1] == 0x0A:
                             raise Error(
-                                "RFC 9112 violation: LF (0x0A) after invalid UTF-8 continuation byte at position " + 
-                                String(i + 1) + ". This creates security vulnerabilities."
+                                "."
                             )
             continue
             
         # This should never happen since is_iso_8859_1_octet covers 0x00-0xFF
         raise Error(
-            "RFC 9112 violation: Invalid octet 0x" + hex(Int(b)) + 
+            "Invalid octet 0x" + hex(Int(b)) + 
             " at position " + String(i) + 
             ". HTTP messages must use encoding superset of US-ASCII."
         )
