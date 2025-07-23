@@ -59,6 +59,14 @@ fn NotFound(path: String) -> HTTPResponse:
         status_text="Not Found",
     )
 
+fn URITooLong() -> HTTPResponse:
+    return HTTPResponse(
+        bytes("URI Too Long"),
+        headers=Headers(Header(HeaderKey.CONTENT_TYPE, "text/plain")),
+        status_code=414,
+        status_text="URI Too Long"
+    )
+
 
 fn InternalError() -> HTTPResponse:
     return HTTPResponse(

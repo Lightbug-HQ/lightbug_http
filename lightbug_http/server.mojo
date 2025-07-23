@@ -5,7 +5,7 @@ from lightbug_http._logger import logger
 from lightbug_http.connection import NoTLSListener, default_buffer_size, TCPConnection, ListenConfig
 from lightbug_http.socket import Socket
 from lightbug_http.http import HTTPRequest, encode
-from lightbug_http.http.common_response import InternalError, BadRequest
+from lightbug_http.http.common_response import InternalError, BadRequest, URITooLong
 from lightbug_http.uri import URI
 from lightbug_http.header import Headers
 from lightbug_http.service import HTTPService
@@ -14,6 +14,7 @@ from lightbug_http.error import ErrorHandler
 
 alias DefaultConcurrency: Int = 256 * 1024
 alias default_max_request_body_size = 4 * 1024 * 1024  # 4MB
+alias default_max_request_uri_length = 8192
 
 
 struct Server(Movable):
@@ -27,6 +28,7 @@ struct Server(Movable):
     var max_requests_per_connection: UInt
 
     var _max_request_body_size: UInt
+    var _max_request_uri_length: UInt
     var tcp_keep_alive: Bool
 
     fn __init__(
@@ -37,13 +39,15 @@ struct Server(Movable):
         max_concurrent_connections: UInt = 1000,
         max_requests_per_connection: UInt = 0,
         max_request_body_size: UInt = default_max_request_body_size,
+        max_request_uri_length: UInt = default_max_request_uri_length,
         tcp_keep_alive: Bool = False,
     ) raises:
         self.error_handler = error_handler
         self.name = name
         self._address = address
         self.max_requests_per_connection = max_requests_per_connection
-        self._max_request_body_size = default_max_request_body_size
+        self._max_request_body_size = max_request_body_size
+        self._max_request_uri_length = max_request_uri_length
         self.tcp_keep_alive = tcp_keep_alive
         if max_concurrent_connections == 0:
             self.max_concurrent_connections = DefaultConcurrency
@@ -57,6 +61,7 @@ struct Server(Movable):
         self.max_concurrent_connections = other.max_concurrent_connections
         self.max_requests_per_connection = other.max_requests_per_connection
         self._max_request_body_size = other._max_request_body_size
+        self._max_request_uri_length = other._max_request_uri_length
         self.tcp_keep_alive = other.tcp_keep_alive
 
     fn address(self) -> ref [self._address] String:
@@ -70,6 +75,12 @@ struct Server(Movable):
 
     fn set_max_request_body_size(mut self, size: UInt) -> None:
         self._max_request_body_size = size
+
+    fn max_request_uri_length(self) -> UInt:
+        return self._max_request_uri_length
+
+    fn set_max_request_uri_length(mut self, length: UInt) -> None:
+        self._max_request_uri_length = length
 
     fn get_concurrency(self) -> UInt:
         """Retrieve the concurrency level which is either
@@ -128,6 +139,10 @@ struct Server(Movable):
         var max_request_body_size = self.max_request_body_size()
         if max_request_body_size <= 0:
             max_request_body_size = default_max_request_body_size
+        
+        var max_request_uri_length = self.max_request_uri_length()
+        if max_request_uri_length <= 0:
+            max_request_uri_length = default_max_request_uri_length
 
         var req_number = 0
         while True:
@@ -163,7 +178,7 @@ struct Server(Movable):
 
             var request: HTTPRequest
             try:
-                request = HTTPRequest.from_bytes(self.address(), max_request_body_size, request_buffer)
+                request = HTTPRequest.from_bytes(self.address(), max_request_body_size, max_request_uri_length, request_buffer)
                 var response: HTTPResponse
                 var close_connection = (not self.tcp_keep_alive) or request.connection_close()
                 try:
@@ -200,7 +215,10 @@ struct Server(Movable):
             except e:
                 logger.error("Failed to parse HTTPRequest:", String(e))
                 try:
-                    _ = conn.write(encode(BadRequest()))
+                    if String(e) == "HTTPRequest.from_bytes: Request URI too long":
+                        _ = conn.write(encode(URITooLong()))
+                    else:
+                        _ = conn.write(encode(BadRequest()))
                 except e:
                     logger.error("Failed to write BadRequest response to the connection:", String(e))
                     conn.teardown()
