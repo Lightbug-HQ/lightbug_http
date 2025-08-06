@@ -596,9 +596,7 @@ fn create_actual_pthread(
 ) raises -> Bool:
     """Create pthread using pure Mojo external calls - replicating pthread_wrapper.c logic."""
     
-    # Store thread arguments at the provided pointer
-    thread_args_ptr[] = ThreadArgs(port, core, num_cpu_cores, num_workers_inited_ptr)
-    
+    # Thread arguments are already initialized by caller
     # Create pthread using direct external calls, passing thread_args_ptr as argument
     return create_pthread_direct_with_args(core, 8 * 1024 * 1024, thread_args_ptr)  # 8MB stack like Rust
 
@@ -688,14 +686,22 @@ fn create_pthread_direct_with_args(thread_id: Int, stack_size: Int, thread_args_
 fn mojo_pthread_worker_entry(arg: UnsafePointer[NoneType]) -> UnsafePointer[NoneType]:
     """Exported function that serves as pthread entry point."""
     try:
+        if not arg:
+            print("Error: NULL thread argument")
+            return UnsafePointer[NoneType]()
+            
         # Extract ThreadArgs pointer from argument
         var thread_args_ptr = arg.bitcast[ThreadArgs]()
         var args = thread_args_ptr[]
         var thread_id = args.core
-        # print("Pthread started for thread_id:", thread_id)
+        print("Pthread started for thread_id:", thread_id)
         
         # Unshare file descriptor table like Rust code  
-        unshare(CLONE_FILES)
+        try:
+            unshare(CLONE_FILES)
+        except e:
+            print("Warning: unshare failed:", e)
+            
         set_current_thread_cpu_affinity_to(args.core)
         
         # Call the main worker function
@@ -714,19 +720,15 @@ fn mojo_pthread_worker_entry(arg: UnsafePointer[NoneType]) -> UnsafePointer[None
 
 fn get_worker_function_pointer() -> UnsafePointer[NoneType]:
     """Get function pointer to our exported worker function."""
-    # Use dlsym to get the address of our exported function
-    var handle = external_call["dlopen", UnsafePointer[NoneType], UnsafePointer[UInt8], c_int](
-        UnsafePointer[UInt8](),  # NULL for main program
-        0x00002  # RTLD_NOW
+    # Get address of the exported function
+    # This should work with the @export decorator
+    return external_call["dlsym", UnsafePointer[NoneType], UnsafePointer[NoneType], UnsafePointer[UInt8]](
+        external_call["dlopen", UnsafePointer[NoneType], UnsafePointer[UInt8], c_int](
+            UnsafePointer[UInt8](),  # NULL for main program 
+            2  # RTLD_NOW
+        ),
+        String("mojo_pthread_worker_entry").unsafe_ptr()
     )
-    
-    var func_name = "mojo_pthread_worker_entry"
-    var func_ptr = external_call["dlsym", UnsafePointer[NoneType], UnsafePointer[NoneType], UnsafePointer[UInt8]](
-        handle, 
-        func_name.unsafe_ptr()
-    )
-    
-    return func_ptr
 
 # Old functions removed - now using pure Mojo pthread implementation above
 
@@ -1387,14 +1389,23 @@ fn go(port: UInt16, cb: fn(UnsafePointer[UInt8], Int, UnsafePointer[UInt8], Int,
     # var num_workers_inited_storage = Int(0)
     var num_workers_inited_ptr = UnsafePointer(to=num_workers_inited_storage)
     
-    # Allocate thread arguments storage on stack (one per core)
-    var thread_args_storage = StaticTuple[ThreadArgs, 64]()
+    # Allocate thread arguments storage on heap (persistent memory)
+    var thread_args_storage = UnsafePointer[ThreadArgs].alloc(num_cpu_cores)
     
     # Create actual pthreads like in the original Rust code
     for core in range(num_cpu_cores):
         try:
             print("Creating pthread worker for core", core)
-            var thread_args_ptr = UnsafePointer(to=thread_args_storage[core])
+            var thread_args_ptr = thread_args_storage + core
+            
+            # Initialize the thread args properly
+            thread_args_ptr[] = ThreadArgs(
+                UInt16(port),
+                core,
+                num_cpu_cores,
+                num_workers_inited_ptr
+            )
+            
             var success = create_actual_pthread(
                 port,
                 core, 
@@ -1452,18 +1463,28 @@ fn threaded_worker(
         var epoll_event_listener = epoll_event(EPOLLIN, epoll_data(UInt64(listener_fd)))
         epoll_ctl(epfd, EPOLL_CTL_ADD, listener_fd, UnsafePointer(to=epoll_event_listener))
         
-        # Initialize buffers and state
+        # Initialize buffers and state with error checking
         var epoll_events = AlignedEpollEvents(AlignedEpollEventsTuple())
-        memset_zero(rebind[UnsafePointer[UInt8]](UnsafePointer(to=epoll_events)), sizeof[AlignedEpollEvents]())
+        var epoll_events_ptr = UnsafePointer(to=epoll_events)
+        if epoll_events_ptr:
+            memset_zero(rebind[UnsafePointer[UInt8]](epoll_events_ptr), sizeof[AlignedEpollEvents]())
         
         var saved_event = epoll_event(EPOLLIN, epoll_data(0))
         
         var reqbuf = ReqBufAligned(ReqBufAlignedTuple())
-        memset_zero(rebind[UnsafePointer[UInt8]](UnsafePointer(to=reqbuf)), sizeof[ReqBufAligned]())
+        var reqbuf_ptr = UnsafePointer(to=reqbuf)
+        if reqbuf_ptr:
+            memset_zero(rebind[UnsafePointer[UInt8]](reqbuf_ptr), sizeof[ReqBufAligned]())
         
-        # Request buffer position tracking arrays
+        # Request buffer position tracking arrays with bounds checking
         var reqbuf_cur_addr = StaticTuple[Int, MAX_CONN]()
         var reqbuf_start_address = Int(UnsafePointer(to=reqbuf.data).bitcast[Int]())
+        
+        # Validate buffer address is reasonable
+        if reqbuf_start_address == 0:
+            print("Error: Invalid request buffer address")
+            return
+            
         for i in range(MAX_CONN):
             reqbuf_cur_addr[i] = reqbuf_start_address + i * REQ_BUF_SIZE
         
@@ -1472,7 +1493,9 @@ fn threaded_worker(
             reqbuf_residual[i] = 0
         
         var resbuf = ResBufAligned(ResBufAlignedTuple())
-        memset_zero(rebind[UnsafePointer[UInt8]](UnsafePointer(to=resbuf)), sizeof[ResBufAligned]())
+        var resbuf_ptr = UnsafePointer(to=resbuf)
+        if resbuf_ptr:
+            memset_zero(rebind[UnsafePointer[UInt8]](resbuf_ptr), sizeof[ResBufAligned]())
         var resbuf_start_address = UnsafePointer(to=resbuf.data)
         
         var epoll_wait_type = -1  # EPOLL_TIMEOUT_BLOCKING
@@ -1498,49 +1521,64 @@ fn threaded_worker(
                 
                 if cur_fd == listener_fd:
                     # Handle new connection
-                    var incoming_fd = accept_connection(listener_fd)
-                    
-                    if incoming_fd >= 0 and incoming_fd < MAX_CONN:
-                        var req_buf_start_address = reqbuf_start_address + incoming_fd * REQ_BUF_SIZE
-                        reqbuf_cur_addr[incoming_fd] = req_buf_start_address
-                        reqbuf_residual[incoming_fd] = 0
-                        setup_connection(incoming_fd)
-                        saved_event.data.u64 = UInt64(incoming_fd)
-                        epoll_ctl(epfd, EPOLL_CTL_ADD, incoming_fd, UnsafePointer(to=saved_event))
-                    else:
-                        close_connection(epfd, cur_fd)
+                    try:
+                        var incoming_fd = accept_connection(listener_fd)
+                        
+                        if incoming_fd >= 0 and incoming_fd < MAX_CONN:
+                            var req_buf_start_address = reqbuf_start_address + incoming_fd * REQ_BUF_SIZE
+                            reqbuf_cur_addr[incoming_fd] = req_buf_start_address
+                            reqbuf_residual[incoming_fd] = 0
+                            setup_connection(incoming_fd)
+                            saved_event.data.u64 = UInt64(incoming_fd)
+                            epoll_ctl(epfd, EPOLL_CTL_ADD, incoming_fd, UnsafePointer(to=saved_event))
+                        else:
+                            if incoming_fd >= 0:
+                                _ = sys_close(incoming_fd)  # Close the fd if it's valid but out of range
+                    except e:
+                        print("Error accepting connection:", e)
                 else:
-                    # Handle existing connection data
-                    var req_buf_start_address = reqbuf_start_address + cur_fd * REQ_BUF_SIZE
-                    var req_buf_cur_position = reqbuf_cur_addr[cur_fd]
-                    var residual = reqbuf_residual[cur_fd]
-                    
-                    var buffer_remaining = REQ_BUF_SIZE - (req_buf_cur_position - req_buf_start_address)
-                    var read = recv_from(cur_fd, rebind[UnsafePointer[UInt8]](UnsafePointer(to=req_buf_cur_position)), buffer_remaining)
-                    
-                    if read > 0:
-                        # Process the received data (simplified)
-                        var response = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!"
-                        var response_len = len(response)
-                        
-                        # Copy response to buffer
-                        var response_ptr = response.unsafe_ptr()
-                        var dest_ptr = rebind[UnsafePointer[UInt8]](resbuf_start_address)
-                        memcpy(dest_ptr, response_ptr, response_len)
-                        
-                        var wrote = send_to(cur_fd, dest_ptr, response_len)
-                        
-                        # Reset buffer state
-                        reqbuf_cur_addr[cur_fd] = req_buf_start_address
-                        reqbuf_residual[cur_fd] = 0
-                        
-                        if wrote != response_len:
+                    # Handle existing connection data with bounds checking
+                    if cur_fd >= 0 and cur_fd < MAX_CONN:
+                        try:
+                            var req_buf_start_address = reqbuf_start_address + cur_fd * REQ_BUF_SIZE
+                            var req_buf_cur_position = reqbuf_cur_addr[cur_fd]
+                            var residual = reqbuf_residual[cur_fd]
+                            
+                            var buffer_remaining = REQ_BUF_SIZE - (req_buf_cur_position - req_buf_start_address)
+                            if buffer_remaining > 0:
+                                var read = recv_from(cur_fd, rebind[UnsafePointer[UInt8]](UnsafePointer(to=req_buf_cur_position)), buffer_remaining)
+                                
+                                if read > 0:
+                                    # Process the received data (simplified)
+                                    var response = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!"
+                                    var response_len = len(response)
+                                    
+                                    # Copy response to buffer
+                                    var response_ptr = response.unsafe_ptr()
+                                    var dest_ptr = rebind[UnsafePointer[UInt8]](resbuf_start_address)
+                                    memcpy(dest_ptr, response_ptr, response_len)
+                                    
+                                    var wrote = send_to(cur_fd, dest_ptr, response_len)
+                                    
+                                    # Reset buffer state
+                                    reqbuf_cur_addr[cur_fd] = req_buf_start_address
+                                    reqbuf_residual[cur_fd] = 0
+                                    
+                                    if wrote != response_len:
+                                        close_connection(epfd, cur_fd)
+                                else:
+                                    # Connection closed or error
+                                    reqbuf_cur_addr[cur_fd] = req_buf_start_address
+                                    reqbuf_residual[cur_fd] = 0
+                                    close_connection(epfd, cur_fd)
+                            else:
+                                # Buffer full, close connection
+                                close_connection(epfd, cur_fd)
+                        except e:
+                            print("Error handling connection data:", e)
                             close_connection(epfd, cur_fd)
                     else:
-                        # Connection closed or error
-                        reqbuf_cur_addr[cur_fd] = req_buf_start_address
-                        reqbuf_residual[cur_fd] = 0
-                        close_connection(epfd, cur_fd)
+                        print("Invalid file descriptor:", cur_fd)
     
     except e:
         print("Worker thread error:", e)
