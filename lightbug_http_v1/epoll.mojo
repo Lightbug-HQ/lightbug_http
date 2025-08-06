@@ -1,7 +1,7 @@
 from utils import Variant, StaticTuple
 from sys.ffi import c_uint, c_int, external_call
 from sys.ffi import external_call, c_int, c_long, c_size_t, c_uchar
-from sys.info import sizeof, os_is_linux, os_is_macos, num_logical_cores
+from sys.info import sizeof, CompilationTarget, num_logical_cores
 from memory import memcmp, UnsafePointer, stack_allocation
 from sys.info import sizeof
 from time import sleep

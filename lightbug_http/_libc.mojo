@@ -1,6 +1,6 @@
 from utils import StaticTuple
 from sys.ffi import external_call, c_char, c_int, c_size_t, c_ssize_t, c_uchar, c_ushort, c_uint
-from sys.info import sizeof, os_is_windows, os_is_macos, os_is_linux
+from sys.info import sizeof, CompilationTarget
 from memory import memcpy, UnsafePointer, stack_allocation
 from lightbug_http.io.bytes import Bytes
 
@@ -55,31 +55,31 @@ alias EPIPE = 32
 alias EDOM = 33
 alias ERANGE = 34
 alias EWOULDBLOCK = EAGAIN
-alias EINPROGRESS = 36 if os_is_macos() else 115
-alias EALREADY = 37 if os_is_macos() else 114
-alias ENOTSOCK = 38 if os_is_macos() else 88
-alias EDESTADDRREQ = 39 if os_is_macos() else 89
-alias EMSGSIZE = 40 if os_is_macos() else 90
-alias ENOPROTOOPT = 42 if os_is_macos() else 92
-alias EAFNOSUPPORT = 47 if os_is_macos() else 97
-alias EADDRINUSE = 48 if os_is_macos() else 98
-alias EADDRNOTAVAIL = 49 if os_is_macos() else 99
-alias ENETDOWN = 50 if os_is_macos() else 100
-alias ENETUNREACH = 51 if os_is_macos() else 101
-alias ECONNABORTED = 53 if os_is_macos() else 103
-alias ECONNRESET = 54 if os_is_macos() else 104
-alias ENOBUFS = 55 if os_is_macos() else 105
-alias EISCONN = 56 if os_is_macos() else 106
-alias ENOTCONN = 57 if os_is_macos() else 107
-alias ETIMEDOUT = 60 if os_is_macos() else 110
-alias ECONNREFUSED = 61 if os_is_macos() else 111
-alias ELOOP = 62 if os_is_macos() else 40
-alias ENAMETOOLONG = 63 if os_is_macos() else 36
-alias EHOSTUNREACH = 65 if os_is_macos() else 113
-alias EDQUOT = 69 if os_is_macos() else 122
-alias ENOMSG = 91 if os_is_macos() else 42
-alias EPROTO = 100 if os_is_macos() else 71
-alias EOPNOTSUPP = 102 if os_is_macos() else 95
+alias EINPROGRESS = 36 if CompilationTarget.is_macos() else 115
+alias EALREADY = 37 if CompilationTarget.is_macos() else 114
+alias ENOTSOCK = 38 if CompilationTarget.is_macos() else 88
+alias EDESTADDRREQ = 39 if CompilationTarget.is_macos() else 89
+alias EMSGSIZE = 40 if CompilationTarget.is_macos() else 90
+alias ENOPROTOOPT = 42 if CompilationTarget.is_macos() else 92
+alias EAFNOSUPPORT = 47 if CompilationTarget.is_macos() else 97
+alias EADDRINUSE = 48 if CompilationTarget.is_macos() else 98
+alias EADDRNOTAVAIL = 49 if CompilationTarget.is_macos() else 99
+alias ENETDOWN = 50 if CompilationTarget.is_macos() else 100
+alias ENETUNREACH = 51 if CompilationTarget.is_macos() else 101
+alias ECONNABORTED = 53 if CompilationTarget.is_macos() else 103
+alias ECONNRESET = 54 if CompilationTarget.is_macos() else 104
+alias ENOBUFS = 55 if CompilationTarget.is_macos() else 105
+alias EISCONN = 56 if CompilationTarget.is_macos() else 106
+alias ENOTCONN = 57 if CompilationTarget.is_macos() else 107
+alias ETIMEDOUT = 60 if CompilationTarget.is_macos() else 110
+alias ECONNREFUSED = 61 if CompilationTarget.is_macos() else 111
+alias ELOOP = 62 if CompilationTarget.is_macos() else 40
+alias ENAMETOOLONG = 63 if CompilationTarget.is_macos() else 36
+alias EHOSTUNREACH = 65 if CompilationTarget.is_macos() else 113
+alias EDQUOT = 69 if CompilationTarget.is_macos() else 122
+alias ENOMSG = 91 if CompilationTarget.is_macos() else 42
+alias EPROTO = 100 if CompilationTarget.is_macos() else 71
+alias EOPNOTSUPP = 102 if CompilationTarget.is_macos() else 95
 
 # --- ( Network Related Constants )---------------------------------------------
 alias sa_family_t = c_ushort
@@ -1349,7 +1349,7 @@ fn accept(socket: c_int) raises -> c_int:
             raise Error("accept: Protocol error.")
 
         @parameter
-        if os_is_linux():
+        if os_CompilationTarget.is_linux():
             if errno == EPERM:
                 raise Error("accept: Firewall rules forbid connection.")
         raise Error("accept: An error occurred while listening on the socket. Error code: " + String(errno))
@@ -2118,10 +2118,10 @@ fn get_errno() -> c_int:
     """
 
     @parameter
-    if os_is_windows():
+    if CompilationTarget.is_windows():
         var errno = stack_allocation[1, c_int]()
         _ = external_call["_get_errno", c_void](errno)
         return errno[]
     else:
-        alias loc = "__error" if os_is_macos() else "__errno_location"
+        alias loc = "__error" if CompilationTarget.is_macos() else "__errno_location"
         return external_call[loc, UnsafePointer[c_int]]()[]

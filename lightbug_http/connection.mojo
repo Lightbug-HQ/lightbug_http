@@ -1,6 +1,6 @@
 from time import sleep
 from memory import Span
-from sys.info import os_is_macos
+from sys.info import CompilationTarget.is_macos()
 from lightbug_http.address import NetworkType
 from lightbug_http.io.bytes import Bytes, ByteView, bytes
 from lightbug_http.io.sync import Duration
@@ -99,7 +99,7 @@ struct ListenConfig:
 
         @parameter
         # TODO: do we want to add SO_REUSEPORT on linux? Doesn't work on some systems
-        if os_is_macos():
+        if CompilationTarget.is_macos():
             try:
                 socket.set_socket_option(SO_REUSEADDR, 1)
             except e:

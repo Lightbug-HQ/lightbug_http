@@ -25,6 +25,8 @@ bench_server = { cmd = "bash scripts/bench_server.sh" }
 
 [dependencies]
 max = ">=25.5.0,<25.6.0"
+modular = "25.5.*"
+mojo = ">=25.5.0,<26"
 
 [feature.integration-tests.dependencies]
 requests = ">=2.32.3,<3"

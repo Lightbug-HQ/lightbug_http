@@ -1,7 +1,7 @@
 from memory import stack_allocation
 from utils import StaticTuple
 from sys import sizeof, external_call
-from sys.info import os_is_macos
+from sys.info import CompilationTarget.is_macos()
 from memory import Pointer, UnsafePointer
 from lightbug_http._libc import (
     socket,
@@ -429,7 +429,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
         """
 
         @parameter
-        if os_is_macos():
+        if CompilationTarget.is_macos():
             ip = addrinfo_macos().get_ip_address(address)
         else:
             ip = addrinfo_unix().get_ip_address(address)
@@ -503,7 +503,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
         """
 
         @parameter
-        if os_is_macos():
+        if CompilationTarget.is_macos():
             ip = addrinfo_macos().get_ip_address(address)
         else:
             ip = addrinfo_unix().get_ip_address(address)
