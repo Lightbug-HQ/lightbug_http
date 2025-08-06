@@ -9,4 +9,4 @@ fn main():
     
     # Start the server
     var NUM_WORKERS_INITED = 0
-    go(8080, example_callback, NUM_WORKERS_INITED, HTTP_DATE)
+    go(8080, example_callback, HTTP_DATE, NUM_WORKERS_INITED)

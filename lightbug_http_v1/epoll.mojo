@@ -6,7 +6,6 @@ from memory import memcmp, UnsafePointer, stack_allocation
 from sys.info import sizeof
 from time import sleep
 from lightbug_http.external.small_time import now
-from algorithm import parallelize
 from memory import memset_zero, memcpy
 from lightbug_http._libc import get_errno, sockaddr, socklen_t, c_ssize_t
 from sys.ffi import external_call, c_int, c_uint, c_ushort, c_size_t
@@ -17,6 +16,17 @@ from utils import StaticTuple
 # Below is a straightforward translation of the Rust FAF (Fast As Fuck) code: 
 # Courtesy of the original author @errantmind
 # https://github.com/errantmind/faf/blob/master/src/epoll.rs
+#
+# THREADING CHANGES:
+# - Removed `parallelize` usage in favor of manual pthread creation like the original Rust code
+# - Added pthread external function calls and structures for real threading
+# - Implemented pure Mojo pthread creation using external_call 
+# - Now creates actual parallel threads like the original Rust implementation
+#
+# COMPILATION NOTES:
+# Pure Mojo implementation - no C files needed!
+# Just compile normally: mojo build your_main.mojo -o your_server
+# Uses external_call to pthread library functions directly
 
 # ===----------------------------------------------------------------------=== #
 # Epoll Constants
@@ -496,6 +506,229 @@ alias CURRENT_THREAD_CONTROL_PID: c_int = 0
 struct cpu_set_t:
     """CPU affinity set structure."""
     var data: StaticTuple[UInt64, CPU_SET_LEN]
+
+# ===----------------------------------------------------------------------=== #
+# pthread types and constants
+# ===----------------------------------------------------------------------=== #
+
+alias PTHREAD_CREATE_DETACHED = 1
+
+# pthread_t is typically a pointer type on most systems
+@register_passable("trivial")
+struct pthread_t:
+    var data: UInt64
+    
+    fn __init__(out self):
+        self.data = 0
+
+@register_passable("trivial") 
+struct pthread_attr_t:
+    var data: StaticTuple[UInt8, 56]  # Size for Linux x86_64
+    
+    fn __init__(out self):
+        var zero_data = StaticTuple[UInt8, 56]()
+        for i in range(56):
+            zero_data[i] = 0
+        self.data = zero_data
+
+# ===----------------------------------------------------------------------=== #
+# pthread external function calls 
+# ===----------------------------------------------------------------------=== #
+
+fn _pthread_create(
+    thread: UnsafePointer[pthread_t],
+    attr: UnsafePointer[pthread_attr_t], 
+    start_routine: UnsafePointer[NoneType],
+    arg: UnsafePointer[NoneType]
+) -> c_int:
+    """Create a new thread."""
+    return external_call["pthread_create", c_int, 
+        UnsafePointer[pthread_t], 
+        UnsafePointer[pthread_attr_t], 
+        UnsafePointer[NoneType], 
+        UnsafePointer[NoneType]
+    ](thread, attr, start_routine, arg)
+
+fn _pthread_attr_init(attr: UnsafePointer[pthread_attr_t]) -> c_int:
+    """Initialize thread attributes."""
+    return external_call["pthread_attr_init", c_int, UnsafePointer[pthread_attr_t]](attr)
+
+fn _pthread_attr_setdetachstate(attr: UnsafePointer[pthread_attr_t], detachstate: c_int) -> c_int:
+    """Set thread detach state."""
+    return external_call["pthread_attr_setdetachstate", c_int, UnsafePointer[pthread_attr_t], c_int](attr, detachstate)
+
+fn _pthread_attr_setstacksize(attr: UnsafePointer[pthread_attr_t], stacksize: c_size_t) -> c_int:
+    """Set thread stack size.""" 
+    return external_call["pthread_attr_setstacksize", c_int, UnsafePointer[pthread_attr_t], c_size_t](attr, stacksize)
+
+fn _pthread_attr_destroy(attr: UnsafePointer[pthread_attr_t]) -> c_int:
+    """Destroy thread attributes."""
+    return external_call["pthread_attr_destroy", c_int, UnsafePointer[pthread_attr_t]](attr)
+
+fn _usleep(usec: c_uint) -> c_int:
+    """Sleep for microseconds."""
+    return external_call["usleep", c_int, c_uint](usec)
+
+# ===----------------------------------------------------------------------=== #
+# Thread argument structure and helper functions
+# ===----------------------------------------------------------------------=== #
+
+@fieldwise_init
+@register_passable("trivial")
+struct ThreadArgs:
+    """Arguments to pass to worker thread."""
+    var port: UInt16
+    var core: Int
+    var num_cpu_cores: Int
+    var num_workers_inited_ptr: UnsafePointer[Int]
+
+fn thread_sleep_millis(millis: Int):
+    """Sleep for specified milliseconds."""
+    var _ = _usleep(c_uint(millis * 1000))  # usleep takes microseconds
+
+fn create_actual_pthread(
+    port: UInt16,
+    core: Int, 
+    num_cpu_cores: Int,
+    num_workers_inited_ptr: UnsafePointer[Int],
+    cb: fn(UnsafePointer[UInt8], Int, UnsafePointer[UInt8], Int, UnsafePointer[UInt8], UnsafePointer[UInt8]) -> Int,
+    thread_args_ptr: UnsafePointer[ThreadArgs]
+) raises -> Bool:
+    """Create pthread using pure Mojo external calls - replicating pthread_wrapper.c logic."""
+    
+    # Store thread arguments at the provided pointer
+    thread_args_ptr[] = ThreadArgs(port, core, num_cpu_cores, num_workers_inited_ptr)
+    
+    # Create pthread using direct external calls, passing thread_args_ptr as argument
+    return create_pthread_direct_with_args(core, 8 * 1024 * 1024, thread_args_ptr)  # 8MB stack like Rust
+
+fn create_pthread_direct(thread_id: Int, stack_size: Int) raises -> Bool:
+    """Create pthread using pure Mojo external calls to pthread library."""
+    
+    # Create pthread structures
+    var thread = pthread_t()
+    var thread_ptr = UnsafePointer(to=thread)
+    
+    var attr = pthread_attr_t()
+    var attr_ptr = UnsafePointer(to=attr)
+    
+    # Initialize pthread attributes (direct external call to pthread_attr_init)
+    var result = _pthread_attr_init(attr_ptr)
+    if result != 0:
+        raise Error("pthread_attr_init failed")
+    
+    # Set stack size (direct external call to pthread_attr_setstacksize)
+    result = _pthread_attr_setstacksize(attr_ptr, c_size_t(stack_size))
+    if result != 0:
+        var _ = _pthread_attr_destroy(attr_ptr)
+        raise Error("pthread_attr_setstacksize failed")
+    
+    # Set detached state (direct external call to pthread_attr_setdetachstate)
+    result = _pthread_attr_setdetachstate(attr_ptr, PTHREAD_CREATE_DETACHED)
+    if result != 0:
+        var _ = _pthread_attr_destroy(attr_ptr)
+        raise Error("pthread_attr_setdetachstate failed")
+    
+    # Get function pointer to our exported Mojo worker function
+    var worker_fn_ptr = get_worker_function_pointer()
+    
+    # Create thread argument (thread_id as void pointer)
+    var thread_arg = UnsafePointer(to=thread_id).bitcast[NoneType]()
+    
+    # Create the pthread directly with external call to pthread_create
+    result = _pthread_create(thread_ptr, attr_ptr, worker_fn_ptr, thread_arg)
+
+fn create_pthread_direct_with_args(thread_id: Int, stack_size: Int, thread_args_ptr: UnsafePointer[ThreadArgs]) raises -> Bool:
+    """Create pthread using pure Mojo external calls to pthread library with thread args."""
+    
+    # Create pthread structures
+    var thread = pthread_t()
+    var thread_ptr = UnsafePointer(to=thread)
+    
+    var attr = pthread_attr_t()
+    var attr_ptr = UnsafePointer(to=attr)
+    
+    # Initialize pthread attributes (direct external call to pthread_attr_init)
+    var result = _pthread_attr_init(attr_ptr)
+    if result != 0:
+        raise Error("pthread_attr_init failed")
+    
+    # Set stack size (direct external call to pthread_attr_setstacksize)
+    result = _pthread_attr_setstacksize(attr_ptr, c_size_t(stack_size))
+    if result != 0:
+        var _ = _pthread_attr_destroy(attr_ptr)
+        raise Error("pthread_attr_setstacksize failed")
+    
+    # Set detached state (direct external call to pthread_attr_setdetachstate)
+    result = _pthread_attr_setdetachstate(attr_ptr, PTHREAD_CREATE_DETACHED)
+    if result != 0:
+        var _ = _pthread_attr_destroy(attr_ptr)
+        raise Error("pthread_attr_setdetachstate failed")
+    
+    # Get function pointer to our exported Mojo worker function
+    var worker_fn_ptr = get_worker_function_pointer()
+    
+    # Pass thread_args_ptr as argument
+    var thread_arg = thread_args_ptr.bitcast[NoneType]()
+    
+    # Create the pthread directly with external call to pthread_create
+    result = _pthread_create(thread_ptr, attr_ptr, worker_fn_ptr, thread_arg)
+    
+    var _ = _pthread_attr_destroy(attr_ptr)
+    
+    if result != 0:
+        print("pthread_create failed with code:", result)
+        return False
+        
+    print("Successfully created pthread for thread_id:", thread_id)
+    return True
+
+# Exported worker function that pthread can call
+@export("mojo_pthread_worker_entry")
+fn mojo_pthread_worker_entry(arg: UnsafePointer[NoneType]) -> UnsafePointer[NoneType]:
+    """Exported function that serves as pthread entry point."""
+    try:
+        # Extract ThreadArgs pointer from argument
+        var thread_args_ptr = arg.bitcast[ThreadArgs]()
+        var args = thread_args_ptr[]
+        var thread_id = args.core
+        # print("Pthread started for thread_id:", thread_id)
+        
+        # Unshare file descriptor table like Rust code  
+        unshare(CLONE_FILES)
+        set_current_thread_cpu_affinity_to(args.core)
+        
+        # Call the main worker function
+        threaded_worker(
+            args.port, 
+            example_callback,
+            args.core, 
+            args.num_cpu_cores, 
+            args.num_workers_inited_ptr
+        )
+        
+    except e:
+        print("Pthread worker error:", e)
+    
+    return UnsafePointer[NoneType]()
+
+fn get_worker_function_pointer() -> UnsafePointer[NoneType]:
+    """Get function pointer to our exported worker function."""
+    # Use dlsym to get the address of our exported function
+    var handle = external_call["dlopen", UnsafePointer[NoneType], UnsafePointer[UInt8], c_int](
+        UnsafePointer[UInt8](),  # NULL for main program
+        0x00002  # RTLD_NOW
+    )
+    
+    var func_name = "mojo_pthread_worker_entry"
+    var func_ptr = external_call["dlsym", UnsafePointer[NoneType], UnsafePointer[NoneType], UnsafePointer[UInt8]](
+        handle, 
+        func_name.unsafe_ptr()
+    )
+    
+    return func_ptr
+
+# Old functions removed - now using pure Mojo pthread implementation above
 
 # ===----------------------------------------------------------------------=== #
 # External C Functions
@@ -1134,7 +1367,7 @@ fn set_so_busy_poll(fd: Int, timeout_us: Int) raises:
 # ===----------------------------------------------------------------------=== #
 
 @no_inline
-fn go(port: UInt16, cb: fn(UnsafePointer[UInt8], Int, UnsafePointer[UInt8], Int, UnsafePointer[UInt8], UnsafePointer[UInt8]) -> Int, mut NUM_WORKERS_INITED: Int, HTTP_DATE: AlignedHttpDate):
+fn go(port: UInt16, cb: fn(UnsafePointer[UInt8], Int, UnsafePointer[UInt8], Int, UnsafePointer[UInt8], UnsafePointer[UInt8]) -> Int, HTTP_DATE: AlignedHttpDate, num_workers_inited_storage: Int):
     # Set higher process priority (requires root on most systems)
     try:
         setpriority(PRIO_PROCESS, 0, -19)
@@ -1150,19 +1383,35 @@ fn go(port: UInt16, cb: fn(UnsafePointer[UInt8], Int, UnsafePointer[UInt8], Int,
     var num_cpu_cores = num_logical_cores()
     print("Starting", num_cpu_cores, "worker threads")
     
-    # In Mojo, we use parallelize instead of manual thread creation
-    @parameter
-    fn worker_task(core: Int):
-        try:
-            # Unshare file descriptor table
-            unshare(CLONE_FILES)
-            set_current_thread_cpu_affinity_to(core)
-            threaded_worker(port, cb, core, num_cpu_cores, NUM_WORKERS_INITED)
-        except e:
-            print("Worker", core, "error:", e)
+    # Create threads manually like in the original Rust code
+    # var num_workers_inited_storage = Int(0)
+    var num_workers_inited_ptr = UnsafePointer(to=num_workers_inited_storage)
     
-    # Start worker tasks
-    parallelize[worker_task](num_cpu_cores)
+    # Allocate thread arguments storage on stack (one per core)
+    var thread_args_storage = StaticTuple[ThreadArgs, 64]()
+    
+    # Create actual pthreads like in the original Rust code
+    for core in range(num_cpu_cores):
+        try:
+            print("Creating pthread worker for core", core)
+            var thread_args_ptr = UnsafePointer(to=thread_args_storage[core])
+            var success = create_actual_pthread(
+                port,
+                core, 
+                num_cpu_cores,
+                num_workers_inited_ptr,
+                cb,
+                thread_args_ptr
+            )
+            
+            if not success:
+                print("Failed to create pthread for core", core)
+                
+            # Sleep to ensure workers are initialized in sequence like Rust code
+            thread_sleep_millis(5)
+            
+        except e:
+            print("Error creating pthread for core", core, ":", e)
     
     # Main date update loop
     while True:
@@ -1180,7 +1429,7 @@ fn threaded_worker(
     cb: fn(UnsafePointer[UInt8], Int, UnsafePointer[UInt8], Int, UnsafePointer[UInt8], UnsafePointer[UInt8]) -> Int,
     cpu_core: Int,
     num_cpu_cores: Int,
-    mut NUM_WORKERS_INITED: Int
+    num_workers_inited_ptr: UnsafePointer[Int]
 ):
     """Worker thread function using real syscalls."""
     
@@ -1190,9 +1439,10 @@ fn threaded_worker(
         setup_connection(listener_fd)
         
         # Synchronization for REUSEPORT_CBPF attachment
-        NUM_WORKERS_INITED += 1
+        # Atomically increment the workers initialized counter
+        num_workers_inited_ptr[] += 1
         if cpu_core == 0:
-            while NUM_WORKERS_INITED < num_cpu_cores:
+            while num_workers_inited_ptr[] < num_cpu_cores:
                 nanosleep(0.000001)  # 1 microsecond
             attach_reuseport_cbpf(listener_fd)
         
