@@ -2,7 +2,7 @@ from lightbug_http_v1.epoll import go, example_callback, AlignedHttpDate, Static
 
 fn main():
     """Main function to start the server."""
-    print("Starting FaF server on port 8080")
+    print("Starting server on port 8080")
     
     # Initialize global HTTP_DATE
     HTTP_DATE = AlignedHttpDate(StaticTuple[UInt8, 35]())

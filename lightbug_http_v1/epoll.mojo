@@ -151,62 +151,137 @@ struct ResBufAligned:
     var data: ResBufAlignedTuple
 
 # ===----------------------------------------------------------------------=== #
-# Syscall implementations
+# Process Control Functions
 # ===----------------------------------------------------------------------=== #
 
 fn sys_call_setpriority(which: Int, who: Int, priority: Int) -> Int:
-    """Set process priority using setpriority syscall."""
-    return Int(external_call["syscall", c_int, Int, Int, Int, Int](
-        SYS_SETPRIORITY, which, who, priority
+    """Set process priority using setpriority C library function."""
+    return Int(external_call["setpriority", c_int, c_int, c_int, c_int](
+        c_int(which), c_int(who), c_int(priority)
     ))
 
 fn sys_call_unshare(flags: Int) -> Int:
-    """Unshare system resources using unshare syscall."""
-    return Int(external_call["syscall", c_int, Int, Int](
-        SYS_UNSHARE, flags
+    """Unshare system resources using unshare C library function."""
+    return Int(external_call["unshare", c_int, c_int](
+        c_int(flags)
     ))
 
 fn sys_call_nanosleep(req: UnsafePointer[timespec], rem: UnsafePointer[timespec]) -> Int:
-    """Sleep for specified time using nanosleep syscall."""
-    return Int(external_call["syscall", c_int, Int, UnsafePointer[timespec], UnsafePointer[timespec]](
-        SYS_NANOSLEEP, req, rem
+    """Sleep for specified time using nanosleep C library function."""
+    return Int(external_call["nanosleep", c_int, UnsafePointer[timespec], UnsafePointer[timespec]](
+        req, rem
     ))
 
+# ===----------------------------------------------------------------------=== #
+# Epoll Functions (Linux-specific)
+# ===----------------------------------------------------------------------=== #
+
 fn sys_call_epoll_create1(flags: Int) -> Int:
-    """Create epoll instance using epoll_create1 syscall."""
-    return Int(external_call["syscall", c_int, Int, Int](
-        SYS_EPOLL_CREATE1, flags
+    """Create epoll instance using epoll_create1 C library function."""
+    return Int(external_call["epoll_create1", c_int, c_int](
+        c_int(flags)
     ))
 
 fn sys_call_epoll_ctl(epfd: Int, op: Int, fd: Int, event: UnsafePointer[epoll_event]) -> Int:
-    """Control epoll instance using epoll_ctl syscall."""
-    return Int(external_call["syscall", c_int, Int, Int, Int, Int, UnsafePointer[epoll_event]](
-        SYS_EPOLL_CTL, epfd, op, fd, event
+    """Control epoll instance using epoll_ctl C library function."""
+    return Int(external_call["epoll_ctl", c_int, c_int, c_int, c_int, UnsafePointer[epoll_event]](
+        c_int(epfd), c_int(op), c_int(fd), event
     ))
 
 fn sys_call_epoll_wait(epfd: Int, events: UnsafePointer[epoll_event], maxevents: Int, timeout: Int) -> Int:
-    """Wait for epoll events using epoll_wait syscall."""
-    return Int(external_call["syscall", c_int, Int, Int, UnsafePointer[epoll_event], Int, Int](
-        SYS_EPOLL_WAIT, epfd, events, maxevents, timeout
+    """Wait for epoll events using epoll_wait C library function."""
+    return Int(external_call["epoll_wait", c_int, c_int, UnsafePointer[epoll_event], c_int, c_int](
+        c_int(epfd), events, c_int(maxevents), c_int(timeout)
     ))
 
+# ===----------------------------------------------------------------------=== #
+# Socket Functions
+# ===----------------------------------------------------------------------=== #
+
 fn sys_call_accept(sockfd: Int, addr: UnsafePointer[sockaddr], addrlen: UnsafePointer[socklen_t]) -> Int:
-    """Accept connection using accept syscall."""
-    return Int(external_call["syscall", c_int, Int, Int, UnsafePointer[sockaddr], UnsafePointer[socklen_t]](
-        SYS_ACCEPT, sockfd, addr, addrlen
+    """Accept connection using accept C library function."""
+    return Int(external_call["accept", c_int, c_int, UnsafePointer[sockaddr], UnsafePointer[socklen_t]](
+        c_int(sockfd), addr, addrlen
     ))
 
 fn sys_call_recvfrom(sockfd: Int, buf: UnsafePointer[UInt8], len: Int, flags: Int, src_addr: UnsafePointer[sockaddr], addrlen: UnsafePointer[socklen_t]) -> Int:
-    """Receive data using recvfrom syscall."""
-    return Int(external_call["syscall", c_ssize_t, Int, Int, UnsafePointer[UInt8], Int, Int, UnsafePointer[sockaddr], UnsafePointer[socklen_t]](
-        SYS_RECVFROM, sockfd, buf, len, flags, src_addr, addrlen
+    """Receive data using recvfrom C library function."""
+    return Int(external_call["recvfrom", c_ssize_t, c_int, UnsafePointer[UInt8], c_int, c_int, UnsafePointer[sockaddr], UnsafePointer[socklen_t]](
+        c_int(sockfd), buf, c_int(len), c_int(flags), src_addr, addrlen
     ))
 
 fn sys_call_sendto(sockfd: Int, buf: UnsafePointer[UInt8], len: Int, flags: Int, dest_addr: UnsafePointer[sockaddr], addrlen: socklen_t) -> Int:
-    """Send data using sendto syscall."""
-    return Int(external_call["syscall", c_ssize_t, Int, Int, UnsafePointer[UInt8], Int, Int, UnsafePointer[sockaddr], socklen_t](
-        SYS_SENDTO, sockfd, buf, len, flags, dest_addr, addrlen
+    """Send data using sendto C library function."""
+    return Int(external_call["sendto", c_ssize_t, c_int, UnsafePointer[UInt8], c_int, c_int, UnsafePointer[sockaddr], socklen_t](
+        c_int(sockfd), buf, c_int(len), c_int(flags), dest_addr, addrlen
     ))
+
+# ===----------------------------------------------------------------------=== #
+# Alternative Versions with Better Error Handling
+# ===----------------------------------------------------------------------=== #
+
+fn setpriority_safe(which: Int, who: Int, priority: Int) raises -> Int:
+    """Set process priority with error handling."""
+    var result = sys_call_setpriority(which, who, priority)
+    if result == -1:
+        raise Error("setpriority failed")
+    return result
+
+fn unshare_safe(flags: Int) raises -> Int:
+    """Unshare system resources with error handling."""
+    var result = sys_call_unshare(flags)
+    if result == -1:
+        raise Error("unshare failed")
+    return result
+
+fn nanosleep_safe(req: UnsafePointer[timespec], rem: UnsafePointer[timespec]) raises -> Int:
+    """Sleep for specified time with error handling."""
+    var result = sys_call_nanosleep(req, rem)
+    if result == -1:
+        raise Error("nanosleep failed")
+    return result
+
+fn epoll_create1_safe(flags: Int) raises -> Int:
+    """Create epoll instance with error handling."""
+    var result = sys_call_epoll_create1(flags)
+    if result == -1:
+        raise Error("epoll_create1 failed")
+    return result
+
+fn epoll_ctl_safe(epfd: Int, op: Int, fd: Int, event: UnsafePointer[epoll_event]) raises -> Int:
+    """Control epoll instance with error handling."""
+    var result = sys_call_epoll_ctl(epfd, op, fd, event)
+    if result == -1:
+        raise Error("epoll_ctl failed")
+    return result
+
+fn epoll_wait_safe(epfd: Int, events: UnsafePointer[epoll_event], maxevents: Int, timeout: Int) raises -> Int:
+    """Wait for epoll events with error handling."""
+    var result = sys_call_epoll_wait(epfd, events, maxevents, timeout)
+    if result == -1:
+        raise Error("epoll_wait failed")
+    return result
+
+fn accept_safe(sockfd: Int, addr: UnsafePointer[sockaddr], addrlen: UnsafePointer[socklen_t]) raises -> Int:
+    """Accept connection with error handling."""
+    var result = sys_call_accept(sockfd, addr, addrlen)
+    if result == -1:
+        raise Error("accept failed")
+    return result
+
+fn recvfrom_safe(sockfd: Int, buf: UnsafePointer[UInt8], len: Int, flags: Int, src_addr: UnsafePointer[sockaddr], addrlen: UnsafePointer[socklen_t]) raises -> Int:
+    """Receive data with error handling."""
+    var result = sys_call_recvfrom(sockfd, buf, len, flags, src_addr, addrlen)
+    if result == -1:
+        raise Error("recvfrom failed")
+    return result
+
+fn sendto_safe(sockfd: Int, buf: UnsafePointer[UInt8], len: Int, flags: Int, dest_addr: UnsafePointer[sockaddr], addrlen: socklen_t) raises -> Int:
+    """Send data with error handling."""
+    var result = sys_call_sendto(sockfd, buf, len, flags, dest_addr, addrlen)
+    if result == -1:
+        raise Error("sendto failed")
+    return result
 
 # ===----------------------------------------------------------------------=== #
 # Higher-level wrapper functions with error handling
@@ -729,50 +804,50 @@ fn ntohl(net_val: c_uint) -> c_uint:
 
 fn sys_socket(domain: c_int, type: c_int, protocol: c_int) -> Int:
     """Create a socket."""
-    return Int(external_call["syscall", c_int, c_int, c_int, c_int, c_int](
-        SYS_SOCKET, domain, type, protocol
+    return Int(external_call["socket", c_int, c_int, c_int, c_int](
+        domain, type, protocol
     ))
 
 fn sys_bind(sockfd: Int, addr: UnsafePointer[sockaddr_in], addrlen: c_size_t) -> Int:
     """Bind socket to address."""
-    return Int(external_call["syscall", c_int, c_int, Int, UnsafePointer[sockaddr_in], c_size_t](
-        SYS_BIND, sockfd, addr, addrlen
+    return Int(external_call["bind", c_int, c_int, UnsafePointer[sockaddr_in], c_size_t](
+        c_int(sockfd), addr, addrlen
     ))
 
 fn sys_listen(sockfd: Int, backlog: c_int) -> Int:
     """Listen for connections."""
-    return Int(external_call["syscall", c_int, c_int, Int, c_int](
-        SYS_LISTEN, sockfd, backlog
+    return Int(external_call["listen", c_int, c_int, c_int](
+        c_int(sockfd), backlog
     ))
 
 fn sys_setsockopt(sockfd: Int, level: c_int, optname: c_int, optval: UnsafePointer[NoneType], optlen: c_size_t) -> Int:
     """Set socket options."""
-    return Int(external_call["syscall", c_int, c_int, Int, c_int, c_int, UnsafePointer[NoneType], c_size_t](
-        SYS_SETSOCKOPT, sockfd, level, optname, optval, optlen
+    return Int(external_call["setsockopt", c_int, c_int, c_int, c_int, UnsafePointer[NoneType], c_size_t](
+        c_int(sockfd), level, optname, optval, optlen
     ))
 
 fn sys_getsockopt(sockfd: Int, level: c_int, optname: c_int, optval: UnsafePointer[NoneType], optlen: UnsafePointer[c_size_t]) -> Int:
     """Get socket options."""
-    return Int(external_call["syscall", c_int, c_int, Int, c_int, c_int, UnsafePointer[NoneType], UnsafePointer[c_size_t]](
-        SYS_GETSOCKOPT, sockfd, level, optname, optval, optlen
+    return Int(external_call["getsockopt", c_int, c_int, c_int, c_int, UnsafePointer[NoneType], UnsafePointer[c_size_t]](
+        c_int(sockfd), level, optname, optval, optlen
     ))
 
 fn sys_fcntl(fd: Int, cmd: c_int, arg: c_int) -> Int:
     """File control operations."""
-    return Int(external_call["syscall", c_int, c_int, Int, c_int, c_int](
-        SYS_FCNTL, fd, cmd, arg
+    return Int(external_call["fcntl", c_int, c_int, c_int, c_int](
+        c_int(fd), cmd, arg
     ))
 
 fn sys_close(fd: Int) -> Int:
     """Close file descriptor."""
-    return Int(external_call["syscall", c_int, c_int, Int](
-        SYS_CLOSE, fd
+    return Int(external_call["close", c_int, c_int](
+        c_int(fd)
     ))
 
 fn sys_epoll_ctl(epfd: Int, op: c_int, fd: Int, event: UnsafePointer[NoneType]) -> Int:
     """Control epoll instance."""
-    return Int(external_call["syscall", c_int, c_int, Int, c_int, Int, UnsafePointer[NoneType]](
-        SYS_EPOLL_CTL, epfd, op, fd, event
+    return Int(external_call["epoll_ctl", c_int, c_int, c_int, c_int, UnsafePointer[NoneType]](
+        c_int(epfd), op, c_int(fd), event
     ))
 
 # ===----------------------------------------------------------------------=== #
