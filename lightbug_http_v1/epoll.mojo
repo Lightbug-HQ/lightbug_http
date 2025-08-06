@@ -1,9 +1,11 @@
 from utils import Variant, StaticTuple
 from sys.ffi import c_uint, c_int, external_call
 from sys import num_logical_cores
+from sys.info import sizeof
 from time import sleep
+from lightbug_http.external.small_time import now
 from algorithm import parallelize
-from memory import memset_zero
+from memory import memset_zero, memcpy
 from lightbug_http._libc import get_errno, sockaddr, socklen_t, c_ssize_t
 
 # Below is a straightforward translation of the Rust FAF (Fast As Fuck) code: 
@@ -117,19 +119,23 @@ struct epoll_event:
 struct AlignedHttpDate:
     var data: StaticTuple[UInt8, 35]
 
+alias AlignedEpollEventsTuple = StaticTuple[epoll_event, MAX_EPOLL_EVENTS_RETURNED]
+
 @fieldwise_init
 @register_passable("trivial")
 struct AlignedEpollEvents:
-    var data: StaticTuple[epoll_event, MAX_EPOLL_EVENTS_RETURNED]
+    var data: AlignedEpollEventsTuple
 
 @fieldwise_init
 struct AlignedEpollEvent:
     var data: epoll_event
 
+alias ReqBufAlignedTuple = StaticTuple[UInt8, REQ_BUF_SIZE * MAX_CONN]
+
 @fieldwise_init
 @register_passable("trivial")
 struct ReqBufAligned:
-    var data: StaticTuple[UInt8, REQ_BUF_SIZE * MAX_CONN]
+    var data: ReqBufAlignedTuple
 
 @fieldwise_init
 @register_passable("trivial")
@@ -377,13 +383,24 @@ fn send_to(sockfd: Int, buf: UnsafePointer[UInt8], len: Int, flags: Int = 0) rai
     return result
 
 # ===----------------------------------------------------------------------=== #
+# HTTP date update loop
+# ===----------------------------------------------------------------------=== #
+
+fn get_http_date(http_date: UnsafePointer[StaticTuple[UInt8, 35]], HTTP_DATE: AlignedHttpDate) raises:
+    """Get the current HTTP date."""
+    var current_time = now()
+    var http_date_str = current_time.format("ddd, DD MMM YYYY HH:mm:ss [GMT]")
+    var http_date_len = len(http_date_str)
+    memcpy(UnsafePointer(to=HTTP_DATE.data[0]), http_date_str.unsafe_ptr(), http_date_len)
+
+# ===----------------------------------------------------------------------=== #
 # Updated web server implementation using real syscalls
 # ===----------------------------------------------------------------------=== #
 
 # Now update your web server code to use these real syscalls:
 
 @no_inline
-fn go(port: UInt16, cb: fn(UnsafePointer[UInt8], Int, UnsafePointer[UInt8], Int, UnsafePointer[UInt8], UnsafePointer[UInt8]) -> Int):
+fn go(port: UInt16, cb: fn(UnsafePointer[UInt8], Int, UnsafePointer[UInt8], Int, UnsafePointer[UInt8], UnsafePointer[UInt8]) -> Int, mut NUM_WORKERS_INITED: Int, HTTP_DATE: AlignedHttpDate):
     # Set higher process priority (requires root on most systems)
     try:
         setpriority(PRIO_PROCESS, 0, -19)
@@ -391,7 +408,10 @@ fn go(port: UInt16, cb: fn(UnsafePointer[UInt8], Int, UnsafePointer[UInt8], Int,
         print("Warning: Could not set priority:", e)
     
     # Initialize HTTP date
-    get_http_date(HTTP_DATE.data.unsafe_ptr())
+    try:
+        get_http_date(UnsafePointer(to=HTTP_DATE.data), HTTP_DATE)
+    except e:
+        print("Warning: Could not initialize HTTP date:", e)
     
     var num_cpu_cores = num_logical_cores()
     print("Starting", num_cpu_cores, "worker threads")
@@ -403,7 +423,7 @@ fn go(port: UInt16, cb: fn(UnsafePointer[UInt8], Int, UnsafePointer[UInt8], Int,
             # Unshare file descriptor table
             unshare(CLONE_FILES)
             set_current_thread_cpu_affinity_to(core)
-            threaded_worker(port, cb, core, num_cpu_cores)
+            threaded_worker(port, cb, core, num_cpu_cores, NUM_WORKERS_INITED)
         except e:
             print("Worker", core, "error:", e)
     
@@ -412,7 +432,10 @@ fn go(port: UInt16, cb: fn(UnsafePointer[UInt8], Int, UnsafePointer[UInt8], Int,
     
     # Main date update loop
     while True:
-        get_http_date(HTTP_DATE.data.unsafe_ptr())
+        try:
+            get_http_date(UnsafePointer(to=HTTP_DATE.data), HTTP_DATE)
+        except e:
+            print("Warning: Could not update HTTP date:", e)
         try:
             nanosleep(1.0)  # Sleep for 1 second
         except:
@@ -422,7 +445,8 @@ fn threaded_worker(
     port: UInt16,
     cb: fn(UnsafePointer[UInt8], Int, UnsafePointer[UInt8], Int, UnsafePointer[UInt8], UnsafePointer[UInt8]) -> Int,
     cpu_core: Int,
-    num_cpu_cores: Int
+    num_cpu_cores: Int,
+    mut NUM_WORKERS_INITED: Int
 ):
     """Worker thread function using real syscalls."""
     
@@ -445,12 +469,12 @@ fn threaded_worker(
         epoll_ctl(epfd, EPOLL_CTL_ADD, listener_fd, UnsafePointer(to=epoll_event_listener))
         
         # Initialize buffers and state
-        var epoll_events = AlignedEpollEvents()
+        var epoll_events = AlignedEpollEvents(AlignedEpollEventsTuple())
         memset_zero(UnsafePointer(to=epoll_events).bitcast[UInt8](), sizeof[AlignedEpollEvents]())
         
         var saved_event = epoll_event(EPOLLIN, epoll_data(0))
         
-        var reqbuf = ReqBufAligned()
+        var reqbuf = ReqBufAligned(ReqBufAlignedTuple())
         memset_zero(UnsafePointer(to=reqbuf).bitcast[UInt8](), sizeof[ReqBufAligned]())
         
         # Request buffer position tracking arrays
@@ -558,7 +582,8 @@ fn main():
     print("Starting FaF server on port 8080")
     
     # Initialize global HTTP_DATE
-    HTTP_DATE = AlignedHttpDate()
+    HTTP_DATE = AlignedHttpDate(StaticTuple[UInt8, 35]())
     
     # Start the server
-    go(8080, example_callback)
+    var NUM_WORKERS_INITED = 0
+    go(8080, example_callback, NUM_WORKERS_INITED, HTTP_DATE)
