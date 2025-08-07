@@ -1349,7 +1349,7 @@ fn accept(socket: c_int) raises -> c_int:
             raise Error("accept: Protocol error.")
 
         @parameter
-        if os_CompilationTarget.is_linux():
+        if CompilationTarget.is_linux():
             if errno == EPERM:
                 raise Error("accept: Firewall rules forbid connection.")
         raise Error("accept: An error occurred while listening on the socket. Error code: " + String(errno))
