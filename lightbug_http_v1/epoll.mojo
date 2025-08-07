@@ -190,13 +190,17 @@ async fn worker_task_shared(
     shared_listener_fd: c_int
 ):
     """Async worker task that shares a listener socket with other workers."""
+    print("Worker", config.worker_id, "async function called - starting with shared listener fd", shared_listener_fd)
+    
     try:
-        print("Worker", config.worker_id, "starting with shared listener fd", shared_listener_fd)
+        print("Worker", config.worker_id, "inside try block")
         
         # Signal that this worker is ready
+        var count_before = workers_ready[].load()
         var _ = workers_ready[].fetch_add(1)
+        var count_after = workers_ready[].load()
         
-        print("Worker", config.worker_id, "ready, sharing listener on port", config.port)
+        print("Worker", config.worker_id, "ready, count went from", count_before, "to", count_after, "- sharing listener on port", config.port)
         
         # Simplified event loop - accept connections from shared listener
         var req_buf = UnsafePointer[UInt8].alloc(REQ_BUF_SIZE)
@@ -296,11 +300,22 @@ fn go_async_simple(
         # Small delay to help with initialization order
         nanosleep_simple(0.01)  # 10ms delay
     
-    # Wait for all workers to be ready
-    while workers_ready.load() < num_workers:
-        nanosleep_simple(0.001)  # 1ms polling
+    print("Waiting for workers to become ready...")
     
-    print("All", num_workers, "workers are ready!")
+    # Wait for all workers to be ready with timeout
+    var timeout_count = 0
+    var max_timeout = 100  # 100ms timeout
+    while workers_ready.load() < num_workers and timeout_count < max_timeout:
+        nanosleep_simple(0.001)  # 1ms polling
+        timeout_count += 1
+        if timeout_count % 10 == 0:
+            print("Still waiting for workers... ready:", workers_ready.load(), "of", num_workers)
+    
+    if workers_ready.load() < num_workers:
+        print("Warning: Only", workers_ready.load(), "of", num_workers, "workers are ready")
+    else:
+        print("All", num_workers, "workers are ready!")
+    
     print("Server is running on port", port)
     print("Try: curl http://localhost:" + String(port))
     
