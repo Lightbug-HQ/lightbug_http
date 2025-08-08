@@ -2,7 +2,7 @@ from utils import Variant, StaticTuple
 from sys.ffi import c_uint, c_int, external_call, c_long, c_size_t, c_uchar, c_ushort, c_char
 from sys.info import sizeof, CompilationTarget, num_logical_cores
 from memory import memcmp, UnsafePointer, stack_allocation, memset_zero, memcpy
-from time import sleep
+from time import sleep, now
 from runtime import asyncrt
 from os.atomic import Atomic
 
@@ -27,19 +27,29 @@ from lightbug_http._libc import (
 )
 
 # Correct socket option constants for Ubuntu/Linux
-alias SO_REUSEADDR = 0x0004
-alias SO_REUSEPORT = 0x0200
+alias SO_REUSEADDR = 2
+alias SO_REUSEPORT = 15
 
-# Async version of the epoll server using Mojo's async runtime
-# This replaces the pthread-based approach with TaskGroup/async tasks
+# System call constants
+alias SYS_SETPRIORITY = 141
+alias SYS_NANOSLEEP = 35
+alias SYS_EPOLL_CREATE1 = 291
+alias SYS_EPOLL_CTL = 233
+alias SYS_EPOLL_WAIT = 232
+alias SYS_ACCEPT = 43
+alias SYS_RECVFROM = 45
+alias SYS_SENDTO = 44
+
+# Epoll-based HTTP server using Mojo's async runtime
+# This translates the Rust threading approach to async tasks
 
 # ===----------------------------------------------------------------------=== #
 # Epoll Constants
 # ===----------------------------------------------------------------------=== #
 
 alias MAX_EPOLL_EVENTS_RETURNED = 1024
-alias REQ_BUF_SIZE = 1024
-alias RES_BUF_SIZE = 1024
+alias REQ_BUFF_SIZE = 1024  # Match Rust naming
+alias RES_BUFF_SIZE = 1024  # Match Rust naming
 alias MAX_CONN = 1024
 
 alias EPOLL_TIMEOUT_BLOCKING = -1
@@ -73,97 +83,319 @@ alias PRIO_PGRP = 1
 alias PRIO_USER = 2
 
 # ===----------------------------------------------------------------------=== #
-# Epoll structures and functions
+# Epoll structures and system call wrappers
 # ===----------------------------------------------------------------------=== #
 
 @register_passable("trivial")  
 struct epoll_event:
     var events: UInt32
-    var data: UInt64
+    var data: UInt64  # This represents the union epoll_data as a single 64-bit value
     
     fn __init__(out self):
         self.events = 0
         self.data = 0
+        
+    fn __init__(out self, events: UInt32, fd: Int):
+        self.events = events
+        self.data = UInt64(fd)  # Store fd in the data field
 
 @register_passable("trivial")
 struct AlignedHttpDate:
-    var data: StaticTuple[UInt8, 32]
+    var data: StaticTuple[UInt8, 35]  # Match Rust size
     
     fn __init__(out self):
-        self.data = StaticTuple[UInt8, 32]()
+        self.data = StaticTuple[UInt8, 35]()
 
-# Epoll syscall wrappers
-fn epoll_create1(flags: Int) -> Int:
+# Note: Mojo doesn't support global variables, so we'll pass these as parameters
+
+# Direct system call wrappers using external_call
+fn sys_setpriority(which: Int, who: Int, priority: Int) -> Int:
+    """Set process priority."""
+    return Int(external_call["setpriority", c_int, c_int, c_int, c_int](which, who, priority))
+
+fn sys_epoll_create1(flags: Int) -> Int:
+    """Create an epoll instance."""
     return Int(external_call["epoll_create1", c_int, c_int](flags))
 
-fn epoll_ctl(epfd: Int, op: Int, fd: Int, event: UnsafePointer[epoll_event]) -> Int:
+fn sys_epoll_ctl(epfd: Int, op: Int, fd: Int, event: UnsafePointer[epoll_event]) -> Int:
+    """Control epoll instance."""
     return Int(external_call["epoll_ctl", c_int, c_int, c_int, c_int, UnsafePointer[epoll_event]](epfd, op, fd, event))
 
-fn epoll_wait(epfd: Int, events: UnsafePointer[epoll_event], maxevents: Int, timeout: Int) -> Int:
+fn sys_epoll_wait(epfd: Int, events: UnsafePointer[epoll_event], maxevents: Int, timeout: Int) -> Int:
+    """Wait for epoll events."""
     return Int(external_call["epoll_wait", c_int, c_int, UnsafePointer[epoll_event], c_int, c_int](epfd, events, maxevents, timeout))
 
-fn nanosleep_simple(seconds: Float64):
-    """Sleep for specified seconds using Mojo's sleep."""
-    sleep(seconds)
+fn sys_accept(sockfd: Int, addr: Int, addrlen: Int) -> Int:
+    """Accept a connection."""
+    return Int(external_call["accept", c_int, c_int, c_int, c_int](sockfd, addr, addrlen))
 
-# HTTP date function (simplified)
-fn get_http_date(buf: UnsafePointer[UInt8], http_date: AlignedHttpDate):
+fn sys_recvfrom(sockfd: Int, buf: UnsafePointer[UInt8], len: Int, flags: Int, src_addr: Int, addrlen: Int) -> Int:
+    """Receive data from socket."""
+    return Int(external_call["recvfrom", c_int, c_int, UnsafePointer[UInt8], c_size_t, c_int, c_int, c_int](sockfd, buf, len, flags, src_addr, addrlen))
+
+fn sys_sendto(sockfd: Int, buf: UnsafePointer[UInt8], len: Int, flags: Int, dest_addr: Int, addrlen: Int) -> Int:
+    """Send data to socket."""
+    return Int(external_call["sendto", c_int, c_int, UnsafePointer[UInt8], c_size_t, c_int, c_int, c_int](sockfd, buf, len, flags, dest_addr, addrlen))
+
+fn sys_setsockopt(sockfd: Int, level: Int, optname: Int, optval: UnsafePointer[c_int], optlen: Int) -> Int:
+    """Set socket options."""
+    return Int(external_call["setsockopt", c_int, c_int, c_int, c_int, UnsafePointer[c_int], c_uint](sockfd, level, optname, optval, optlen))
+
+# HTTP date function (simplified but proper format)
+fn get_http_date(buf: UnsafePointer[UInt8]):
     """Get current HTTP date string."""
-    # Simplified implementation - in real code this would get actual date
+    # Simplified - real implementation would get actual current date
     var date_str = "Thu, 01 Jan 1970 00:00:00 GMT\r\n"
     var date_bytes = date_str.as_bytes()
-    memcpy(buf, date_bytes.unsafe_ptr(), min(len(date_bytes), 32))
+    memcpy(buf, date_bytes.unsafe_ptr(), min(len(date_bytes), 35))
 
 # ===----------------------------------------------------------------------=== #
-# Worker task data structure
+# Socket setup functions matching Rust net::get_listener_fd
 # ===----------------------------------------------------------------------=== #
 
-@register_passable("trivial")
-struct WorkerConfig:
-    """Configuration for each worker task."""
-    var port: UInt16
-    var worker_id: Int
-    var total_workers: Int
-    
-    fn __init__(out self, port: UInt16, worker_id: Int, total_workers: Int):
-        self.port = port
-        self.worker_id = worker_id
-        self.total_workers = total_workers
-
-# ===----------------------------------------------------------------------=== #
-# Socket setup functions using working libc
-# ===----------------------------------------------------------------------=== #
-
-fn get_listener_fd_simple(port: UInt16) raises -> c_int:
-    """Create and configure listener socket - simplified version without socket options."""
+fn get_listener_fd(port: UInt16) raises -> (c_int, Bool, Bool):
+    """Create and configure listener socket with SO_REUSEPORT (matches Rust version)."""
     var listener_fd = socket(AddressFamily.AF_INET.value, SOCK_STREAM, 0)
     
-    print("Created socket fd:", listener_fd)
+    if listener_fd < 0:
+        return (-1, False, False)
     
-    # Skip socket options for now - they're optimizations, not requirements
-    # In production you'd want SO_REUSEADDR and SO_REUSEPORT but let's get basic functionality working first
+    # Set SO_REUSEADDR
+    var reuseaddr = c_int(1)
+    var ret = sys_setsockopt(
+        Int(listener_fd), 
+        SOL_SOCKET, 
+        SO_REUSEADDR, 
+        UnsafePointer(to=reuseaddr), 
+        sizeof[c_int]()
+    )
     
-    # Bind socket using the working sockaddr_in from libc
+    # Set SO_REUSEPORT (critical for multi-worker performance)
+    var reuseport = c_int(1)
+    var _ = sys_setsockopt(
+        Int(listener_fd), 
+        SOL_SOCKET, 
+        SO_REUSEPORT, 
+        UnsafePointer(to=reuseport), 
+        sizeof[c_int]()
+    )
+    
+    # Bind socket
     var addr = sockaddr_in(Int(AddressFamily.AF_INET.value), port, 0)  # INADDR_ANY = 0
     try:
         bind(listener_fd, addr)
-        print("Socket bound to port", port)
-    except e:
+    except:
         var _ = close(listener_fd)
-        raise Error("Failed to bind socket: " + String(e))
+        return (-1, False, False)
     
     # Listen
     try:
         listen(listener_fd, 128)
-        print("Socket listening with backlog 128")
-    except e:
+    except:
         var _ = close(listener_fd)
-        raise Error("Failed to listen on socket: " + String(e))
+        return (-1, False, False)
     
-    return listener_fd
+    return (listener_fd, True, True)
+
+fn setup_connection(fd: Int):
+    """Set up connection options (matches Rust net::setup_connection)."""
+    # In the Rust version this sets TCP_NODELAY and other options
+    # For simplicity, we'll skip those optimizations for now
+    pass
+
+fn close_connection(epfd: Int, fd: Int):
+    """Close connection and remove from epoll (matches Rust net::close_connection)."""
+    var _ = sys_epoll_ctl(epfd, EPOLL_CTL_DEL, fd, UnsafePointer[epoll_event]())
+    try:
+        var _ = close(c_int(fd))
+    except:
+        pass
 
 # ===----------------------------------------------------------------------=== #
-# Example callback function
+# HTTP request parsing (simplified version)
+# ===----------------------------------------------------------------------=== #
+
+fn parse_request_path_simple(
+    request_buffer: UnsafePointer[UInt8],
+    buffer_len: Int,
+    method: UnsafePointer[UnsafePointer[UInt8]],
+    method_len: UnsafePointer[Int],
+    path: UnsafePointer[UnsafePointer[UInt8]],
+    path_len: UnsafePointer[Int]
+) -> Int:
+    """Simple HTTP request parser - returns bytes parsed or 0 if incomplete."""
+    if buffer_len < 4:
+        return 0
+    
+    # Look for "GET " or "POST"
+    var buf = request_buffer
+    if buf[0] == ord("G") and buf[1] == ord("E") and buf[2] == ord("T") and buf[3] == ord(" "):
+        method[] = buf
+        method_len[] = 3
+        
+        # Find path start (after "GET ")
+        var path_start = buf + 4
+        path[] = path_start
+        
+        # Find end of path (space or newline)
+        var i = 4
+        while i < buffer_len and buf[i] != ord(" ") and buf[i] != ord("\r") and buf[i] != ord("\n"):
+            i += 1
+        
+        path_len[] = i - 4
+        
+        # Find end of request (double CRLF)
+        while i < buffer_len - 3:
+            if buf[i] == ord("\r") and buf[i+1] == ord("\n") and buf[i+2] == ord("\r") and buf[i+3] == ord("\n"):
+                return i + 4
+            i += 1
+        
+        # Incomplete request
+        return 0
+    
+    return 0  # Invalid request
+
+# ===----------------------------------------------------------------------=== #
+# Simplified async worker function (following async_demo.mojo pattern)
+# ===----------------------------------------------------------------------=== #
+
+async fn epoll_worker(worker_id: Int):
+    """Async epoll-based HTTP worker."""
+    print("Worker", worker_id, "starting epoll-based HTTP server")
+    
+    try:
+        # Create listener socket for this worker (with SO_REUSEPORT)
+        var (listener_fd, success1, success2) = get_listener_fd(UInt16(8080 + worker_id))  # Use different ports for each worker for now
+        if listener_fd < 0:
+            print("Worker", worker_id, "failed to create listener socket")
+            return
+        
+        setup_connection(Int(listener_fd))
+        print("Worker", worker_id, "listener socket created on port", 8080 + worker_id)
+        
+        # Create epoll instance
+        var epfd = sys_epoll_create1(0)
+        if epfd < 0:
+            print("Worker", worker_id, "failed to create epoll")
+            try:
+                var _ = close(listener_fd)
+            except:
+                pass
+            return
+        
+        # Add listener fd to epoll for monitoring
+        var epoll_event_listener = epoll_event(EPOLLIN, Int(listener_fd))
+        var _ = sys_epoll_ctl(epfd, EPOLL_CTL_ADD, Int(listener_fd), UnsafePointer(to=epoll_event_listener))
+        
+        # Allocate event array and buffers
+        var epoll_events = UnsafePointer[epoll_event].alloc(MAX_EPOLL_EVENTS_RETURNED)
+        memset_zero(epoll_events, MAX_EPOLL_EVENTS_RETURNED * sizeof[epoll_event]())
+        
+        var saved_event = epoll_event(EPOLLIN, 0)
+        
+        # Request and response buffers (simplified)
+        var reqbuf = UnsafePointer[UInt8].alloc(REQ_BUFF_SIZE)
+        var resbuf = UnsafePointer[UInt8].alloc(RES_BUFF_SIZE)
+        
+        var epoll_wait_type = EPOLL_TIMEOUT_BLOCKING
+        var connections_handled = 0
+        var max_connections = 5  # Limit for demo
+        
+        print("Worker", worker_id, "starting epoll event loop")
+        
+        # Main epoll event loop
+        while connections_handled < max_connections:
+            var num_incoming_events = sys_epoll_wait(epfd, epoll_events, MAX_EPOLL_EVENTS_RETURNED, epoll_wait_type)
+            
+            if num_incoming_events <= 0:
+                epoll_wait_type = EPOLL_TIMEOUT_BLOCKING
+                continue
+            
+            epoll_wait_type = EPOLL_TIMEOUT_IMMEDIATE_RETURN
+            
+            for index in range(num_incoming_events):
+                var event = epoll_events[index]
+                var cur_fd = Int(event.data)
+                
+                if cur_fd == Int(listener_fd):
+                    # Accept new connection
+                    var incoming_fd = sys_accept(Int(listener_fd), 0, 0)
+                    
+                    if incoming_fd >= 0:
+                        print("Worker", worker_id, "accepted connection fd:", incoming_fd)
+                        setup_connection(incoming_fd)
+                        saved_event.data = UInt64(incoming_fd)
+                        
+                        var _ = sys_epoll_ctl(epfd, EPOLL_CTL_ADD, incoming_fd, UnsafePointer(to=saved_event))
+                    else:
+                        close_connection(epfd, cur_fd)
+                else:
+                    # Handle client connection
+                    var read_bytes = sys_recvfrom(cur_fd, reqbuf, REQ_BUFF_SIZE - 1, 0, 0, 0)
+                    
+                    if read_bytes > 0:
+                        # Null-terminate the request
+                        reqbuf[read_bytes] = 0
+                        
+                        print("Worker", worker_id, "received", read_bytes, "bytes from fd", cur_fd)
+                        
+                        # Simple HTTP request parsing
+                        var method_ptr = reqbuf
+                        var method_len = 3  # Assume "GET"
+                        var path_ptr = reqbuf + 4  # Skip "GET "
+                        var path_len = 1  # Assume "/"
+                        
+                        # Generate response using callback
+                        var response_len = example_callback(
+                            method_ptr, method_len,
+                            path_ptr, path_len,
+                            resbuf,
+                            UnsafePointer[UInt8]()  # HTTP date - simplified
+                        )
+                        
+                        # Send response
+                        var wrote = sys_sendto(cur_fd, resbuf, response_len, 0, 0, 0)
+                        
+                        if wrote == response_len:
+                            print("Worker", worker_id, "sent", response_len, "bytes to fd", cur_fd)
+                        else:
+                            print("Worker", worker_id, "partial write:", wrote, "of", response_len, "bytes")
+                        
+                        connections_handled += 1
+                        
+                        # Close connection after response
+                        close_connection(epfd, cur_fd)
+                        
+                    elif read_bytes < 0:
+                        var errno = -read_bytes
+                        if errno != EAGAIN and errno != EWOULDBLOCK:
+                            print("Worker", worker_id, "read error on fd", cur_fd, "errno:", errno)
+                            close_connection(epfd, cur_fd)
+                    else:
+                        # Connection closed by client
+                        print("Worker", worker_id, "connection closed by client fd", cur_fd)
+                        close_connection(epfd, cur_fd)
+        
+        print("Worker", worker_id, "handled", connections_handled, "connections, shutting down")
+        
+        # Cleanup
+        epoll_events.free()
+        reqbuf.free()
+        resbuf.free()
+        try:
+            var _ = close(c_int(epfd))
+        except:
+            pass
+        try:
+            var _ = close(listener_fd)
+        except:
+            pass
+        
+    except e:
+        print("Worker", worker_id, "error:", e)
+
+# ===----------------------------------------------------------------------=== #
+# Main server function matching Rust go() function
 # ===----------------------------------------------------------------------=== #
 
 fn example_callback(
@@ -179,169 +411,54 @@ fn example_callback(
     memcpy(response, response_bytes.unsafe_ptr(), len(response_bytes))
     return len(response_bytes)
 
-# ===----------------------------------------------------------------------=== #
-# Simplified async worker that focuses on demonstrating the async approach
-# ===----------------------------------------------------------------------=== #
-
-async fn worker_task_shared(
-    config: WorkerConfig,
-    cb: fn(UnsafePointer[UInt8], Int, UnsafePointer[UInt8], Int, UnsafePointer[UInt8], UnsafePointer[UInt8]) -> Int,
-    workers_ready: UnsafePointer[Atomic[DType.index]],
-    shared_listener_fd: c_int
-):
-    """Async worker task that shares a listener socket with other workers."""
-    print("Worker", config.worker_id, "async function called - starting with shared listener fd", shared_listener_fd)
-    
-    try:
-        print("Worker", config.worker_id, "inside try block")
-        
-        # Signal that this worker is ready
-        var count_before = workers_ready[].load()
-        var _ = workers_ready[].fetch_add(1)
-        var count_after = workers_ready[].load()
-        
-        print("Worker", config.worker_id, "ready, count went from", count_before, "to", count_after, "- sharing listener on port", config.port)
-        
-        # Simplified event loop - accept connections from shared listener
-        var req_buf = UnsafePointer[UInt8].alloc(REQ_BUF_SIZE)
-        var res_buf = UnsafePointer[UInt8].alloc(RES_BUF_SIZE)
-        var should_continue = True
-        var connections_handled = 0
-        
-        while should_continue and connections_handled < 10:  # Limit for demo
-            try:
-                # Accept new connection from shared listener socket
-                var client_fd = accept(shared_listener_fd)
-                connections_handled += 1
-                
-                print("Worker", config.worker_id, "accepted connection", connections_handled)
-                
-                # Read data using working libc
-                var bytes_read = recv(client_fd, req_buf.bitcast[UInt8](), REQ_BUF_SIZE - 1, 0)
-                
-                if bytes_read > 0:
-                    # Null-terminate the request
-                    req_buf[bytes_read] = 0
-                    
-                    # Parse basic HTTP request (simplified)
-                    var method_ptr = req_buf
-                    var method_len = 3  # Assume "GET"
-                    var path_ptr = req_buf + 4  # Skip "GET "
-                    var path_len = 1  # Assume "/"
-                    
-                    # Call the callback to generate response
-                    var response_len = cb(
-                        method_ptr, method_len,
-                        path_ptr, path_len,
-                        res_buf,
-                        UnsafePointer[UInt8]()  # HTTP date - simplified
-                    )
-                    
-                    # Send response using working libc
-                    var _ = send(client_fd, res_buf.bitcast[c_void](), response_len, 0)
-                    
-                    print("Worker", config.worker_id, "sent response of", response_len, "bytes")
-                
-                # Close connection
-                var _ = close(client_fd)
-                
-            except e:
-                print("Worker", config.worker_id, "connection error:", e)
-                # Continue to next connection
-        
-        # Cleanup (but don't close the shared listener)
-        req_buf.free()
-        res_buf.free()
-        
-        print("Worker", config.worker_id, "finished after handling", connections_handled, "connections")
-        
-    except e:
-        print("Worker", config.worker_id, "error:", e)
-
-# ===----------------------------------------------------------------------=== #
-# Main server function using async runtime
-# ===----------------------------------------------------------------------=== #
-
-fn go_async_simple(
+fn go(
     port: UInt16, 
     cb: fn(UnsafePointer[UInt8], Int, UnsafePointer[UInt8], Int, UnsafePointer[UInt8], UnsafePointer[UInt8]) -> Int
 ):
-    """Start the async HTTP server - replacement for the pthread-based version."""
+    """Main server function matching the Rust go() function."""
+    print("Starting server on port", port)
     
-    # Create the main listener socket ONCE here
-    var listener_fd: c_int
-    try:
-        listener_fd = get_listener_fd_simple(port)
-        print("Main listener socket created on port", port)
-    except e:
-        print("Failed to create main listener socket:", e)
-        return
+    # Attempt to set higher process priority (matches Rust version)
+    var priority_result = sys_setpriority(PRIO_PROCESS, 0, -19)
+    if priority_result != 0:
+        print("Warning: Could not set priority: setpriority: Permission denied")
     
-    var num_workers = min(4, num_logical_cores())  # Limit workers for demo
-    print("Starting", num_workers, "async worker tasks")
+    # Create local variables to replace globals
+    var http_date = AlignedHttpDate()
+    var workers_inited = Atomic[DType.index](0)
     
-    # Create atomic counter for tracking ready workers
-    var workers_ready = Atomic[DType.index](0)
-    var workers_ready_ptr = UnsafePointer(to=workers_ready)
+    # Initialize HTTP date before launching workers
+    var date_ptr = UnsafePointer(to=http_date.data[0])
+    get_http_date(date_ptr)
     
-    # Create task group for all workers
+    var num_cpu_cores = min(2, num_logical_cores())  # Limit for demo
+    print("Starting", num_cpu_cores, "epoll-based HTTP workers via asyncrt")
+    
+    # Create task group for all workers (following async_demo.mojo pattern)
     var task_group = asyncrt.TaskGroup()
     
-    # Launch worker tasks (equivalent to spawning threads in Rust)
-    for worker_id in range(num_workers):
-        var config = WorkerConfig(port, worker_id, num_workers)
+    # Launch epoll worker tasks (equivalent to spawning threads in Rust)
+    for core in range(num_cpu_cores):
+        print("Creating worker", core)
         
-        print("Creating async worker task for worker", worker_id)
+        try:
+            var worker_coro = epoll_worker(core)
+            # Use TaskGroup.create_task following the working pattern from async_demo.mojo
+            task_group.create_task(worker_coro^)
+        except e:
+            print("Error launching worker", core, ":", e)
         
-        # Create worker task - pass the shared listener_fd
-        var worker_coro = worker_task_shared(config, cb, workers_ready_ptr, listener_fd)
-        task_group.create_task(worker_coro^)
-        
-        # Small delay to help with initialization order
-        nanosleep_simple(0.01)  # 10ms delay
+        # Small delay to ensure workers are initialized in sequence
+        sleep(0.005)  # 5ms delay (matches Rust)
     
-    print("Waiting for workers to become ready...")
+    print("All epoll workers launched, waiting for completion")
+    # print("Workers listening on ports:", [8080 + i for i in range(num_cpu_cores)])
+    print("Try: curl http://localhost:8080 or curl http://localhost:8081")
     
-    # Wait for all workers to be ready with timeout
-    var timeout_count = 0
-    var max_timeout = 100  # 100ms timeout
-    while workers_ready.load() < num_workers and timeout_count < max_timeout:
-        nanosleep_simple(0.001)  # 1ms polling
-        timeout_count += 1
-        if timeout_count % 10 == 0:
-            print("Still waiting for workers... ready:", workers_ready.load(), "of", num_workers)
+    # Wait for all workers to complete (following async_demo.mojo pattern)
+    task_group.wait()
+    print("All epoll workers completed")
     
-    if workers_ready.load() < num_workers:
-        print("Warning: Only", workers_ready.load(), "of", num_workers, "workers are ready")
-    else:
-        print("All", num_workers, "workers are ready!")
+    print("Epoll-based HTTP server demo shutting down")
     
-    print("Server is running on port", port)
-    print("Try: curl http://localhost:" + String(port))
-    
-    # Main server loop - for demo, run for 30 seconds then exit
-    var run_time = 30.0
-    var elapsed = 0.0
-    var http_date = AlignedHttpDate()
-    
-    while elapsed < run_time:
-        # Get pointer to first element of the StaticTuple
-        var date_ptr = UnsafePointer(to=http_date.data[0])
-        get_http_date(date_ptr, http_date)
-        
-        nanosleep_simple(1.0)  # Sleep for 1 second
-        elapsed += 1.0
-        
-        if Int(elapsed) % 10 == 0:
-            print("Server running for", Int(elapsed), "seconds...")
-    
-    print("Demo server shutting down after", run_time, "seconds")
-    
-    # Close the shared listener socket
-    try:
-        var _ = close(listener_fd)
-    except:
-        print("could not close listener_fd")
-    print("Shared listener socket closed")
-    
-    # Note: In a real implementation, you'd want to properly shut down the task group
+    # In the Rust version, this runs forever. For demo purposes, we let workers complete their simulation.
