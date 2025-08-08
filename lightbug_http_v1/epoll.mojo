@@ -1,6 +1,7 @@
 from utils import Variant, StaticTuple
 from sys.ffi import c_uint, c_int, external_call, c_long, c_size_t, c_uchar, c_ushort, c_char
 from sys.info import sizeof, CompilationTarget, num_logical_cores
+from sys.intrinsics import likely, unlikely
 from memory import memcmp, UnsafePointer, stack_allocation, memset_zero, memcpy
 from time import sleep, now
 from runtime import asyncrt
@@ -48,8 +49,8 @@ alias SYS_SENDTO = 44
 # ===----------------------------------------------------------------------=== #
 
 alias MAX_EPOLL_EVENTS_RETURNED = 1024
-alias REQ_BUFF_SIZE = 1024  # Match Rust naming
-alias RES_BUFF_SIZE = 1024  # Match Rust naming
+alias REQ_BUFF_SIZE = 1024
+alias RES_BUFF_SIZE = 1024
 alias MAX_CONN = 1024
 
 alias EPOLL_TIMEOUT_BLOCKING = -1
@@ -101,7 +102,7 @@ struct epoll_event:
 
 @register_passable("trivial")
 struct AlignedHttpDate:
-    var data: StaticTuple[UInt8, 35]  # Match Rust size
+    var data: StaticTuple[UInt8, 35]
     
     fn __init__(out self):
         self.data = StaticTuple[UInt8, 35]()
@@ -150,11 +151,11 @@ fn get_http_date(buf: UnsafePointer[UInt8]):
     memcpy(buf, date_bytes.unsafe_ptr(), min(len(date_bytes), 35))
 
 # ===----------------------------------------------------------------------=== #
-# Socket setup functions matching Rust net::get_listener_fd
+# Socket setup functions
 # ===----------------------------------------------------------------------=== #
 
 fn get_listener_fd(port: UInt16) raises -> (c_int, Bool, Bool):
-    """Create and configure listener socket with SO_REUSEPORT (matches Rust version)."""
+    """Create and configure listener socket with SO_REUSEPORT."""
     var listener_fd = socket(AddressFamily.AF_INET.value, SOCK_STREAM, 0)
     
     if listener_fd < 0:
@@ -198,13 +199,12 @@ fn get_listener_fd(port: UInt16) raises -> (c_int, Bool, Bool):
     return (listener_fd, True, True)
 
 fn setup_connection(fd: Int):
-    """Set up connection options (matches Rust net::setup_connection)."""
-    # In the Rust version this sets TCP_NODELAY and other options
-    # For simplicity, we'll skip those optimizations for now
+    """Set up connection options."""
+    # todo: In the Rust version this sets TCP_NODELAY and other options, need to make the same
     pass
 
 fn close_connection(epfd: Int, fd: Int):
-    """Close connection and remove from epoll (matches Rust net::close_connection)."""
+    """Close connection and remove from epoll."""
     var _ = sys_epoll_ctl(epfd, EPOLL_CTL_DEL, fd, UnsafePointer[epoll_event]())
     try:
         var _ = close(c_int(fd))
@@ -261,19 +261,10 @@ fn parse_request_path_simple(
 
 async fn epoll_worker(worker_id: Int):
     """Async epoll-based HTTP worker matching Rust threaded_worker."""
-    print("Worker", worker_id, "ASYNC TASK STARTED!")
-    
-    # First, let's test if async workers are running at all
-    for i in range(3):
-        print("Worker", worker_id, "async iteration", i)
-        sleep(0.1)
-    
-    print("Worker", worker_id, "async test completed - now trying socket operations")
-    
     try:
         # Create listener socket for this worker (with SO_REUSEPORT) - all workers use same port
         print("Worker", worker_id, "calling get_listener_fd...")
-        var (listener_fd, success1, success2) = get_listener_fd(UInt16(8080))  # Same port for all workers
+        var (listener_fd, success1, success2) = get_listener_fd(UInt16(8080))  # todo: make port configurable
         if listener_fd < 0:
             print("Worker", worker_id, "failed to create listener socket")
             return
@@ -281,6 +272,7 @@ async fn epoll_worker(worker_id: Int):
         print("Worker", worker_id, "got listener_fd:", listener_fd)
         setup_connection(Int(listener_fd))
         print("Worker", worker_id, "listener socket created, sharing port 8080")
+        # todo: add atach_reuseport_cbpf
         
         # Create epoll instance
         var epfd = sys_epoll_create1(0)
@@ -302,17 +294,17 @@ async fn epoll_worker(worker_id: Int):
         
         var saved_event = epoll_event(EPOLLIN, 0)
         
-        # Request buffer management (matches Rust version)
+        # Request buffer management
         var reqbuf = UnsafePointer[UInt8].alloc(REQ_BUFF_SIZE * MAX_CONN)
         memset_zero(reqbuf, REQ_BUFF_SIZE * MAX_CONN)
         
-        # Track buffer positions and residuals per connection (matches Rust)
+        # Track buffer positions and residuals per connection
         var reqbuf_cur_addr = UnsafePointer[UInt64].alloc(MAX_CONN)
         var reqbuf_residual = UnsafePointer[Int].alloc(MAX_CONN)
         memset_zero(reqbuf_cur_addr, MAX_CONN * sizeof[UInt64]())
         memset_zero(reqbuf_residual, MAX_CONN * sizeof[Int]())
         
-        # Initialize buffer addresses (matches Rust initialization)
+        # Initialize buffer addresses
         var reqbuf_start_address = Int(reqbuf)
         for i in range(MAX_CONN):
             reqbuf_cur_addr[i] = UInt64(reqbuf_start_address + i * REQ_BUFF_SIZE)
@@ -323,11 +315,11 @@ async fn epoll_worker(worker_id: Int):
         
         var epoll_wait_type = EPOLL_TIMEOUT_BLOCKING
         var connections_handled = 0
-        var max_connections = 100  # Match Rust demo limit
+        var max_connections = 100 # todo: make configurable
         
         print("Worker", worker_id, "starting epoll event loop")
         
-        # Main epoll event loop (matches Rust version exactly)
+        # Main epoll event loop
         while connections_handled < max_connections:
             var num_incoming_events = sys_epoll_wait(epfd, epoll_events, MAX_EPOLL_EVENTS_RETURNED, epoll_wait_type)
             
@@ -341,17 +333,17 @@ async fn epoll_worker(worker_id: Int):
                 var event = epoll_events[index]
                 var cur_fd = Int(event.data)
                 
-                # Calculate buffer addresses for this connection (matches Rust)
+                # Calculate buffer addresses for this connection
                 var req_buf_start_address = reqbuf_start_address + cur_fd * REQ_BUFF_SIZE
                 var req_buf_cur_position = reqbuf_cur_addr[cur_fd]
                 var residual = reqbuf_residual[cur_fd]
                 
                 if cur_fd == Int(listener_fd):
-                    # Accept new connection (matches Rust)
+                    # Accept new connection
                     var incoming_fd = sys_accept(Int(listener_fd), 0, 0)
                     
-                    if incoming_fd >= 0 and incoming_fd < MAX_CONN:
-                        # Reset buffer state for this connection (matches Rust)
+                    if likely(incoming_fd >= 0 and incoming_fd < MAX_CONN):
+                        # Reset buffer state for this connection
                         reqbuf_cur_addr[incoming_fd] = UInt64(reqbuf_start_address + incoming_fd * REQ_BUFF_SIZE)
                         reqbuf_residual[incoming_fd] = 0
                         
@@ -362,16 +354,16 @@ async fn epoll_worker(worker_id: Int):
                     else:
                         close_connection(epfd, cur_fd)
                 else:
-                    # Handle client connection (matches Rust buffer management)
+                    # Handle client connection
                     var buffer_remaining = REQ_BUFF_SIZE - Int(req_buf_cur_position - UInt64(req_buf_start_address))
                     var buf_ptr = reqbuf + (cur_fd * REQ_BUFF_SIZE) + Int(req_buf_cur_position - UInt64(req_buf_start_address))
                     var read_bytes = sys_recvfrom(cur_fd, buf_ptr, buffer_remaining, 0, 0, 0)
                     
-                    if read_bytes > 0:
+                    if likely(read_bytes > 0):
                         var request_buffer_offset = 0
                         var response_buffer_filled_total = 0
                         
-                        # Process potentially multiple pipelined requests (matches Rust)
+                        # Process potentially multiple pipelined requests
                         while request_buffer_offset != (read_bytes + residual):
                             var method = UnsafePointer[UInt8]()
                             var method_len = 0
@@ -403,7 +395,7 @@ async fn epoll_worker(worker_id: Int):
                             else:
                                 break
                         
-                        # Handle buffer state updates (matches Rust logic)
+                        # Handle buffer state updates
                         if request_buffer_offset == 0 or response_buffer_filled_total == 0:
                             # Reset buffer and close connection
                             reqbuf_cur_addr[cur_fd] = UInt64(req_buf_start_address)
@@ -419,14 +411,14 @@ async fn epoll_worker(worker_id: Int):
                             reqbuf_cur_addr[cur_fd] += UInt64(read_bytes)
                             reqbuf_residual[cur_fd] += (read_bytes - request_buffer_offset)
                         
-                        # Send response (matches Rust)
+                        # Send response
                         var wrote = sys_sendto(cur_fd, resbuf, response_buffer_filled_total, 0, 0, 0)
                         
-                        if wrote == response_buffer_filled_total:
+                        if likely(wrote == response_buffer_filled_total):
                             # Successful write - continue
                             pass
-                        elif wrote < 0 and (-wrote == EAGAIN or -wrote == 11):  # EINTR = 11
-                            # Handle EAGAIN/EINTR (matches Rust)
+                        elif unlikely(wrote < 0 and (-wrote == EAGAIN or -wrote == 11)):  # todo: make constant EINTR = 11 
+                            # Handle EAGAIN/EINTR
                             reqbuf_cur_addr[cur_fd] = UInt64(req_buf_start_address)
                             reqbuf_residual[cur_fd] = 0
                             close_connection(epfd, cur_fd)
@@ -441,7 +433,7 @@ async fn epoll_worker(worker_id: Int):
                     elif read_bytes < 0:
                         var errno = -read_bytes
                         if errno == EAGAIN or errno == EWOULDBLOCK:
-                            # Would block - continue (matches Rust)
+                            # Would block - continue
                             pass
                         else:
                             # Error - close connection
@@ -456,7 +448,7 @@ async fn epoll_worker(worker_id: Int):
         
         print("Worker", worker_id, "handled", connections_handled, "connections, shutting down")
         
-        # Cleanup (matches Rust)
+        # Cleanup
         epoll_events.free()
         reqbuf.free()
         reqbuf_cur_addr.free()
@@ -475,7 +467,7 @@ async fn epoll_worker(worker_id: Int):
         print("Worker", worker_id, "error:", e)
 
 # ===----------------------------------------------------------------------=== #
-# Main server function matching Rust go() function
+# Main server function
 # ===----------------------------------------------------------------------=== #
 
 fn example_callback(
@@ -498,7 +490,7 @@ fn go(
     """Main server function matching the Rust go() function."""
     print("Starting server on port", port)
     
-    # Attempt to set higher process priority (matches Rust version)
+    # Attempt to set higher process priority
     var priority_result = sys_setpriority(PRIO_PROCESS, 0, -19)
     if priority_result != 0:
         print("Warning: Could not set priority: setpriority: Permission denied")
@@ -526,7 +518,7 @@ fn go(
         task_group.create_task(worker_coro^)
         
         # Small delay to ensure workers are initialized in sequence
-        sleep(0.005)  # 5ms delay (matches Rust)
+        sleep(0.005)  # todo: make constant
     
     print("All epoll workers launched")
     print("Waiting for workers to initialize their sockets...")
@@ -538,7 +530,7 @@ fn go(
     print("Try: curl http://localhost:8080")
     
     # For now, let's wait for the workers to complete their demo runs
-    # In the real Rust version, this would be an infinite loop updating HTTP date
+    # todo: make this date update loop like in Rust
     print("Waiting for workers to complete their connection handling...")
     task_group.wait()
     print("All workers completed their demo runs")
