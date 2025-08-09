@@ -101,7 +101,7 @@ fn test_result_type():
     
     try:
         var value = success_result.value()
-        print("Success result value:", value)
+        # print("Success result value:", value)
     except e:
         print("Error getting value:", e)
     
