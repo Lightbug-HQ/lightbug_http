@@ -302,6 +302,10 @@ fn parse_request_path_pipelined_simd(
 # Thread Worker (matching Rust threaded_worker)
 # ===----------------------------------------------------------------------=== #
 
+# ===----------------------------------------------------------------------=== #
+# Thread Worker (matching Rust threaded_worker)
+# ===----------------------------------------------------------------------=== #
+
 fn threaded_worker(
     port: UInt16,
     cb: fn(UnsafePointer[UInt8], Int, UnsafePointer[UInt8], Int, UnsafePointer[UInt8], UnsafePointer[UInt8]) -> Int,
@@ -314,7 +318,12 @@ fn threaded_worker(
     
     # Get listener socket
     var (listener_fd, _, _) = get_listener_fd(port)
+    if listener_fd < 0:
+        print("Failed to create listener socket")
+        return
+    
     setup_connection(listener_fd)
+    print("Worker", cpu_core, "listening on fd", listener_fd)
     
     # Signal initialization complete
     _ = num_workers_inited[].fetch_add(1)
@@ -327,13 +336,24 @@ fn threaded_worker(
     
     # Create epoll instance
     var epfd = sys_epoll_create1(0)
+    if epfd < 0:
+        print("Failed to create epoll instance")
+        _ = close(listener_fd)
+        return
+    
+    print("Worker", cpu_core, "created epoll fd", epfd)
     
     # Add listener to epoll
     var epoll_event_listener = epoll_event()
     epoll_event_listener.events = EPOLLIN
     epoll_event_listener.data = UInt64(listener_fd)
-    _ = sys_epoll_ctl(epfd, EPOLL_CTL_ADD, listener_fd, 
-                     UnsafePointer(to=epoll_event_listener))
+    var ret = sys_epoll_ctl(epfd, EPOLL_CTL_ADD, listener_fd, 
+                           UnsafePointer(to=epoll_event_listener))
+    if ret < 0:
+        print("Failed to add listener to epoll")
+        _ = close(epfd)
+        _ = close(listener_fd)
+        return
     
     # Allocate aligned buffers
     var epoll_events = AlignedEpollEvents()
@@ -341,11 +361,11 @@ fn threaded_worker(
     var saved_event = epoll_event()
     saved_event.events = EPOLLIN
     
-    # Request buffer and state
+    # Request buffer and state - FIXED: Use Int arrays to store addresses
     var reqbuf = UnsafePointer[UInt8].alloc(REQ_BUFF_SIZE * MAX_CONN)
     memset_zero(reqbuf, REQ_BUFF_SIZE * MAX_CONN)
     
-    var reqbuf_cur_addr = UnsafePointer[UInt8].alloc(MAX_CONN)
+    var reqbuf_cur_addr = UnsafePointer[Int].alloc(MAX_CONN)  # Store as Int
     var reqbuf_residual = UnsafePointer[Int].alloc(MAX_CONN)
     
     # Initialize buffer addresses
@@ -360,6 +380,8 @@ fn threaded_worker(
     
     var epoll_wait_type = EPOLL_TIMEOUT_BLOCKING
     
+    print("Worker", cpu_core, "entering event loop")
+    
     # Main event loop
     while True:
         var num_incoming_events = sys_epoll_wait(epfd, epoll_events.data,
@@ -369,105 +391,138 @@ fn threaded_worker(
             epoll_wait_type = EPOLL_TIMEOUT_BLOCKING
             continue
         
+        print("Worker", cpu_core, "got", num_incoming_events, "events")
         epoll_wait_type = EPOLL_TIMEOUT_IMMEDIATE_RETURN
         
         for index in range(num_incoming_events):
             var event = epoll_events.data[index]
             var cur_fd = Int(event.data)
             
-            var req_buf_start_address = reqbuf_start + cur_fd * REQ_BUFF_SIZE
-            var req_buf_cur_position = UnsafePointer(to=reqbuf_cur_addr[cur_fd])
-            var residual = UnsafePointer(to=reqbuf_residual[cur_fd])
+            # print("Processing event for fd", cur_fd)
             
             if cur_fd == listener_fd:
                 # Accept new connection
                 var incoming_fd = sys_accept(listener_fd)
+                print("Accepted connection, fd", incoming_fd)
                 
                 if incoming_fd >= 0 and incoming_fd < MAX_CONN:
-                    req_buf_cur_position[] = req_buf_start_address
-                    residual[] = 0
+                    # Initialize buffer state for new connection
+                    reqbuf_cur_addr[incoming_fd] = reqbuf_start + incoming_fd * REQ_BUFF_SIZE
+                    reqbuf_residual[incoming_fd] = 0
+                    
                     setup_connection(incoming_fd)
                     saved_event.data = UInt64(incoming_fd)
-                    _ = sys_epoll_ctl(epfd, EPOLL_CTL_ADD, incoming_fd,
-                                     UnsafePointer(to=saved_event))
+                    var add_ret = sys_epoll_ctl(epfd, EPOLL_CTL_ADD, incoming_fd,
+                                               UnsafePointer(to=saved_event))
+                    if add_ret < 0:
+                        print("Failed to add fd", incoming_fd, "to epoll")
+                        _ = close(incoming_fd)
+                    else:
+                        print("Added fd", incoming_fd, "to epoll")
+                elif incoming_fd >= MAX_CONN:
+                    print("FD", incoming_fd, "exceeds MAX_CONN")
+                    _ = close(incoming_fd)
                 else:
-                    close_connection(epfd, cur_fd)
+                    print("Accept failed with fd", incoming_fd)
             else:
                 # Handle client connection
-                var buffer_remaining = Int(REQ_BUFF_SIZE - (req_buf_cur_position[] - req_buf_start_address))
-                var read = sys_recvfrom(cur_fd, 
-                                       req_buf_cur_position,
-                                       buffer_remaining, 0)
+                var req_buf_start_address = reqbuf_start + cur_fd * REQ_BUFF_SIZE
+                var req_buf_cur_position_addr = reqbuf_cur_addr[cur_fd]
+                var residual = reqbuf_residual[cur_fd]
+                
+                var buffer_remaining = REQ_BUFF_SIZE - (req_buf_cur_position_addr - req_buf_start_address)
+                
+                # Create pointer from address for recv
+                var recv_ptr = UnsafePointer[UInt8]()
+                recv_ptr = reqbuf + (cur_fd * REQ_BUFF_SIZE) + (req_buf_cur_position_addr - req_buf_start_address)
+                
+                var read = sys_recvfrom(cur_fd, recv_ptr, buffer_remaining, 0)
+                print("Read", read, "bytes from fd", cur_fd)
                 
                 if read > 0:
                     var request_buffer_offset = 0
                     var response_buffer_filled_total = 0
                     
                     # Process pipelined requests
-                    while request_buffer_offset != (read + residual[]):
+                    while request_buffer_offset != (read + residual):
                         var method = UnsafePointer[UInt8]()
                         var method_len = 0
                         var path = UnsafePointer[UInt8]()
                         var path_len = 0
                         
-                        var parse_start = UInt8(req_buf_cur_position[] - residual[] + request_buffer_offset)
+                        # Calculate parse buffer pointer
+                        var parse_offset = (req_buf_cur_position_addr - req_buf_start_address) - residual + request_buffer_offset
+                        var parse_ptr = reqbuf + (cur_fd * REQ_BUFF_SIZE) + parse_offset
+                        
                         var request_buffer_bytes_parsed = parse_request_path_pipelined_simd(
-                            UnsafePointer[UInt8](to=parse_start),
-                            read + residual[] - request_buffer_offset,
+                            parse_ptr,
+                            read + residual - request_buffer_offset,
                             UnsafePointer(to=method),
                             UnsafePointer(to=method_len),
                             UnsafePointer(to=path),
                             UnsafePointer(to=path_len)
                         )
                         
+                        # print("Parsed", request_buffer_bytes_parsed, "bytes")
+                        
                         if request_buffer_bytes_parsed > 0:
                             request_buffer_offset += request_buffer_bytes_parsed
-                            var resbuf_from_start = UInt8(resbuf_start + response_buffer_filled_total)
                             
+                            # Call callback to generate response
+                            var response_ptr = resbuf + response_buffer_filled_total
                             var response_buffer_filled = cb(
                                 method, method_len,
                                 path, path_len,
-                                UnsafePointer[UInt8](to=resbuf_from_start),
+                                response_ptr,
                                 http_date
                             )
                             response_buffer_filled_total += response_buffer_filled
+                            print("Generated", response_buffer_filled, "bytes of response")
                         else:
                             break
                     
                     # Update buffer state
                     if request_buffer_offset == 0 or response_buffer_filled_total == 0:
-                        req_buf_cur_position[] = req_buf_start_address
-                        residual[] = 0
+                        reqbuf_cur_addr[cur_fd] = req_buf_start_address
+                        reqbuf_residual[cur_fd] = 0
+                        print("Closing connection - no valid request")
                         close_connection(epfd, cur_fd)
                         continue
-                    elif request_buffer_offset == (read + residual[]):
-                        req_buf_cur_position[] = req_buf_start_address
-                        residual[] = 0
+                    elif request_buffer_offset == (read + residual):
+                        # Complete request processed
+                        reqbuf_cur_addr[cur_fd] = req_buf_start_address
+                        reqbuf_residual[cur_fd] = 0
                     else:
-                        req_buf_cur_position[] += read
-                        residual[] += (read - request_buffer_offset)
+                        # Partial request remains
+                        reqbuf_cur_addr[cur_fd] = req_buf_cur_position_addr + read
+                        reqbuf_residual[cur_fd] = residual + (read - request_buffer_offset)
                     
                     # Send response
-                    var resbuf_start_uint8 = UInt8(resbuf_start)
-                    var wrote = sys_sendto(cur_fd,
-                                         UnsafePointer[UInt8](to=resbuf_start_uint8),
-                                         response_buffer_filled_total, 0)
+                    var wrote = sys_sendto(cur_fd, resbuf, response_buffer_filled_total, 0)
+                    print("Sent", wrote, "bytes to fd", cur_fd)
                     
                     if wrote != response_buffer_filled_total:
                         if -wrote == EAGAIN or -wrote == EINTR:
-                            pass  # Would block, try again later
+                            print("Send would block")
                         else:
-                            req_buf_cur_position[] = req_buf_start_address
-                            residual[] = 0
+                            print("Send failed, closing connection")
+                            reqbuf_cur_addr[cur_fd] = req_buf_start_address
+                            reqbuf_residual[cur_fd] = 0
                             close_connection(epfd, cur_fd)
-                elif -read == EAGAIN or -read == EINTR:
-                    pass  # Would block
-                else:
-                    # Error or connection closed
-                    req_buf_cur_position[] = req_buf_start_address
-                    residual[] = 0
+                elif read == 0:
+                    # Connection closed by client
+                    print("Connection closed by client")
+                    reqbuf_cur_addr[cur_fd] = req_buf_start_address
+                    reqbuf_residual[cur_fd] = 0
                     close_connection(epfd, cur_fd)
-
+                elif -read == EAGAIN or -read == EINTR:
+                    print("Read would block")
+                else:
+                    # Error
+                    print("Read error:", -read)
+                    reqbuf_cur_addr[cur_fd] = req_buf_start_address
+                    reqbuf_residual[cur_fd] = 0
+                    close_connection(epfd, cur_fd)
 # ===----------------------------------------------------------------------=== #
 # Main Entry Point (matching Rust go function)
 # ===----------------------------------------------------------------------=== #
