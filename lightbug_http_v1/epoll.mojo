@@ -1,8 +1,9 @@
-from sys.ffi import external_call, c_int, c_long, c_size_t, c_void, c_uint, c_char
-from sys.info import num_logical_cores
+from sys.ffi import external_call, c_int, c_long, c_size_t, c_uint, c_char
+from sys.info import num_logical_cores, sizeof
 from memory import memset_zero, memcpy, UnsafePointer
 from time import sleep
 from os.atomic import Atomic
+from lightbug_http._libc import c_void
 import os
 
 # ===----------------------------------------------------------------------=== #
@@ -82,33 +83,41 @@ struct timespec:
 # Aligned structures (matching Rust's #[repr(align(64))])
 struct AlignedHttpDate:
     var data: UnsafePointer[UInt8]
+    var original: UnsafePointer[UInt8]  # Keep track of original allocation
     
     fn __init__(out self):
-        # Allocate 64-byte aligned memory
-        self.data = UnsafePointer[UInt8].alloc(35 + 64)
-        # Align to 64-byte boundary
-        var addr = Int(self.data)
-        var aligned = ((addr + 63) // 64) * 64
-        self.data.init_pointee_copy(aligned)
+        # Allocate extra space for alignment
+        self.original = UnsafePointer[UInt8].alloc(35 + 64)
+        # Calculate aligned address
+        var addr = Int(self.original)
+        var offset = 0
+        if addr % 64 != 0:
+            offset = 64 - (addr % 64)
+        # Use pointer arithmetic to get aligned pointer
+        self.data = self.original + offset
         memset_zero(self.data, 35)
     
     fn __del__(owned self):
-        # Note: This won't deallocate the original allocation properly
-        # In production, you'd need to track the original pointer
-        pass
+        self.original.free()
 
 struct AlignedEpollEvents:
     var data: UnsafePointer[epoll_event]
     var original: UnsafePointer[epoll_event]  # Track original for deallocation
     
     fn __init__(out self):
-        var size = MAX_EPOLL_EVENTS_RETURNED * sizeof[epoll_event]()
+        # Allocate extra space for alignment
         self.original = UnsafePointer[epoll_event].alloc(MAX_EPOLL_EVENTS_RETURNED + 16)
-        # Align to 64-byte boundary
+        # Calculate aligned address
         var addr = Int(self.original)
-        var aligned = ((addr + 63) // 64) * 64
-        self.data = UnsafePointer[epoll_event](address=aligned)
-        memset_zero(self.data, size)
+        var offset = 0
+        if addr % 64 != 0:
+            # Calculate offset in terms of epoll_event elements
+            var bytes_offset = 64 - (addr % 64)
+            # Convert byte offset to element offset (rounding up)
+            offset = (bytes_offset + sizeof[epoll_event]() - 1) // sizeof[epoll_event]()
+        # Use pointer arithmetic to get aligned pointer
+        self.data = self.original + offset
+        memset_zero(self.data, MAX_EPOLL_EVENTS_RETURNED * sizeof[epoll_event]())
     
     fn __del__(owned self):
         self.original.free()
@@ -143,7 +152,7 @@ fn sys_accept(sockfd: Int) -> Int:
     """Accept a connection on a socket."""
     return Int(external_call["accept", c_int, c_int, c_void, c_void](sockfd, 0, 0))
 
-fn sys_recvfrom(sockfd: Int, buf: UnsafePointer[Int], len: Int, flags: Int) -> Int:
+fn sys_recvfrom(sockfd: Int, buf: UnsafePointer[UInt8], len: Int, flags: Int) -> Int:
     """Receive data from a socket."""
     return Int(external_call["recvfrom", c_long, c_int, UnsafePointer[UInt8], c_size_t, c_int, c_void, c_void](
         sockfd, buf, len, flags, 0, 0))
@@ -336,7 +345,7 @@ fn threaded_worker(
     var reqbuf = UnsafePointer[UInt8].alloc(REQ_BUFF_SIZE * MAX_CONN)
     memset_zero(reqbuf, REQ_BUFF_SIZE * MAX_CONN)
     
-    var reqbuf_cur_addr = UnsafePointer[Int].alloc(MAX_CONN)
+    var reqbuf_cur_addr = UnsafePointer[UInt8].alloc(MAX_CONN)
     var reqbuf_residual = UnsafePointer[Int].alloc(MAX_CONN)
     
     # Initialize buffer addresses
@@ -385,7 +394,7 @@ fn threaded_worker(
                     close_connection(epfd, cur_fd)
             else:
                 # Handle client connection
-                var buffer_remaining = REQ_BUFF_SIZE - (req_buf_cur_position[] - req_buf_start_address)
+                var buffer_remaining = Int(REQ_BUFF_SIZE - (req_buf_cur_position[] - req_buf_start_address))
                 var read = sys_recvfrom(cur_fd, 
                                        req_buf_cur_position,
                                        buffer_remaining, 0)
@@ -401,9 +410,9 @@ fn threaded_worker(
                         var path = UnsafePointer[UInt8]()
                         var path_len = 0
                         
-                        var parse_start = req_buf_cur_position[] - residual[] + request_buffer_offset
+                        var parse_start = UInt8(req_buf_cur_position[] - residual[] + request_buffer_offset)
                         var request_buffer_bytes_parsed = parse_request_path_pipelined_simd(
-                            UnsafePointer[UInt8](address=parse_start),
+                            UnsafePointer[UInt8](to=parse_start),
                             read + residual[] - request_buffer_offset,
                             UnsafePointer(to=method),
                             UnsafePointer(to=method_len),
@@ -413,11 +422,12 @@ fn threaded_worker(
                         
                         if request_buffer_bytes_parsed > 0:
                             request_buffer_offset += request_buffer_bytes_parsed
+                            var resbuf_from_start = UInt8(resbuf_start + response_buffer_filled_total)
                             
                             var response_buffer_filled = cb(
                                 method, method_len,
                                 path, path_len,
-                                UnsafePointer[UInt8](address=resbuf_start + response_buffer_filled_total),
+                                UnsafePointer[UInt8](to=resbuf_from_start),
                                 http_date
                             )
                             response_buffer_filled_total += response_buffer_filled
@@ -438,8 +448,9 @@ fn threaded_worker(
                         residual[] += (read - request_buffer_offset)
                     
                     # Send response
+                    var resbuf_start_uint8 = UInt8(resbuf_start)
                     var wrote = sys_sendto(cur_fd,
-                                         UnsafePointer[UInt8](address=resbuf_start),
+                                         UnsafePointer[UInt8](to=resbuf_start_uint8),
                                          response_buffer_filled_total, 0)
                     
                     if wrote != response_buffer_filled_total:
