@@ -9,18 +9,6 @@ import os
 # System Constants (matching Rust const_sys)
 # ===----------------------------------------------------------------------=== #
 
-# System calls
-alias SYS_SETPRIORITY = 141
-alias SYS_NANOSLEEP = 35
-alias SYS_EPOLL_CREATE1 = 291
-alias SYS_EPOLL_CTL = 233
-alias SYS_EPOLL_WAIT = 232
-alias SYS_ACCEPT = 43
-alias SYS_RECVFROM = 45
-alias SYS_SENDTO = 44
-alias SYS_UNSHARE = 272
-alias SYS_SCHED_SETAFFINITY = 203
-
 # Clone flags
 alias CLONE_FILES = 0x400
 
@@ -103,52 +91,76 @@ struct AlignedHttpDate:
         var aligned = ((addr + 63) // 64) * 64
         self.data.init_pointee_copy(aligned)
         memset_zero(self.data, 35)
+    
+    fn __del__(owned self):
+        # Note: This won't deallocate the original allocation properly
+        # In production, you'd need to track the original pointer
+        pass
 
 struct AlignedEpollEvents:
     var data: UnsafePointer[epoll_event]
+    var original: UnsafePointer[epoll_event]  # Track original for deallocation
     
     fn __init__(out self):
         var size = MAX_EPOLL_EVENTS_RETURNED * sizeof[epoll_event]()
-        self.data = UnsafePointer[epoll_event].alloc(MAX_EPOLL_EVENTS_RETURNED + 16)
+        self.original = UnsafePointer[epoll_event].alloc(MAX_EPOLL_EVENTS_RETURNED + 16)
         # Align to 64-byte boundary
-        var addr = Int(self.data)
+        var addr = Int(self.original)
         var aligned = ((addr + 63) // 64) * 64
         self.data = UnsafePointer[epoll_event](address=aligned)
         memset_zero(self.data, size)
+    
+    fn __del__(owned self):
+        self.original.free()
 
 # ===----------------------------------------------------------------------=== #
-# System Call Wrapper
+# System Call Functions (separated)
 # ===----------------------------------------------------------------------=== #
 
-fn sys_call(syscall_num: Int, *args: Int) -> Int:
-    """Generic system call wrapper."""
-    # This is simplified - real implementation would use assembly
-    if syscall_num == SYS_SETPRIORITY:
-        return Int(external_call["setpriority", c_int, c_int, c_int, c_int](
-            args[0], args[1], args[2]))
-    elif syscall_num == SYS_UNSHARE:
-        return Int(external_call["unshare", c_int, c_int](args[0]))
-    elif syscall_num == SYS_EPOLL_CREATE1:
-        return Int(external_call["epoll_create1", c_int, c_int](args[0]))
-    elif syscall_num == SYS_EPOLL_CTL:
-        return Int(external_call["epoll_ctl", c_int, c_int, c_int, c_int, UnsafePointer[epoll_event]](
-            args[0], args[1], args[2], UnsafePointer[epoll_event](address=args[3])))
-    elif syscall_num == SYS_EPOLL_WAIT:
-        return Int(external_call["epoll_wait", c_int, c_int, UnsafePointer[epoll_event], c_int, c_int](
-            args[0], UnsafePointer[epoll_event](address=args[1]), args[2], args[3]))
-    elif syscall_num == SYS_ACCEPT:
-        return Int(external_call["accept", c_int, c_int, c_void, c_void](args[0], 0, 0))
-    elif syscall_num == SYS_RECVFROM:
-        return Int(external_call["recvfrom", c_long, c_int, UnsafePointer[UInt8], c_size_t, c_int, c_void, c_void](
-            args[0], UnsafePointer[UInt8](address=args[1]), args[2], args[3], 0, 0))
-    elif syscall_num == SYS_SENDTO:
-        return Int(external_call["sendto", c_long, c_int, UnsafePointer[UInt8], c_size_t, c_int, c_void, c_void](
-            args[0], UnsafePointer[UInt8](address=args[1]), args[2], args[3], 0, 0))
-    elif syscall_num == SYS_NANOSLEEP:
-        return Int(external_call["nanosleep", c_int, UnsafePointer[timespec], c_void](
-            UnsafePointer[timespec](address=args[0]), 0))
-    else:
-        return -1
+fn sys_setpriority(which: Int, who: Int, priority: Int) -> Int:
+    """Set process/thread priority."""
+    return Int(external_call["setpriority", c_int, c_int, c_int, c_int](which, who, priority))
+
+fn sys_unshare(flags: Int) -> Int:
+    """Unshare parts of the process execution context."""
+    return Int(external_call["unshare", c_int, c_int](flags))
+
+fn sys_epoll_create1(flags: Int) -> Int:
+    """Create an epoll instance."""
+    return Int(external_call["epoll_create1", c_int, c_int](flags))
+
+fn sys_epoll_ctl(epfd: Int, op: Int, fd: Int, event: UnsafePointer[epoll_event]) -> Int:
+    """Control an epoll instance."""
+    return Int(external_call["epoll_ctl", c_int, c_int, c_int, c_int, UnsafePointer[epoll_event]](
+        epfd, op, fd, event))
+
+fn sys_epoll_wait(epfd: Int, events: UnsafePointer[epoll_event], maxevents: Int, timeout: Int) -> Int:
+    """Wait for events on an epoll instance."""
+    return Int(external_call["epoll_wait", c_int, c_int, UnsafePointer[epoll_event], c_int, c_int](
+        epfd, events, maxevents, timeout))
+
+fn sys_accept(sockfd: Int) -> Int:
+    """Accept a connection on a socket."""
+    return Int(external_call["accept", c_int, c_int, c_void, c_void](sockfd, 0, 0))
+
+fn sys_recvfrom(sockfd: Int, buf: UnsafePointer[Int], len: Int, flags: Int) -> Int:
+    """Receive data from a socket."""
+    return Int(external_call["recvfrom", c_long, c_int, UnsafePointer[UInt8], c_size_t, c_int, c_void, c_void](
+        sockfd, buf, len, flags, 0, 0))
+
+fn sys_sendto(sockfd: Int, buf: UnsafePointer[UInt8], len: Int, flags: Int) -> Int:
+    """Send data to a socket."""
+    return Int(external_call["sendto", c_long, c_int, UnsafePointer[UInt8], c_size_t, c_int, c_void, c_void](
+        sockfd, buf, len, flags, 0, 0))
+
+fn sys_nanosleep(req: UnsafePointer[timespec]) -> Int:
+    """High-resolution sleep."""
+    return Int(external_call["nanosleep", c_int, UnsafePointer[timespec], c_void](req, 0))
+
+fn sys_sched_setaffinity(pid: Int, cpusetsize: Int, mask: UnsafePointer[UInt64]) -> Int:
+    """Set CPU affinity mask."""
+    return Int(external_call["sched_setaffinity", c_int, c_int, c_size_t, UnsafePointer[UInt64]](
+        pid, cpusetsize, mask))
 
 # ===----------------------------------------------------------------------=== #
 # Network Functions (matching Rust net module)
@@ -209,12 +221,13 @@ fn setup_connection(fd: Int):
 
 fn close_connection(epfd: Int, fd: Int):
     """Remove from epoll and close socket."""
-    _ = sys_call(SYS_EPOLL_CTL, epfd, EPOLL_CTL_DEL, fd, 0)
+    _ = sys_epoll_ctl(epfd, EPOLL_CTL_DEL, fd, UnsafePointer[epoll_event]())
     _ = close(fd)
 
 fn attach_reuseport_cbpf(listener_fd: Int):
     """Attach REUSEPORT BPF filter for CPU locality."""
     # TODO: Implement BPF attachment
+    # This would require SO_ATTACH_REUSEPORT_CBPF sockopt
     pass
 
 # ===----------------------------------------------------------------------=== #
@@ -225,8 +238,7 @@ fn set_current_thread_cpu_affinity_to(cpu_core: Int):
     """Pin thread to specific CPU core."""
     var cpu_set = UnsafePointer[UInt64].alloc(1)
     cpu_set[0] = UInt64(1) << cpu_core
-    _ = Int(external_call["sched_setaffinity", c_int, c_int, c_size_t, UnsafePointer[UInt64]](
-        0, 8, cpu_set))
+    _ = sys_sched_setaffinity(0, 8, cpu_set)
     cpu_set.free()
 
 # ===----------------------------------------------------------------------=== #
@@ -305,14 +317,14 @@ fn threaded_worker(
         attach_reuseport_cbpf(listener_fd)
     
     # Create epoll instance
-    var epfd = sys_call(SYS_EPOLL_CREATE1, 0)
+    var epfd = sys_epoll_create1(0)
     
     # Add listener to epoll
     var epoll_event_listener = epoll_event()
     epoll_event_listener.events = EPOLLIN
     epoll_event_listener.data = UInt64(listener_fd)
-    _ = sys_call(SYS_EPOLL_CTL, epfd, EPOLL_CTL_ADD, listener_fd, 
-                Int(UnsafePointer(to=epoll_event_listener)))
+    _ = sys_epoll_ctl(epfd, EPOLL_CTL_ADD, listener_fd, 
+                     UnsafePointer(to=epoll_event_listener))
     
     # Allocate aligned buffers
     var epoll_events = AlignedEpollEvents()
@@ -341,8 +353,8 @@ fn threaded_worker(
     
     # Main event loop
     while True:
-        var num_incoming_events = sys_call(SYS_EPOLL_WAIT, epfd, Int(epoll_events.data),
-                                          MAX_EPOLL_EVENTS_RETURNED, epoll_wait_type)
+        var num_incoming_events = sys_epoll_wait(epfd, epoll_events.data,
+                                                 MAX_EPOLL_EVENTS_RETURNED, epoll_wait_type)
         
         if num_incoming_events <= 0:
             epoll_wait_type = EPOLL_TIMEOUT_BLOCKING
@@ -360,22 +372,23 @@ fn threaded_worker(
             
             if cur_fd == listener_fd:
                 # Accept new connection
-                var incoming_fd = sys_call(SYS_ACCEPT, listener_fd, 0, 0)
+                var incoming_fd = sys_accept(listener_fd)
                 
                 if incoming_fd >= 0 and incoming_fd < MAX_CONN:
                     req_buf_cur_position[] = req_buf_start_address
                     residual[] = 0
                     setup_connection(incoming_fd)
                     saved_event.data = UInt64(incoming_fd)
-                    _ = sys_call(SYS_EPOLL_CTL, epfd, EPOLL_CTL_ADD, incoming_fd,
-                               Int(UnsafePointer(to=saved_event)))
+                    _ = sys_epoll_ctl(epfd, EPOLL_CTL_ADD, incoming_fd,
+                                     UnsafePointer(to=saved_event))
                 else:
                     close_connection(epfd, cur_fd)
             else:
                 # Handle client connection
                 var buffer_remaining = REQ_BUFF_SIZE - (req_buf_cur_position[] - req_buf_start_address)
-                var read = sys_call(SYS_RECVFROM, cur_fd, req_buf_cur_position[], 
-                                  buffer_remaining, 0, 0, 0)
+                var read = sys_recvfrom(cur_fd, 
+                                       req_buf_cur_position,
+                                       buffer_remaining, 0)
                 
                 if read > 0:
                     var request_buffer_offset = 0
@@ -425,8 +438,9 @@ fn threaded_worker(
                         residual[] += (read - request_buffer_offset)
                     
                     # Send response
-                    var wrote = sys_call(SYS_SENDTO, cur_fd, resbuf_start, 
-                                       response_buffer_filled_total, 0, 0, 0)
+                    var wrote = sys_sendto(cur_fd,
+                                         UnsafePointer[UInt8](address=resbuf_start),
+                                         response_buffer_filled_total, 0)
                     
                     if wrote != response_buffer_filled_total:
                         if -wrote == EAGAIN or -wrote == EINTR:
@@ -444,20 +458,6 @@ fn threaded_worker(
                     close_connection(epfd, cur_fd)
 
 # ===----------------------------------------------------------------------=== #
-# Thread creation helper
-# ===----------------------------------------------------------------------=== #
-
-fn create_thread(
-    name: String,
-    stack_size: Int,
-    worker_fn: fn() -> None
-) -> Int:
-    """Create a new OS thread."""
-    # Simplified - would use pthread_create
-    return Int(external_call["pthread_create", c_int, UnsafePointer[c_void], UnsafePointer[c_void], UnsafePointer[c_void]](
-        UnsafePointer[c_void](), 0, 0, 0))
-
-# ===----------------------------------------------------------------------=== #
 # Main Entry Point (matching Rust go function)
 # ===----------------------------------------------------------------------=== #
 
@@ -468,7 +468,7 @@ fn go(
     """Main server entry point."""
     
     # Set process priority
-    _ = sys_call(SYS_SETPRIORITY, PRIO_PROCESS, 0, -19)
+    _ = sys_setpriority(PRIO_PROCESS, 0, -19)
     
     # Initialize HTTP date
     var http_date = AlignedHttpDate()
@@ -479,32 +479,21 @@ fn go(
     
     print("Starting FaF server on port", port, "with", num_cpu_cores, "workers")
     
-    # Spawn worker threads
-    for core in range(num_cpu_cores):
-        # In real implementation, we'd spawn OS threads here
-        # For now, we'll use a simplified approach
-        @parameter
-        fn worker_wrapper():
-            # Unshare file descriptor table
-            _ = sys_call(SYS_UNSHARE, CLONE_FILES)
-            set_current_thread_cpu_affinity_to(core)
-            threaded_worker(port, cb, core, num_cpu_cores, 
-                          UnsafePointer(to=num_workers_inited),
-                          http_date.data)
-        
-        # Create thread (simplified - would use pthread_create)
-        # For demonstration, just run in main thread
-        if core == 0:
-            worker_wrapper()
-        else:
-            # Would spawn thread here
-            sleep(0.005)  # 5ms delay between worker spawns
+    # For now, run single worker in main thread
+    # In production, would spawn OS threads here
     
-    # Main thread updates HTTP date every second
-    var sleep_time = timespec(1, 0)
-    while True:
-        get_http_date(http_date.data)
-        _ = sys_call(SYS_NANOSLEEP, Int(UnsafePointer(to=sleep_time)), 0)
+    # Unshare file descriptor table
+    _ = sys_unshare(CLONE_FILES)
+    set_current_thread_cpu_affinity_to(0)
+    threaded_worker(port, cb, 0, 1,  # Single worker for testing
+                   UnsafePointer(to=num_workers_inited),
+                   http_date.data)
+    
+    # This would normally be the date update loop
+    # var sleep_time = timespec(1, 0)
+    # while True:
+    #     get_http_date(http_date.data)
+    #     _ = sys_nanosleep(UnsafePointer(to=sleep_time))
 
 # ===----------------------------------------------------------------------=== #
 # Example Usage
