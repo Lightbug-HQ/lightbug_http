@@ -125,7 +125,7 @@ fn get_token_to_eol(
         ret = -1
         return UnsafePointer[UInt8]()
     
-    token = String(token_start, token_len)
+    token = create_string_from_ptr(token_start, token_len)
     return current
 
 fn is_complete(
@@ -183,7 +183,7 @@ fn parse_token(
         ret = -2
         return UnsafePointer[UInt8]()
     
-    token = String(buf_start, Int(current) - Int(buf_start))
+    token = create_string_from_ptr(buf_start, Int(current) - Int(buf_start))
     token_len = Int(current) - Int(buf_start)
     return current
 
@@ -350,7 +350,7 @@ fn phr_parse_request(
     if current >= buf_end:
         return -2
     
-    path = String(path_start, Int(current) - Int(path_start))
+    path = create_string_from_ptr(path_start, Int(current) - Int(path_start))
     path_len = Int(current) - Int(path_start)
     
     # Skip spaces
@@ -720,6 +720,17 @@ fn memmove_bytes(
     """
     memmove[UInt8](dest, src, num_bytes)
 
+
+fn create_string_from_ptr(ptr: UnsafePointer[UInt8], length: Int) -> String:
+    """Create a String from a pointer and length."""
+    if length <= 0:
+        return String()
+    
+    var result = String()
+    result.reserve(length)
+    for i in range(length):
+        result += chr(Int(ptr[i]))
+    return result
 
 fn bufis(s: String, t: String) -> Bool:
     """Check if string s equals t."""
