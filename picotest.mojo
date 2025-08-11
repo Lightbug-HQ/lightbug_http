@@ -246,8 +246,8 @@ fn parse_headers(
         
         # Parse header name
         if num_headers == 0 or (current[] != ord(' ') and current[] != ord('\t')):
-            var name: String
-            var name_len: Int
+            var name = String()
+            var name_len = Int()
             current = parse_token(current, buf_end, name, name_len, ord(':'), ret)
             if not current or name_len == 0:
                 ret = -1
@@ -265,8 +265,8 @@ fn parse_headers(
             headers[num_headers].name_len = 0
         
         # Parse header value
-        var value: String
-        var value_len: Int
+        var value = String()
+        var value_len = Int()
         current = get_token_to_eol(current, buf_end, value, value_len, ret)
         if not current:
             return UnsafePointer[UInt8]()
@@ -615,7 +615,7 @@ fn phr_parse_response(
             i += 1
         msg = msg[i:]
         msg_len -= i
-    elif msg_len > 0 and msg[0] != ' ':
+    elif msg_len > 0 and msg[0] != String(' '):
         # Garbage found after status code
         return -1
     
@@ -727,13 +727,13 @@ fn bufis(s: String, t: String) -> Bool:
 
 fn test_request() raises:
     """Test HTTP request parsing."""
-    var method: String
-    var method_len: Int
-    var path: String
-    var path_len: Int
-    var minor_version: Int
+    var method = String()
+    var method_len = Int()
+    var path = String()
+    var path_len = Int()
+    var minor_version = Int()
     var headers = UnsafePointer[PhrHeader].alloc(4)
-    var num_headers: Int
+    var num_headers = Int()
     
     # Helper to create test buffer
     fn parse_test(
@@ -872,12 +872,12 @@ fn test_request() raises:
 
 fn test_response() raises:
     """Test HTTP response parsing."""
-    var minor_version: Int
-    var status: Int
-    var msg: String
-    var msg_len: Int
+    var minor_version = Int()
+    var status = Int()
+    var msg = String()
+    var msg_len = Int()
     var headers = UnsafePointer[PhrHeader].alloc(4)
-    var num_headers: Int
+    var num_headers = Int()
     
     fn parse_test(
         data: String,
@@ -984,7 +984,7 @@ fn test_response() raises:
 fn test_headers() raises:
     """Test header parsing."""
     var headers = UnsafePointer[PhrHeader].alloc(4)
-    var num_headers: Int
+    var num_headers = Int()
     
     fn parse_test(
         data: String,
@@ -1209,7 +1209,7 @@ fn main():
         test_headers()
         test_chunked()
         test_chunked_consume_trailer()
+        print("All tests passed!")
     except e:
         print("Test failed:", e)
     
-    print("All tests passed!")
