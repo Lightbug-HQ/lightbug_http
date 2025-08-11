@@ -767,9 +767,8 @@ fn create_string_from_ptr(ptr: UnsafePointer[UInt8], length: Int) -> String:
 fn bufis(s: String, t: String) -> Bool:
     """Check if string s equals t."""
     return s == t
-
 @fieldwise_init
-struct ParseResult(Copyable):
+struct ParseRequestResult(Copyable):
     var ret: Int
     var method: String
     var method_len: Int
@@ -777,23 +776,28 @@ struct ParseResult(Copyable):
     var path_len: Int
     var minor_version: Int
     var num_headers: Int
-    
-    fn __init__(out self):
-        self.ret = 0
-        self.method = String()
-        self.method_len = 0
-        self.path = String()
-        self.path_len = 0
-        self.minor_version = -1
-        self.num_headers = 0
 
-fn parse_test(
+@fieldwise_init
+struct ParseResponseResult(Copyable):
+    var ret: Int
+    var minor_version: Int
+    var status: Int
+    var msg: String
+    var msg_len: Int
+    var num_headers: Int
+
+@fieldwise_init
+struct ParseHeadersResult(Copyable):
+    var ret: Int
+    var num_headers: Int
+
+fn parse_request_test(
     data: String,
     last_len: Int,
     headers: UnsafePointer[PhrHeader]
-) -> ParseResult:
+) -> ParseRequestResult:
     """Helper to parse request and return results."""
-    var result = ParseResult()
+    var result = ParseRequestResult(0, String(), 0, String(), 0, -1, 0)
     
     var buf = data.as_bytes()
     var buf_ptr = UnsafePointer[UInt8].alloc(len(buf))
@@ -817,11 +821,66 @@ fn parse_test(
     buf_ptr.free()
     return result
 
+fn parse_response_test(
+    data: String,
+    last_len: Int,
+    headers: UnsafePointer[PhrHeader]
+) -> ParseResponseResult:
+    """Helper to parse response and return results."""
+    var result = ParseResponseResult(-1, -1, 0, String(), 0, 0)
+    
+    var buf = data.as_bytes()
+    var buf_ptr = UnsafePointer[UInt8].alloc(len(buf))
+    for i in range(len(buf)):
+        buf_ptr[i] = buf[i]
+    
+    result.num_headers = 4
+    result.ret = phr_parse_response(
+        buf_ptr,
+        len(buf),
+        result.minor_version,
+        result.status,
+        result.msg,
+        result.msg_len,
+        headers,
+        result.num_headers,
+        last_len
+    )
+    
+    buf_ptr.free()
+    return result
+
+fn parse_headers_test(
+    data: String,
+    last_len: Int,
+    headers: UnsafePointer[PhrHeader]
+) -> ParseHeadersResult:
+    """Helper to parse headers and return results."""
+    var result = ParseHeadersResult(0, 0)
+    
+    var buf = data.as_bytes()
+    var buf_ptr = UnsafePointer[UInt8].alloc(len(buf))
+    for i in range(len(buf)):
+        buf_ptr[i] = buf[i]
+    
+    result.num_headers = 4
+    result.ret = phr_parse_headers(
+        buf_ptr,
+        len(buf),
+        headers,
+        result.num_headers,
+        last_len
+    )
+    
+    buf_ptr.free()
+    return result
+
 fn test_request() raises:
     """Test HTTP request parsing."""
-    var headers = UnsafePointer[PhrHeader].alloc(4)    
+    var headers = UnsafePointer[PhrHeader].alloc(4)
+    
     # Simple request
-    var result = parse_test("GET / HTTP/1.0\r\n\r\n", 0, headers)
+    var result = parse_request_test("GET / HTTP/1.0\r\n\r\n", 0, headers)
     assert_equal(result.ret, 18)
     assert_equal(result.num_headers, 0)
     assert_true(bufis(result.method, "GET"))
@@ -829,11 +888,11 @@ fn test_request() raises:
     assert_equal(result.minor_version, 0)
     
     # Partial request
-    result = parse_test("GET / HTTP/1.0\r\n\r", 0, headers)
+    result = parse_request_test("GET / HTTP/1.0\r\n\r", 0, headers)
     assert_equal(result.ret, -2)
     
     # Request with headers
-    result = parse_test(
+    result = parse_request_test(
         "GET /hoge HTTP/1.1\r\nHost: example.com\r\nCookie: \r\n\r\n",
         0, headers
     )
@@ -847,7 +906,7 @@ fn test_request() raises:
     assert_true(bufis(headers[1].value, ""))
     
     # Multiline headers
-    result = parse_test(
+    result = parse_request_test(
         "GET / HTTP/1.0\r\nfoo: \r\nfoo: b\r\n  \tc\r\n\r\n",
         0, headers
     )
@@ -863,232 +922,177 @@ fn test_request() raises:
     assert_true(bufis(headers[2].value, "  \tc"))
     
     # Invalid header name with trailing space
-    result = parse_test(
+    result = parse_request_test(
         "GET / HTTP/1.0\r\nfoo : ab\r\n\r\n",
         0, headers
     )
     assert_equal(result.ret, -1)
     
     # Various incomplete requests
-    result = parse_test("GET", 0, headers)
+    result = parse_request_test("GET", 0, headers)
     assert_equal(result.ret, -2)
     
-    result = parse_test("GET ", 0, headers)
+    result = parse_request_test("GET ", 0, headers)
     assert_equal(result.ret, -2)
     assert_true(bufis(result.method, "GET"))
     
-    result = parse_test("GET /", 0, headers)
+    result = parse_request_test("GET /", 0, headers)
     assert_equal(result.ret, -2)
     
-    result = parse_test("GET / ", 0, headers)
+    result = parse_request_test("GET / ", 0, headers)
     assert_equal(result.ret, -2)
     assert_true(bufis(result.path, "/"))
     
-    result = parse_test("GET / H", 0, headers)
+    result = parse_request_test("GET / H", 0, headers)
     assert_equal(result.ret, -2)
     
-    result = parse_test("GET / HTTP/1.", 0, headers)
+    result = parse_request_test("GET / HTTP/1.", 0, headers)
     assert_equal(result.ret, -2)
     
-    result = parse_test("GET / HTTP/1.0", 0, headers)
+    result = parse_request_test("GET / HTTP/1.0", 0, headers)
     assert_equal(result.ret, -2)
     
-    result = parse_test("GET / HTTP/1.0\r", 0, headers)
+    result = parse_request_test("GET / HTTP/1.0\r", 0, headers)
     assert_equal(result.ret, -2)
     assert_equal(result.minor_version, 0)
     
     # Slowloris tests
     var test_str = "GET /hoge HTTP/1.0\r\n\r"
-    result = parse_test(test_str, len(test_str) - 1, headers)
+    result = parse_request_test(test_str, len(test_str) - 1, headers)
     assert_equal(result.ret, -2)
     
     var test_str_incomplete = "GET /hoge HTTP/1.0\r\n\r\n"
-    result = parse_test(test_str_incomplete, len(test_str_incomplete) - 1, headers)
+    result = parse_request_test(test_str_incomplete, len(test_str_incomplete) - 1, headers)
     assert_true(result.ret > 0)
     
     # Invalid requests
-    result = parse_test(" / HTTP/1.0\r\n\r\n", 0, headers)
+    result = parse_request_test(" / HTTP/1.0\r\n\r\n", 0, headers)
     assert_equal(result.ret, -1)
     
-    result = parse_test("GET  HTTP/1.0\r\n\r\n", 0, headers)
+    result = parse_request_test("GET  HTTP/1.0\r\n\r\n", 0, headers)
     assert_equal(result.ret, -1)
     
-    result = parse_test("GET / HTTP/1.0\r\n:a\r\n\r\n", 0, headers)
+    result = parse_request_test("GET / HTTP/1.0\r\n:a\r\n\r\n", 0, headers)
     assert_equal(result.ret, -1)
     
-    result = parse_test("GET / HTTP/1.0\r\n :a\r\n\r\n", 0, headers)
+    result = parse_request_test("GET / HTTP/1.0\r\n :a\r\n\r\n", 0, headers)
     assert_equal(result.ret, -1)
     
     # Multiple spaces between tokens
-    result = parse_test("GET   /   HTTP/1.0\r\n\r\n", 0, headers)
+    result = parse_request_test("GET   /   HTTP/1.0\r\n\r\n", 0, headers)
     assert_true(result.ret > 0)
     
     headers.free()
 
 fn test_response() raises:
     """Test HTTP response parsing."""
-    var minor_version = Int()
-    var status = Int()
-    var msg = String()
-    var msg_len = Int()
     var headers = UnsafePointer[PhrHeader].alloc(4)
-    var num_headers = Int()
-    
-    fn parse_test(
-        data: String,
-        last_len: Int,
-        expected: Int,
-        comment: String,
-    ) -> Int:
-        print("Testing:", comment)
-        var buf = data.as_bytes()
-        var buf_ptr = UnsafePointer[UInt8].alloc(len(buf))
-        for i in range(len(buf)):
-            buf_ptr[i] = buf[i]
-        
-        num_headers = 4
-        var result = phr_parse_response(
-            buf_ptr,
-            len(buf),
-            minor_version,
-            status,
-            msg,
-            msg_len,
-            headers,
-            num_headers,
-            last_len
-        )
-        
-        buf_ptr.free()
-        return result
     
     # Simple response
-    var ret = parse_test("HTTP/1.0 200 OK\r\n\r\n", 0, 0, "simple")
-    assert_equal(num_headers, 0)
-    assert_equal(status, 200)
-    assert_equal(minor_version, 0)
-    assert_true(bufis(msg, "OK"))
+    var result = parse_response_test("HTTP/1.0 200 OK\r\n\r\n", 0, headers)
+    assert_equal(result.ret, 19)
+    assert_equal(result.num_headers, 0)
+    assert_equal(result.status, 200)
+    assert_equal(result.minor_version, 0)
+    assert_true(bufis(result.msg, "OK"))
     
     # Partial response
-    ret = parse_test("HTTP/1.0 200 OK\r\n\r", 0, -2, "partial")
-    assert_equal(ret, -2)
+    result = parse_response_test("HTTP/1.0 200 OK\r\n\r", 0, headers)
+    assert_equal(result.ret, -2)
     
     # Response with headers
-    ret = parse_test(
+    result = parse_response_test(
         "HTTP/1.1 200 OK\r\nHost: example.com\r\nCookie: \r\n\r\n",
-        0, 0, "parse headers"
+        0, headers
     )
-    assert_equal(num_headers, 2)
-    assert_equal(minor_version, 1)
-    assert_equal(status, 200)
-    assert_true(bufis(msg, "OK"))
+    assert_equal(result.num_headers, 2)
+    assert_equal(result.minor_version, 1)
+    assert_equal(result.status, 200)
+    assert_true(bufis(result.msg, "OK"))
     assert_true(bufis(headers[0].name, "Host"))
     assert_true(bufis(headers[0].value, "example.com"))
     assert_true(bufis(headers[1].name, "Cookie"))
     assert_true(bufis(headers[1].value, ""))
     
     # Internal server error
-    ret = parse_test(
+    result = parse_response_test(
         "HTTP/1.0 500 Internal Server Error\r\n\r\n",
-        0, 0, "internal server error"
+        0, headers
     )
-    assert_equal(num_headers, 0)
-    assert_equal(minor_version, 0)
-    assert_equal(status, 500)
-    assert_true(bufis(msg, "Internal Server Error"))
+    assert_equal(result.num_headers, 0)
+    assert_equal(result.minor_version, 0)
+    assert_equal(result.status, 500)
+    assert_true(bufis(result.msg, "Internal Server Error"))
     
     # Various incomplete responses
-    ret = parse_test("H", 0, -2, "incomplete 1")
-    assert_equal(ret, -2)
+    result = parse_response_test("H", 0, headers)
+    assert_equal(result.ret, -2)
     
-    ret = parse_test("HTTP/1.", 0, -2, "incomplete 2")
-    assert_equal(ret, -2)
+    result = parse_response_test("HTTP/1.", 0, headers)
+    assert_equal(result.ret, -2)
     
-    ret = parse_test("HTTP/1.1", 0, -2, "incomplete 3")
-    assert_equal(ret, -2)
+    result = parse_response_test("HTTP/1.1", 0, headers)
+    assert_equal(result.ret, -2)
     
-    ret = parse_test("HTTP/1.1 ", 0, -2, "incomplete 4")
-    assert_equal(ret, -2)
+    result = parse_response_test("HTTP/1.1 ", 0, headers)
+    assert_equal(result.ret, -2)
     
-    ret = parse_test("HTTP/1.1 2", 0, -2, "incomplete 5")
-    assert_equal(ret, -2)
+    result = parse_response_test("HTTP/1.1 2", 0, headers)
+    assert_equal(result.ret, -2)
     
-    ret = parse_test("HTTP/1.1 200", 0, -2, "incomplete 6")
-    assert_equal(ret, -2)
+    result = parse_response_test("HTTP/1.1 200", 0, headers)
+    assert_equal(result.ret, -2)
     
-    ret = parse_test("HTTP/1.1 200 ", 0, -2, "incomplete 7")
-    assert_equal(ret, -2)
+    result = parse_response_test("HTTP/1.1 200 ", 0, headers)
+    assert_equal(result.ret, -2)
     
     # Accept missing trailing whitespace in status-line
-    ret = parse_test("HTTP/1.1 200\r\n\r\n", 0, 0, "accept missing trailing whitespace in status-line")
-    assert_true(ret > 0)
-    assert_true(bufis(msg, ""))
+    result = parse_response_test("HTTP/1.1 200\r\n\r\n", 0, headers)
+    assert_true(result.ret > 0)
+    assert_true(bufis(result.msg, ""))
     
     # Invalid responses
-    ret = parse_test("HTTP/1. 200 OK\r\n\r\n", 0, -1, "invalid http version")
-    assert_equal(ret, -1)
+    result = parse_response_test("HTTP/1. 200 OK\r\n\r\n", 0, headers)
+    assert_equal(result.ret, -1)
     
-    ret = parse_test("HTTP/1.2z 200 OK\r\n\r\n", 0, -1, "invalid http version 2")
-    assert_equal(ret, -1)
+    result = parse_response_test("HTTP/1.2z 200 OK\r\n\r\n", 0, headers)
+    assert_equal(result.ret, -1)
     
-    ret = parse_test("HTTP/1.1  OK\r\n\r\n", 0, -1, "no status code")
-    assert_equal(ret, -1)
+    result = parse_response_test("HTTP/1.1  OK\r\n\r\n", 0, headers)
+    assert_equal(result.ret, -1)
     
     headers.free()
 
 fn test_headers() raises:
     """Test header parsing."""
     var headers = UnsafePointer[PhrHeader].alloc(4)
-    var num_headers = Int()
-    
-    fn parse_test(
-        data: String,
-        last_len: Int,
-        expected: Int,
-        comment: String,
-    ) -> Int:
-        print("Testing:", comment)
-        var buf = data.as_bytes()
-        var buf_ptr = UnsafePointer[UInt8].alloc(len(buf))
-        for i in range(len(buf)):
-            buf_ptr[i] = buf[i]
-        
-        num_headers = 4
-        var result = phr_parse_headers(
-            buf_ptr,
-            len(buf),
-            headers,
-            num_headers,
-            last_len
-        )
-        
-        buf_ptr.free()
-        return result
     
     # Simple headers
-    var ret = parse_test(
+    var result = parse_headers_test(
         "Host: example.com\r\nCookie: \r\n\r\n",
-        0, 0, "simple"
+        0, headers
     )
-    assert_equal(num_headers, 2)
+    assert_equal(result.ret, 32)
+    assert_equal(result.num_headers, 2)
     assert_true(bufis(headers[0].name, "Host"))
     assert_true(bufis(headers[0].value, "example.com"))
     assert_true(bufis(headers[1].name, "Cookie"))
     assert_true(bufis(headers[1].value, ""))
     
     # Slowloris test
-    ret = parse_test(
+    result = parse_headers_test(
         "Host: example.com\r\nCookie: \r\n\r\n",
-        1, 0, "slowloris"
+        1, headers
     )
-    assert_equal(num_headers, 2)
+    assert_equal(result.num_headers, 2)
+    assert_true(result.ret > 0)
     
     # Partial headers
-    ret = parse_test(
+    result = parse_headers_test(
         "Host: example.com\r\nCookie: \r\n\r",
-        0, -2, "partial"
+        0, headers
     )
-    assert_equal(ret, -2)
+    assert_equal(result.ret, -2)
     
     headers.free()
 
