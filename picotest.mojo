@@ -136,12 +136,20 @@ fn is_complete(
 ) -> UnsafePointer[UInt8]:
     """Check if request/response is complete."""
     var ret_cnt = 0
-    var current = buf + max(0, last_len - 3)
+    var current = buf
+    
+    # If we have previous data, we only need to check the new data
+    # and a bit of overlap to catch split CRLF sequences
+    if last_len > 0:
+        current = buf + max(0, last_len - 3)
     
     while current < buf_end:
         if current[] == 0x0D:  # '\r'
             current += 1
-            if current >= buf_end or current[] != 0x0A:  # '\n'
+            if current >= buf_end:
+                ret = -2
+                return UnsafePointer[UInt8]()
+            if current[] != 0x0A:  # '\n'
                 ret = -1
                 return UnsafePointer[UInt8]()
             current += 1
@@ -150,8 +158,8 @@ fn is_complete(
             current += 1
             ret_cnt += 1
         else:
-            current += 1
             ret_cnt = 0
+            current += 1
         
         if ret_cnt == 2:
             return current
@@ -173,19 +181,16 @@ fn parse_token(
     
     while current < buf_end:
         if current[] == next_char:
-            break
+            token_len = Int(current) - Int(buf_start)  # Set token_len BEFORE creating string
+            token = create_string_from_ptr(buf_start, token_len)
+            return current
         elif not TOKEN_CHAR_MAP[Int(current[])]:
             ret = -1
             return UnsafePointer[UInt8]()
         current += 1
     
-    if current >= buf_end:
-        ret = -2
-        return UnsafePointer[UInt8]()
-    
-    token = create_string_from_ptr(buf_start, Int(current) - Int(buf_start))
-    token_len = Int(current) - Int(buf_start)
-    return current
+    ret = -2
+    return UnsafePointer[UInt8]()
 
 fn parse_http_version(
     buf: UnsafePointer[UInt8],
@@ -200,17 +205,17 @@ fn parse_http_version(
     
     var current = buf
     # Check "HTTP/1."
-    if (current[] != ord('H') or current[1] != ord('T') or 
-        current[2] != ord('T') or current[3] != ord('P') or
-        current[4] != ord('/') or current[5] != ord('1') or
-        current[6] != ord('.')):
+    if (current[] != UInt8(ord('H')) or current[1] != UInt8(ord('T')) or 
+        current[2] != UInt8(ord('T')) or current[3] != UInt8(ord('P')) or
+        current[4] != UInt8(ord('/')) or current[5] != UInt8(ord('1')) or
+        current[6] != UInt8(ord('.'))):
         ret = -1
         return UnsafePointer[UInt8]()
     
     current += 7
     
     # Parse minor version
-    if current[] < ord('0') or current[] > ord('9'):
+    if current[] < UInt8(ord('0')) or current[] > UInt8(ord('9')):
         ret = -1
         return UnsafePointer[UInt8]()
     
@@ -245,11 +250,11 @@ fn parse_headers(
             return UnsafePointer[UInt8]()
         
         # Parse header name
-        if num_headers == 0 or (current[] != ord(' ') and current[] != ord('\t')):
+        if num_headers == 0 or (current[] != UInt8(ord(' ')) and current[] != UInt8(ord('\t'))):
             var name = String()
             var name_len = Int()
-            current = parse_token(current, buf_end, name, name_len, ord(':'), ret)
-            if not current or name_len == 0:
+            current = parse_token(current, buf_end, name, name_len, UInt8(ord(':')), ret)
+            if current == UnsafePointer[UInt8]() or name_len == 0:
                 ret = -1
                 return UnsafePointer[UInt8]()
             
@@ -258,7 +263,7 @@ fn parse_headers(
             current += 1  # Skip ':'
             
             # Skip whitespace
-            while current < buf_end and (current[] == ord(' ') or current[] == ord('\t')):
+            while current < buf_end and (current[] == UInt8(ord(' ')) or current[] == UInt8(ord('\t'))):
                 current += 1
         else:
             headers[num_headers].name = String()
@@ -268,13 +273,13 @@ fn parse_headers(
         var value = String()
         var value_len = Int()
         current = get_token_to_eol(current, buf_end, value, value_len, ret)
-        if not current:
+        if current == UnsafePointer[UInt8]():
             return UnsafePointer[UInt8]()
         
         # Trim trailing whitespace from value
         while value_len > 0:
             var c = value[value_len - 1]
-            if ord(c) != ord(' ') and ord(c) != ord('\t'):
+            if UInt8(ord(c)) != UInt8(ord(' ')) and UInt8(ord(c)) != UInt8(ord('\t')):
                 break
             value_len -= 1
         
@@ -314,35 +319,42 @@ fn phr_parse_request(
     minor_version = -1
     num_headers = 0
     
-    # Check if request is complete
+    # Check if request is complete (only if we have previous data)
     if last_len != 0:
         var complete = is_complete(buf_start, buf_end, last_len, ret)
-        if not complete:
+        if complete == UnsafePointer[UInt8]():
             return ret
+        # Don't update current here - we want to parse from the beginning
     
-    # Skip empty line if present
-    if current < buf_end:
+    # Skip initial empty lines (for tolerance)
+    while current < buf_end:
         if current[] == 0x0D:  # '\r'
             current += 1
-            if current >= buf_end or current[] != 0x0A:  # '\n'
-                return -1
+            if current >= buf_end:
+                return -2
+            if current[] != 0x0A:  # '\n'
+                break  # Not an empty line, start parsing
             current += 1
         elif current[] == 0x0A:  # '\n'
             current += 1
+        else:
+            break  # Start of actual request
     
     # Parse method
-    current = parse_token(current, buf_end, method, method_len, ord(' '), ret)
-    if not current:
+    current = parse_token(current, buf_end, method, method_len, UInt8(ord(' ')), ret)
+    if current == UnsafePointer[UInt8]():
         return ret
     
-    # Skip spaces
+    # Skip the space
     current += 1
-    while current < buf_end and current[] == ord(' '):
+    
+    # Skip any extra spaces
+    while current < buf_end and current[] == UInt8(ord(' ')):
         current += 1
     
     # Parse path
     var path_start = current
-    while current < buf_end and current[] != ord(' '):
+    while current < buf_end and current[] != UInt8(ord(' ')):
         if not is_printable_ascii(current[]):
             return -1
         current += 1
@@ -350,22 +362,30 @@ fn phr_parse_request(
     if current >= buf_end:
         return -2
     
-    path = create_string_from_ptr(path_start, Int(current) - Int(path_start))
     path_len = Int(current) - Int(path_start)
+    path = create_string_from_ptr(path_start, path_len)
     
-    # Skip spaces
-    while current < buf_end and current[] == ord(' '):
+    # Skip spaces before HTTP version
+    while current < buf_end and current[] == UInt8(ord(' ')):
         current += 1
+    
+    if current >= buf_end:
+        return -2
     
     # Parse HTTP version
     current = parse_http_version(current, buf_end, minor_version, ret)
-    if not current:
+    if current == UnsafePointer[UInt8]():
         return ret
     
-    # Parse end of request line
+    # Expect CRLF or LF after version
+    if current >= buf_end:
+        return -2
+    
     if current[] == 0x0D:  # '\r'
         current += 1
-        if current >= buf_end or current[] != 0x0A:  # '\n'
+        if current >= buf_end:
+            return -2
+        if current[] != 0x0A:  # '\n'
             return -1
         current += 1
     elif current[] == 0x0A:  # '\n'
@@ -375,19 +395,19 @@ fn phr_parse_request(
     
     # Parse headers
     current = parse_headers(current, buf_end, headers, num_headers, max_headers, ret)
-    if not current:
+    if current == UnsafePointer[UInt8]():
         return ret
     
     return Int(current) - Int(buf_start)
 
 fn decode_hex(ch: UInt8) -> Int:
     """Decode hexadecimal character."""
-    if ch >= ord('0') and ch <= ord('9'):
-        return Int(ch - ord('0'))
-    elif ch >= ord('A') and ch <= ord('F'):
-        return Int(ch - ord('A') + 10)
-    elif ch >= ord('a') and ch <= ord('f'):
-        return Int(ch - ord('a') + 10)
+    if ch >= UInt8(ord('0')) and ch <= UInt8(ord('9')):
+        return Int(ch - UInt8(ord('0')))
+    elif ch >= UInt8(ord('A')) and ch <= UInt8(ord('F')):
+        return Int(ch - UInt8(ord('A')) + 10)
+    elif ch >= UInt8(ord('a')) and ch <= UInt8(ord('f')):
+        return Int(ch - UInt8(ord('a')) + 10)
     else:
         return -1
 
@@ -412,8 +432,8 @@ fn phr_decode_chunked(
                         return -1
                     # Check for valid characters after chunk size
                     var c = buf[src]
-                    if c != ord(' ') and c != ord('\t') and c != ord(';') and 
-                       c != ord('\n') and c != ord('\r'):
+                    if c != UInt8(ord(' ')) and c != UInt8(ord('\t')) and c != UInt8(ord(';')) and 
+                       c != UInt8(ord('\n')) and c != UInt8(ord('\r')):
                         return -1
                     break
                 
@@ -432,9 +452,9 @@ fn phr_decode_chunked(
             
         elif decoder._state == CHUNKED_IN_CHUNK_EXT:
             while src < bufsz:
-                if buf[src] == ord('\r'):
+                if buf[src] == UInt8(ord('\r')):
                     break
-                elif buf[src] == ord('\n'):
+                elif buf[src] == UInt8(ord('\n')):
                     return -1
                 src += 1
             
@@ -448,7 +468,7 @@ fn phr_decode_chunked(
             if src >= bufsz:
                 break
             
-            if buf[src] != ord('\n'):
+            if buf[src] != UInt8(ord('\n')):
                 return -1
             
             src += 1
@@ -485,7 +505,7 @@ fn phr_decode_chunked(
             if src >= bufsz:
                 break
             
-            if buf[src] != ord('\r'):
+            if buf[src] != UInt8(ord('\r')):
                 return -1
             
             src += 1
@@ -495,7 +515,7 @@ fn phr_decode_chunked(
             if src >= bufsz:
                 break
             
-            if buf[src] != ord('\n'):
+            if buf[src] != UInt8(ord('\n')):
                 return -1
             
             src += 1
@@ -503,14 +523,14 @@ fn phr_decode_chunked(
             
         elif decoder._state == CHUNKED_IN_TRAILERS_LINE_HEAD:
             while src < bufsz:
-                if buf[src] != ord('\r'):
+                if buf[src] != UInt8(ord('\r')):
                     break
                 src += 1
             
             if src >= bufsz:
                 break
             
-            if buf[src] == ord('\n'):
+            if buf[src] == UInt8(ord('\n')):
                 src += 1
                 ret = bufsz - src
                 break
@@ -519,7 +539,7 @@ fn phr_decode_chunked(
             
         elif decoder._state == CHUNKED_IN_TRAILERS_LINE_MIDDLE:
             while src < bufsz:
-                if buf[src] == ord('\n'):
+                if buf[src] == UInt8(ord('\n')):
                     break
                 src += 1
             
@@ -575,19 +595,19 @@ fn phr_parse_response(
     # Check if response is complete
     if last_len != 0:
         var complete = is_complete(buf_start, buf_end, last_len, ret)
-        if not complete:
+        if complete == UnsafePointer[UInt8]():  # Fix: check for null pointer
             return ret
     
     # Parse HTTP version
     current = parse_http_version(current, buf_end, minor_version, ret)
-    if not current:
+    if current == UnsafePointer[UInt8]():
         return ret
     
     # Skip space(s)
-    if current[] != ord(' '):
+    if current[] != UInt8(ord(' ')):
         return -1
     
-    while current < buf_end and current[] == ord(' '):
+    while current < buf_end and current[] == UInt8(ord(' ')):
         current += 1
     
     # Parse status code (3 digits)
@@ -597,15 +617,15 @@ fn phr_parse_response(
     # Parse 3-digit status code
     status = 0
     for i in range(3):
-        if current[] < ord('0') or current[] > ord('9'):
+        if current[] < UInt8(ord('0')) or current[] > UInt8(ord('9')):
             return -1
-        status = status * 10 + Int(current[] - ord('0'))
+        status = status * 10 + Int(current[] - UInt8(ord('0')))
         current += 1
     
     # Get message including preceding space
     var msg_start = current
     current = get_token_to_eol(current, buf_end, msg, msg_len, ret)
-    if not current:
+    if current == UnsafePointer[UInt8]():
         return ret
     
     # Remove preceding spaces from message
@@ -621,7 +641,7 @@ fn phr_parse_response(
     
     # Parse headers
     current = parse_headers(current, buf_end, headers, num_headers, max_headers, ret)
-    if not current:
+    if current == UnsafePointer[UInt8]():
         return ret
     
     return Int(current) - Int(buf_start)
@@ -643,12 +663,12 @@ fn phr_parse_headers(
     # Check if headers are complete
     if last_len != 0:
         var complete = is_complete(buf_start, buf_end, last_len, ret)
-        if not complete:
+        if complete == UnsafePointer[UInt8]():  # Fix: check for null pointer
             return ret
     
     # Parse headers
     var current = parse_headers(buf_start, buf_end, headers, num_headers, max_headers, ret)
-    if not current:
+    if current == UnsafePointer[UInt8]():
         return ret
     
     return Int(current) - Int(buf_start)
