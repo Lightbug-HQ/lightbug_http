@@ -588,7 +588,7 @@ fn phr_parse_response(
         current += 1
     
     # Parse status code (3 digits)
-    if buf_end - current < 4:
+    if Int(buf_end) - Int(current) < 4:
         return -2
     
     # Parse 3-digit status code
@@ -596,7 +596,7 @@ fn phr_parse_response(
     for i in range(3):
         if current[] < ord('0') or current[] > ord('9'):
             return -1
-        status = status * 10 + (current[] - ord('0'))
+        status = status * 10 + Int(current[] - ord('0'))
         current += 1
     
     # Get message including preceding space
@@ -716,3 +716,14 @@ fn memmove_bytes(
         The destination pointer
     """
     memmove[UInt8](dest, src, num_bytes)
+
+fn create_string_from_ptr(ptr: UnsafePointer[UInt8], length: Int) -> String:
+    """Create a String from a pointer and length."""
+    if length <= 0:
+        return String()
+    
+    var result = String()
+    result.reserve(length)
+    for i in range(length):
+        result += chr(Int(ptr[i]))
+    return result
