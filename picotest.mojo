@@ -329,7 +329,6 @@ fn phr_parse_request(
         var complete = is_complete(buf_start, buf_end, last_len, ret)
         if complete == UnsafePointer[UInt8]():
             return ret
-        # Don't update current here - we want to parse from the beginning
     
     # Skip initial empty lines (for tolerance)
     while current < buf_end:
@@ -350,6 +349,10 @@ fn phr_parse_request(
     if current == UnsafePointer[UInt8]():
         return ret
     
+    # Check if method is empty - this is the fix!
+    if method_len == 0:
+        return -1
+    
     # Skip the space
     current += 1
     
@@ -369,6 +372,10 @@ fn phr_parse_request(
     
     path_len = Int(current) - Int(path_start)
     path = create_string_from_ptr(path_start, path_len)
+    
+    # Check if path is empty - add this check too!
+    if path_len == 0:
+        return -1
     
     # Skip spaces before HTTP version
     while current < buf_end and current[] == UInt8(ord(' ')):
@@ -761,81 +768,93 @@ fn bufis(s: String, t: String) -> Bool:
     """Check if string s equals t."""
     return s == t
 
+@fieldwise_init
+struct ParseResult(Copyable):
+    var ret: Int
+    var method: String
+    var method_len: Int
+    var path: String
+    var path_len: Int
+    var minor_version: Int
+    var num_headers: Int
+    
+    fn __init__(out self):
+        self.ret = 0
+        self.method = String()
+        self.method_len = 0
+        self.path = String()
+        self.path_len = 0
+        self.minor_version = -1
+        self.num_headers = 0
+
+fn parse_test(
+    data: String,
+    last_len: Int,
+    headers: UnsafePointer[PhrHeader]
+) -> ParseResult:
+    """Helper to parse request and return results."""
+    var result = ParseResult()
+    
+    var buf = data.as_bytes()
+    var buf_ptr = UnsafePointer[UInt8].alloc(len(buf))
+    for i in range(len(buf)):
+        buf_ptr[i] = buf[i]
+    
+    result.num_headers = 4
+    result.ret = phr_parse_request(
+        buf_ptr,
+        len(buf),
+        result.method,
+        result.method_len,
+        result.path,
+        result.path_len,
+        result.minor_version,
+        headers,
+        result.num_headers,
+        last_len
+    )
+    
+    buf_ptr.free()
+    return result
+
 fn test_request() raises:
     """Test HTTP request parsing."""
-    var method = String()
-    var method_len = Int()
-    var path = String()
-    var path_len = Int()
-    var minor_version = Int()
-    var headers = UnsafePointer[PhrHeader].alloc(4)
-    var num_headers = Int()
-    
-    # Helper to create test buffer
-    fn parse_test(
-        data: String,
-        last_len: Int,
-        expected: Int,
-        comment: String,
-    ) -> Int:
-        print("Testing:", comment)
-        var buf = data.as_bytes()
-        var buf_ptr = UnsafePointer[UInt8].alloc(len(buf))
-        for i in range(len(buf)):
-            buf_ptr[i] = buf[i]
-        
-        num_headers = 4
-        var result = phr_parse_request(
-            buf_ptr,
-            len(buf),
-            method,
-            method_len,
-            path,
-            path_len,
-            minor_version,
-            headers,
-            num_headers,
-            last_len
-        )
-        
-        buf_ptr.free()
-        return result
-    
+    var headers = UnsafePointer[PhrHeader].alloc(4)    
     # Simple request
-    var ret = parse_test("GET / HTTP/1.0\r\n\r\n", 0, 0, "simple")
-    assert_equal(ret, 18)
-    assert_equal(num_headers, 0)
-    assert_true(bufis(method, "GET"))
-    assert_true(bufis(path, "/"))
-    assert_equal(minor_version, 0)
+    var result = parse_test("GET / HTTP/1.0\r\n\r\n", 0, headers)
+    assert_equal(result.ret, 18)
+    assert_equal(result.num_headers, 0)
+    assert_true(bufis(result.method, "GET"))
+    assert_true(bufis(result.path, "/"))
+    assert_equal(result.minor_version, 0)
     
     # Partial request
-    ret = parse_test("GET / HTTP/1.0\r\n\r", 0, -2, "partial")
-    assert_equal(ret, -2)
+    result = parse_test("GET / HTTP/1.0\r\n\r", 0, headers)
+    assert_equal(result.ret, -2)
     
     # Request with headers
-    ret = parse_test(
+    result = parse_test(
         "GET /hoge HTTP/1.1\r\nHost: example.com\r\nCookie: \r\n\r\n",
-        0, 0, "parse headers"
+        0, headers
     )
-    assert_equal(num_headers, 2)
-    assert_true(bufis(method, "GET"))
-    assert_true(bufis(path, "/hoge"))
-    assert_equal(minor_version, 1)
+    assert_equal(result.num_headers, 2)
+    assert_true(bufis(result.method, "GET"))
+    assert_true(bufis(result.path, "/hoge"))
+    assert_equal(result.minor_version, 1)
     assert_true(bufis(headers[0].name, "Host"))
     assert_true(bufis(headers[0].value, "example.com"))
     assert_true(bufis(headers[1].name, "Cookie"))
     assert_true(bufis(headers[1].value, ""))
     
     # Multiline headers
-    ret = parse_test(
+    result = parse_test(
         "GET / HTTP/1.0\r\nfoo: \r\nfoo: b\r\n  \tc\r\n\r\n",
-        0, 0, "parse multiline"
+        0, headers
     )
-    assert_equal(num_headers, 3)
-    assert_true(bufis(method, "GET"))
-    assert_true(bufis(path, "/"))
-    assert_equal(minor_version, 0)
+    assert_equal(result.num_headers, 3)
+    assert_true(bufis(result.method, "GET"))
+    assert_true(bufis(result.path, "/"))
+    assert_equal(result.minor_version, 0)
     assert_true(bufis(headers[0].name, "foo"))
     assert_true(bufis(headers[0].value, ""))
     assert_true(bufis(headers[1].name, "foo"))
@@ -844,65 +863,65 @@ fn test_request() raises:
     assert_true(bufis(headers[2].value, "  \tc"))
     
     # Invalid header name with trailing space
-    ret = parse_test(
+    result = parse_test(
         "GET / HTTP/1.0\r\nfoo : ab\r\n\r\n",
-        0, -1, "parse header name with trailing space"
+        0, headers
     )
-    assert_equal(ret, -1)
+    assert_equal(result.ret, -1)
     
     # Various incomplete requests
-    ret = parse_test("GET", 0, -2, "incomplete 1")
-    assert_equal(ret, -2)
+    result = parse_test("GET", 0, headers)
+    assert_equal(result.ret, -2)
     
-    ret = parse_test("GET ", 0, -2, "incomplete 2")
-    assert_equal(ret, -2)
-    assert_true(bufis(method, "GET"))
+    result = parse_test("GET ", 0, headers)
+    assert_equal(result.ret, -2)
+    assert_true(bufis(result.method, "GET"))
     
-    ret = parse_test("GET /", 0, -2, "incomplete 3")
-    assert_equal(ret, -2)
+    result = parse_test("GET /", 0, headers)
+    assert_equal(result.ret, -2)
     
-    ret = parse_test("GET / ", 0, -2, "incomplete 4")
-    assert_equal(ret, -2)
-    assert_true(bufis(path, "/"))
+    result = parse_test("GET / ", 0, headers)
+    assert_equal(result.ret, -2)
+    assert_true(bufis(result.path, "/"))
     
-    ret = parse_test("GET / H", 0, -2, "incomplete 5")
-    assert_equal(ret, -2)
+    result = parse_test("GET / H", 0, headers)
+    assert_equal(result.ret, -2)
     
-    ret = parse_test("GET / HTTP/1.", 0, -2, "incomplete 6")
-    assert_equal(ret, -2)
+    result = parse_test("GET / HTTP/1.", 0, headers)
+    assert_equal(result.ret, -2)
     
-    ret = parse_test("GET / HTTP/1.0", 0, -2, "incomplete 7")
-    assert_equal(ret, -2)
+    result = parse_test("GET / HTTP/1.0", 0, headers)
+    assert_equal(result.ret, -2)
     
-    ret = parse_test("GET / HTTP/1.0\r", 0, -2, "incomplete 8")
-    assert_equal(ret, -2)
-    assert_equal(minor_version, 0)
+    result = parse_test("GET / HTTP/1.0\r", 0, headers)
+    assert_equal(result.ret, -2)
+    assert_equal(result.minor_version, 0)
     
     # Slowloris tests
     var test_str = "GET /hoge HTTP/1.0\r\n\r"
-    ret = parse_test(test_str, len(test_str) - 1, -2, "slowloris (incomplete)")
-    assert_equal(ret, -2)
+    result = parse_test(test_str, len(test_str) - 1, headers)
+    assert_equal(result.ret, -2)
     
     var test_str_incomplete = "GET /hoge HTTP/1.0\r\n\r\n"
-    ret = parse_test(test_str_incomplete, len(test_str_incomplete) - 1, 0, "slowloris (complete)")
-    assert_true(ret > 0)
+    result = parse_test(test_str_incomplete, len(test_str_incomplete) - 1, headers)
+    assert_true(result.ret > 0)
     
     # Invalid requests
-    ret = parse_test(" / HTTP/1.0\r\n\r\n", 0, -1, "empty method")
-    assert_equal(ret, -1)
+    result = parse_test(" / HTTP/1.0\r\n\r\n", 0, headers)
+    assert_equal(result.ret, -1)
     
-    ret = parse_test("GET  HTTP/1.0\r\n\r\n", 0, -1, "empty request-target")
-    assert_equal(ret, -1)
+    result = parse_test("GET  HTTP/1.0\r\n\r\n", 0, headers)
+    assert_equal(result.ret, -1)
     
-    ret = parse_test("GET / HTTP/1.0\r\n:a\r\n\r\n", 0, -1, "empty header name")
-    assert_equal(ret, -1)
+    result = parse_test("GET / HTTP/1.0\r\n:a\r\n\r\n", 0, headers)
+    assert_equal(result.ret, -1)
     
-    ret = parse_test("GET / HTTP/1.0\r\n :a\r\n\r\n", 0, -1, "header name (space only)")
-    assert_equal(ret, -1)
+    result = parse_test("GET / HTTP/1.0\r\n :a\r\n\r\n", 0, headers)
+    assert_equal(result.ret, -1)
     
     # Multiple spaces between tokens
-    ret = parse_test("GET   /   HTTP/1.0\r\n\r\n", 0, 0, "accept multiple spaces between tokens")
-    assert_true(ret > 0)
+    result = parse_test("GET   /   HTTP/1.0\r\n\r\n", 0, headers)
+    assert_true(result.ret > 0)
     
     headers.free()
 
