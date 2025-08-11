@@ -234,17 +234,24 @@ fn parse_headers(
     var current = buf
     
     while current < buf_end:
+        # Check for end of headers (empty line)
         if current[] == 0x0D:  # '\r'
             current += 1
-            if current >= buf_end or current[] != 0x0A:  # '\n'
+            if current >= buf_end:
+                ret = -2
+                return UnsafePointer[UInt8]()
+            if current[] != 0x0A:  # '\n'
                 ret = -1
                 return UnsafePointer[UInt8]()
             current += 1
-            break
+            # Successfully found end of headers
+            return current  # <-- RETURN HERE! We found the end of headers
         elif current[] == 0x0A:  # '\n'
             current += 1
-            break
+            # Successfully found end of headers
+            return current  # <-- RETURN HERE! We found the end of headers
         
+        # Not end of headers, so we must be parsing a header
         if num_headers >= max_headers:
             ret = -1
             return UnsafePointer[UInt8]()
@@ -287,11 +294,9 @@ fn parse_headers(
         headers[num_headers].value_len = value_len
         num_headers += 1
     
-    if current >= buf_end:
-        ret = -2
-        return UnsafePointer[UInt8]()
-    
-    return current
+    # If we get here, we ran out of buffer without finding the end of headers
+    ret = -2
+    return UnsafePointer[UInt8]()
 
 fn phr_parse_request(
     buf_start: UnsafePointer[UInt8],
