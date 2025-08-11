@@ -1,5 +1,6 @@
 from memory import memcpy
 from sys import simdwidthof
+from sys.info import sizeof
 from algorithm import vectorize
 import math
 from utils import StaticTuple
@@ -76,7 +77,7 @@ fn findchar_fast(
     ranges_size: Int,
     mut found: Bool
 ) -> UnsafePointer[UInt8]:
-    """Find character in ranges using SIMD operations when possible"""
+    """Find character in ranges using SIMD operations when possible."""
     found = False
     var current = buf
     
@@ -87,11 +88,11 @@ fn findchar_fast(
 fn get_token_to_eol(
     buf: UnsafePointer[UInt8],
     buf_end: UnsafePointer[UInt8],
-    inout token: String,
-    inout token_len: Int,
-    inout ret: Int
+    mut token: String,
+    mut token_len: Int,
+    mut ret: Int
 ) -> UnsafePointer[UInt8]:
-    """Get token up to end of line"""
+    """Get token up to end of line."""
     var token_start = buf
     var current = buf
     
@@ -112,10 +113,10 @@ fn get_token_to_eol(
         if current >= buf_end or current[] != 0x0A:  # '\n'
             ret = -1
             return UnsafePointer[UInt8]()
-        token_len = (current - 1 - token_start)
+        token_len = Int(current) - 1 - Int(token_start)
         current += 1
     elif current[] == 0x0A:  # '\n'
-        token_len = (current - token_start)
+        token_len = Int(current) - Int(token_start)
         current += 1
     else:
         ret = -1
@@ -130,7 +131,7 @@ fn is_complete(
     last_len: Int,
     mut ret: Int
 ) -> UnsafePointer[UInt8]:
-    """Check if request/response is complete"""
+    """Check if request/response is complete."""
     var ret_cnt = 0
     var current = buf + max(0, last_len - 3)
     
@@ -158,41 +159,41 @@ fn is_complete(
 fn parse_token(
     buf: UnsafePointer[UInt8],
     buf_end: UnsafePointer[UInt8],
-    inout token: String,
-    inout token_len: Int,
+    mut token: String,
+    mut token_len: Int,
     next_char: UInt8,
-    inout ret: Int
+    mut ret: Int
 ) -> UnsafePointer[UInt8]:
-    """Parse a token until next_char is found"""
+    """Parse a token until next_char is found."""
     var buf_start = buf
     var current = buf
     
     while current < buf_end:
         if current[] == next_char:
             break
-        elif not TOKEN_CHAR_MAP[int(current[])]:
+        elif not TOKEN_CHAR_MAP[Int(current[])]:
             ret = -1
             return UnsafePointer[UInt8]()
         current += 1
     
     if current >= buf_end:
         ret = -2
-        return DTypePointer[DType.uint8]()
+        return UnsafePointer[UInt8]()
     
-    token = String(buf_start, current - buf_start)
-    token_len = current - buf_start
+    token = String(buf_start, Int(current) - Int(buf_start))
+    token_len = Int(current) - Int(buf_start)
     return current
 
 fn parse_http_version(
-    buf: DTypePointer[DType.uint8],
-    buf_end: DTypePointer[DType.uint8],
-    inout minor_version: Int,
-    inout ret: Int
-) -> DTypePointer[DType.uint8]:
-    """Parse HTTP version"""
-    if buf_end - buf < 9:
+    buf: UnsafePointer[UInt8],
+    buf_end: UnsafePointer[UInt8],
+    mut minor_version: Int,
+    mut ret: Int
+) -> UnsafePointer[UInt8]:
+    """Parse HTTP version."""
+    if Int(buf_end) - Int(buf) < 9:
         ret = -2
-        return DTypePointer[DType.uint8]()
+        return UnsafePointer[UInt8]()
     
     var current = buf
     # Check "HTTP/1."
@@ -201,27 +202,27 @@ fn parse_http_version(
         current[4] != ord('/') or current[5] != ord('1') or
         current[6] != ord('.')):
         ret = -1
-        return DTypePointer[DType.uint8]()
+        return UnsafePointer[UInt8]()
     
     current += 7
     
     # Parse minor version
     if current[] < ord('0') or current[] > ord('9'):
         ret = -1
-        return DTypePointer[DType.uint8]()
+        return UnsafePointer[UInt8]()
     
-    minor_version = int(current[] - ord('0'))
+    minor_version = Int(current[]) - ord('0')
     return current + 1
 
 fn parse_headers(
-    buf: DTypePointer[DType.uint8],
-    buf_end: DTypePointer[DType.uint8],
-    headers: DTypePointer[PhrHeader],
-    inout num_headers: Int,
+    buf: UnsafePointer[UInt8],
+    buf_end: UnsafePointer[UInt8],
+    headers: UnsafePointer[PhrHeader],
+    mut num_headers: Int,
     max_headers: Int,
-    inout ret: Int
-) -> DTypePointer[DType.uint8]:
-    """Parse HTTP headers"""
+    mut ret: Int
+) -> UnsafePointer[UInt8]:
+    """Parse HTTP headers."""
     var current = buf
     
     while current < buf_end:
@@ -229,7 +230,7 @@ fn parse_headers(
             current += 1
             if current >= buf_end or current[] != 0x0A:  # '\n'
                 ret = -1
-                return DTypePointer[DType.uint8]()
+                return UnsafePointer[UInt8]()
             current += 1
             break
         elif current[] == 0x0A:  # '\n'
@@ -238,7 +239,7 @@ fn parse_headers(
         
         if num_headers >= max_headers:
             ret = -1
-            return DTypePointer[DType.uint8]()
+            return UnsafePointer[UInt8]()
         
         # Parse header name
         if num_headers == 0 or (current[] != ord(' ') and current[] != ord('\t')):
@@ -247,7 +248,7 @@ fn parse_headers(
             current = parse_token(current, buf_end, name, name_len, ord(':'), ret)
             if not current or name_len == 0:
                 ret = -1
-                return DTypePointer[DType.uint8]()
+                return UnsafePointer[UInt8]()
             
             headers[num_headers].name = name
             headers[num_headers].name_len = name_len
@@ -265,12 +266,12 @@ fn parse_headers(
         var value_len: Int
         current = get_token_to_eol(current, buf_end, value, value_len, ret)
         if not current:
-            return DTypePointer[DType.uint8]()
+            return UnsafePointer[UInt8]()
         
         # Trim trailing whitespace from value
         while value_len > 0:
-            var c = value.data[value_len - 1]
-            if c != ord(' ') and c != ord('\t'):
+            var c = value[value_len - 1]
+            if ord(c) != ord(' ') and ord(c) != ord('\t'):
                 break
             value_len -= 1
         
@@ -280,23 +281,23 @@ fn parse_headers(
     
     if current >= buf_end:
         ret = -2
-        return DTypePointer[DType.uint8]()
+        return UnsafePointer[UInt8]()
     
     return current
 
 fn phr_parse_request(
-    buf_start: DTypePointer[DType.uint8],
+    buf_start: UnsafePointer[UInt8],
     len: Int,
-    inout method: String,
-    inout method_len: Int,
-    inout path: String,
-    inout path_len: Int,
-    inout minor_version: Int,
-    headers: DTypePointer[PhrHeader],
-    inout num_headers: Int,
+    mut method: String,
+    mut method_len: Int,
+    mut path: String,
+    mut path_len: Int,
+    mut minor_version: Int,
+    headers: UnsafePointer[PhrHeader],
+    mut num_headers: Int,
     last_len: Int
 ) -> Int:
-    """Parse HTTP request"""
+    """Parse HTTP request."""
     var buf_end = buf_start + len
     var max_headers = num_headers
     var ret: Int = 0
@@ -346,8 +347,8 @@ fn phr_parse_request(
     if current >= buf_end:
         return -2
     
-    path = String(path_start, current - path_start)
-    path_len = current - path_start
+    path = String(path_start, Int(current) - Int(path_start))
+    path_len = Int(current) - Int(path_start)
     
     # Skip spaces
     while current < buf_end and current[] == ord(' '):
@@ -374,10 +375,10 @@ fn phr_parse_request(
     if not current:
         return ret
     
-    return int(current - buf_start)
+    return Int(current) - Int(buf_start)
 
 fn decode_hex(ch: UInt8) -> Int:
-    """Decode hexadecimal character"""
+    """Decode hexadecimal character."""
     if ch >= ord('0') and ch <= ord('9'):
         return Int(ch - ord('0'))
     elif ch >= ord('A') and ch <= ord('F'):
@@ -392,7 +393,7 @@ fn phr_decode_chunked(
     buf: UnsafePointer[UInt8],
     mut bufsz: Int
 ) -> Int:
-    """Decode chunked transfer encoding"""
+    """Decode chunked transfer encoding."""
     var dst = 0
     var src = 0
     var ret = -2  # incomplete
@@ -541,5 +542,75 @@ fn phr_decode_chunked(
     return ret
 
 fn phr_decode_chunked_is_in_data(decoder: PhrChunkedDecoder) -> Bool:
-    """Check if decoder is currently in chunk data state"""
+    """Check if decoder is currently in chunk data state."""
     return decoder._state == CHUNKED_IN_CHUNK_DATA
+
+
+from memory import memcpy
+
+fn memmove[T: Copyable](
+    dest: UnsafePointer[T], 
+    src: UnsafePointer[T], 
+    count: Int
+):
+    """
+    Copies count elements from src to dest, handling overlapping memory regions safely.
+    
+    Args:
+        dest: Destination pointer.
+        src: Source pointer.
+        count: Number of elements to copy.
+    Returns:
+        The destination pointer
+    """
+    if count <= 0:
+        return
+        
+    if dest == src:
+        return
+    
+    # Check if memory regions overlap
+    var dest_addr = Int(dest)
+    var src_addr = Int(src)
+    var element_size = sizeof[T]()
+    var total_bytes = count * element_size
+    
+    var dest_end = dest_addr + total_bytes
+    var src_end = src_addr + total_bytes
+    
+    # Check for overlap: regions overlap if one starts before the other ends
+    var overlaps = (dest_addr < src_end) and (src_addr < dest_end)
+    
+    if not overlaps:
+        # No overlap - use fast memcpy
+        memcpy(dest, src, count)
+    elif dest_addr < src_addr:
+        # Destination is before source - copy forwards (left to right)
+        # This is safe because we won't overwrite data we haven't read yet
+        memcpy(dest, src, count)
+    else:
+        # Destination is after source - copy backwards (right to left)
+        # This prevents overwriting source data before we've read it
+        var i = count - 1
+        while i >= 0:
+            dest[i] = src[i]
+            i -= 1
+
+
+# Byte-specific version for cases where you're working with raw bytes
+fn memmove_bytes(
+    dest: UnsafePointer[UInt8], 
+    src: UnsafePointer[UInt8], 
+    num_bytes: Int
+):
+    """
+    Copies num_bytes from src to dest, handling overlapping memory regions safely.
+    
+    Args:
+        dest: Destination pointer.
+        src: Source pointer.
+        num_bytes: Number of bytes to copy.
+    Returns:
+        The destination pointer
+    """
+    memmove[UInt8](dest, src, num_bytes)
