@@ -33,24 +33,27 @@ struct AsyncTask(Copyable, Movable):
             
         print("Task", self.task_id, "executing on fd", self.fd, "- Thread:", Int(external_call["pthread_self", UInt64]()))
         
-        # Read all available data
-        var buffer = UnsafePointer[UInt8].alloc(1024)
+        # Read the eventfd value (8 bytes)
+        var buffer = UnsafePointer[UInt64].alloc(1)
         var bytes_read = external_call["syscall", Int](
             0,  # SYS_read
             self.fd,
-            buffer,
-            1024
+            buffer.bitcast[UInt8](),
+            8
         )
         
-        if bytes_read > 0:
-            print("  Processed", bytes_read, "bytes from fd", self.fd)
+        if bytes_read == 8:
+            var value = buffer[]
+            print("  Read eventfd value:", value)
+        else:
+            print("  Error reading eventfd, bytes_read:", bytes_read)
         
         buffer.free()
         self.executed = True
         
         # Close the fd to clean up
         var _ = external_call["close", Int32](self.fd)
-        print("  Closed fd", self.fd)
+        print("  Closed eventfd", self.fd)
 
 struct EpollReactor:
     var epoll_fd: Int
@@ -78,13 +81,13 @@ struct EpollReactor:
         self.tasks.append(task^)
         self.total_tasks += 1
         
-        # Linux epoll_event: 4 bytes events + 4 bytes padding + 8 bytes data = 16 bytes
+        # Linux epoll_event: 4 bytes events + 4 bytes padding + 8 bytes data
         var event_buffer = UnsafePointer[UInt8].alloc(16)
         memset_zero(event_buffer, 16)
         
-        # Set events (first 4 bytes)
+        # Set events (first 4 bytes) - remove edge triggered for now
         var events_ptr = event_buffer.bitcast[UInt32]()
-        events_ptr[] = UInt32(EPOLLIN | EPOLLET)
+        events_ptr[] = UInt32(EPOLLIN)  # Level-triggered instead of edge-triggered
         
         # Set data in fd field (bytes 8-12)
         var data_ptr = (event_buffer + 8).bitcast[UInt32]()
@@ -111,22 +114,22 @@ struct EpollReactor:
         
         print("Event loop starting, waiting for", self.total_tasks, "tasks...")
         
-        while self.tasks_completed < self.total_tasks and iteration < 10:
+        while self.tasks_completed < self.total_tasks and iteration < 15:
             iteration += 1
             
             var nfds = external_call["epoll_wait", Int32](
                 self.epoll_fd,
                 events_buffer,
                 max_events,
-                2000  # 2 second timeout
+                1000  # 1 second timeout
             )
             
             if nfds == -1:
                 print("epoll_wait failed")
                 break
             elif nfds == 0:
-                print("Timeout - completed", self.tasks_completed, "of", self.total_tasks, "tasks")
-                break
+                print("Timeout iteration", iteration, "- completed", self.tasks_completed, "of", self.total_tasks)
+                continue
             
             print("Got", nfds, "events (iteration", iteration, ")")
             
@@ -138,7 +141,7 @@ struct EpollReactor:
                 # Read events (first 4 bytes)
                 var events_field = (event_ptr.bitcast[UInt32]())[]
                 
-                # Read data as fd (bytes 8-12)
+                # Read task_id from fd field (bytes 8-12)
                 var data_fd_ptr = (event_ptr + 8).bitcast[UInt32]()
                 var task_id = Int(data_fd_ptr[])
                 
@@ -154,42 +157,35 @@ struct EpollReactor:
                         break
                 
                 if not found:
-                    print("  Warning: Task", task_id, "not found or already executed")
+                    print("  Skipping: Task", task_id, "not found or already executed")
         
         events_buffer.free()
         print("Event loop finished -", self.tasks_completed, "of", self.total_tasks, "tasks completed")
 
-fn create_pipe() -> Tuple[Int, Int]:
-    var pipe_fds = UnsafePointer[Int32].alloc(2)
-    var result = external_call["pipe", Int32](pipe_fds.bitcast[UInt8]())
-    
-    if result == -1:
-        print("Failed to create pipe")
-        pipe_fds.free()
-        return (0, 0)
-    
-    var read_fd = Int(pipe_fds[0])
-    var write_fd = Int(pipe_fds[1])
-    pipe_fds.free()
-    
-    return (read_fd, write_fd)
+fn create_eventfd() -> Int:
+    """Create an eventfd for notification"""
+    # eventfd(initval, flags) - use 0 for both
+    var fd = external_call["eventfd", Int32](0, 0)
+    return Int(fd)
 
-fn trigger_pipe_event(write_fd: Int, message: String):
-    var data_ptr = message.unsafe_ptr()
-    var data_len = len(message)
+fn trigger_event(eventfd: Int, value: UInt64):
+    """Write to eventfd to trigger event"""
+    var value_ptr = UnsafePointer[UInt64].alloc(1)
+    value_ptr[] = value
     
     var bytes_written = external_call["syscall", Int](
         1,  # SYS_write
-        write_fd, 
-        data_ptr, 
-        data_len
+        eventfd,
+        value_ptr.bitcast[UInt8](),
+        8
     )
     
-    print("  Wrote", bytes_written, "bytes to fd", write_fd)
+    value_ptr.free()
     
-    # Close write end to signal EOF
-    var close_result = external_call["close", Int32](write_fd)
-    print("  Closed write fd", write_fd)
+    if bytes_written == 8:
+        print("  Triggered eventfd", eventfd, "with value", value)
+    else:
+        print("  Failed to trigger eventfd", eventfd)
 
 fn thread_worker(arg: UnsafePointer[UInt8]) -> UnsafePointer[UInt8]:
     var thread_data_ptr = arg.bitcast[ThreadData]()
@@ -198,40 +194,27 @@ fn thread_worker(arg: UnsafePointer[UInt8]) -> UnsafePointer[UInt8]:
     print("Worker thread", thread_data.core_id, "started")
     
     var reactor = EpollReactor()
+    var eventfds = List[Int]()
     
-    # Store task info for later triggering
-    var task_info = List[Tuple[Int, String]]()
-    
-    # Create all tasks first with proper delays to avoid fd conflicts
+    # Create all tasks first
     for i in range(3):
-        # Small delay between pipe creation to avoid fd reuse
-        var _ = external_call["usleep", Int32](10000)  # 10ms delay
-        
-        var pipes = create_pipe()
-        var read_fd = pipes[0]
-        var write_fd = pipes[1]
-        
+        var eventfd = create_eventfd()
         var task_id = thread_data.core_id * 10 + i
         
-        print("Thread", thread_data.core_id, "creating task", task_id, "with read_fd", read_fd, "write_fd", write_fd)
+        print("Thread", thread_data.core_id, "creating task", task_id, "with eventfd", eventfd)
         
-        var task = AsyncTask(task_id, read_fd)
+        var task = AsyncTask(task_id, eventfd)
         reactor.add_task(task^)
-        
-        var message = String("Task ") + String(task_id) + String(" data")
-        task_info.append((write_fd, message))
+        eventfds.append(eventfd)
     
-    print("Thread", thread_data.core_id, "triggering", len(task_info), "events...")
+    print("Thread", thread_data.core_id, "triggering", len(eventfds), "events...")
     
-    # Now trigger all events
-    for i in range(len(task_info)):
-        var info = task_info[i]
-        trigger_pipe_event(info[0], info[1])
+    # Trigger all events
+    for i in range(len(eventfds)):
+        var value = UInt64(thread_data.core_id * 1000 + i + 1)  # Non-zero value
+        trigger_event(eventfds[i], value)
     
     print("Thread", thread_data.core_id, "starting event loop...")
-    
-    # Small delay to ensure all events are ready
-    var _ = external_call["usleep", Int32](50000)  # 50ms
     
     # Run the event loop
     reactor.run_event_loop()
@@ -242,7 +225,7 @@ fn thread_worker(arg: UnsafePointer[UInt8]) -> UnsafePointer[UInt8]:
 fn main():
     var num_cores = 2
     print("Starting async task scheduler with", num_cores, "worker threads")
-    print("This demonstrates: threading + epoll + async task execution")
+    print("Using eventfd for clean event notification")
     
     var threads = UnsafePointer[UInt64].alloc(num_cores)
     var thread_data_array = UnsafePointer[ThreadData].alloc(num_cores)
@@ -265,9 +248,6 @@ fn main():
             print("Failed to create worker thread", i)
         else:
             print("Created worker thread", i)
-        
-        # Small delay between thread creation
-        var _ = external_call["usleep", Int32](50000)  # 50ms
     
     # Wait for all threads
     for i in range(num_cores):
@@ -285,4 +265,4 @@ fn main():
     thread_data_array.free()
     
     print("✅ Async task scheduler completed successfully!")
-    print("Successfully demonstrated: Real OS threads + epoll + concurrent async tasks")
+    print("All tasks executed across", num_cores, "worker threads using epoll + eventfd")
