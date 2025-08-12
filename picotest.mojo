@@ -136,12 +136,7 @@ fn is_complete(
 ) -> UnsafePointer[UInt8]:
     """Check if request/response is complete."""
     var ret_cnt = 0
-    var current = buf
-    
-    # If we have previous data, we only need to check the new data
-    # and a bit of overlap to catch split CRLF sequences
-    if last_len > 0:
-        current = buf + max(0, last_len - 3)
+    var current = buf if last_len < 3 else buf + last_len - 3
     
     while current < buf_end:
         if current[] == 0x0D:  # '\r'
@@ -692,13 +687,6 @@ fn memmove[T: Copyable](
 ):
     """
     Copies count elements from src to dest, handling overlapping memory regions safely.
-    
-    Args:
-        dest: Destination pointer.
-        src: Source pointer.
-        count: Number of elements to copy.
-    Returns:
-        The destination pointer
     """
     if count <= 0:
         return
@@ -723,8 +711,9 @@ fn memmove[T: Copyable](
         memcpy(dest, src, count)
     elif dest_addr < src_addr:
         # Destination is before source - copy forwards (left to right)
-        # This is safe because we won't overwrite data we haven't read yet
-        memcpy(dest, src, count)
+        # We need to copy byte by byte to avoid corruption
+        for i in range(count):
+            dest[i] = src[i]
     else:
         # Destination is after source - copy backwards (right to left)
         # This prevents overwriting source data before we've read it
@@ -732,25 +721,6 @@ fn memmove[T: Copyable](
         while i >= 0:
             dest[i] = src[i]
             i -= 1
-
-
-# Byte-specific version for cases where you're working with raw bytes
-fn memmove_bytes(
-    dest: UnsafePointer[UInt8], 
-    src: UnsafePointer[UInt8], 
-    num_bytes: Int
-):
-    """
-    Copies num_bytes from src to dest, handling overlapping memory regions safely.
-    
-    Args:
-        dest: Destination pointer.
-        src: Source pointer.
-        num_bytes: Number of bytes to copy.
-    Returns:
-        The destination pointer
-    """
-    memmove[UInt8](dest, src, num_bytes)
 
 
 fn create_string_from_ptr(ptr: UnsafePointer[UInt8], length: Int) -> String:
@@ -1072,7 +1042,7 @@ fn test_headers() raises:
         "Host: example.com\r\nCookie: \r\n\r\n",
         0, headers
     )
-    assert_equal(result.ret, 32)
+    assert_equal(result.ret, 31)
     assert_equal(result.num_headers, 2)
     assert_true(bufis(headers[0].name, "Host"))
     assert_true(bufis(headers[0].value, "example.com"))
@@ -1119,8 +1089,13 @@ fn test_chunked_at_once(line: Int,
     assert_equal(ret, expected)
     assert_equal(bufsz, len(decoded))
     
-    # Check decoded content
+    # Debug: print what we got vs what we expected
+    print("Debug: Decoded buffer contents:")
     var decoded_bytes = decoded.as_bytes()
+    for i in range(bufsz):
+        print("  [", i, "] got:", buf_ptr[i], "(", chr(Int(buf_ptr[i])), ") expected:", decoded_bytes[i], "(", chr(Int(decoded_bytes[i])), ")")
+    
+    # Check decoded content
     for i in range(bufsz):
         assert_equal(buf_ptr[i], decoded_bytes[i])
     
@@ -1218,7 +1193,7 @@ fn test_chunked() raises:
     test_chunked_at_once(
         0, False,
         "6\r\nhello \r\n5\r\nworld\r\n0\r\na: b\r\nc: d\r\n\r\n",
-        "hello world", 19  # sizeof("a: b\r\nc: d\r\n\r\n") - 1
+        "hello world", 14  # Change from 19 to 14
     )
 
 fn test_chunked_consume_trailer() raises:
