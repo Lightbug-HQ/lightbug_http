@@ -19,7 +19,7 @@ alias PTHREAD_CREATE_DETACHED = 1
 
 @fieldwise_init
 struct TaskHandle(Copyable & Movable):
-    """Handle to an async task"""
+    """Handle to an async task."""
     var task_id: Int
     var fd: Int
     
@@ -27,8 +27,8 @@ struct TaskHandle(Copyable & Movable):
         return self.fd >= 0
 
 @fieldwise_init
-struct TaskResult:
-    """Result of an async task execution"""
+struct TaskResult(Copyable):
+    """Result of an async task execution."""
     var success: Bool
     var value: UInt64
     var error_msg: String
@@ -40,12 +40,12 @@ struct TaskResult:
 
 # --- Callback Types ---
 trait TaskCallback:
-    """Interface for task callbacks"""
+    """Interface for task callbacks."""
     fn execute(self, task_id: Int, value: UInt64) -> TaskResult:
         ...
 
 struct SimpleCallback(TaskCallback):
-    """Simple callback that just prints the value"""
+    """Simple callback that just prints the value."""
     fn execute(self, task_id: Int, value: UInt64) -> TaskResult:
         var result = TaskResult()
         result.success = True
@@ -67,8 +67,8 @@ struct AsyncTask(Copyable, Movable):
         self.executed = False
         self.callback_ptr = UnsafePointer[UInt8]()
     
-    fn execute(out self) -> TaskResult:
-        """Execute the task and return result"""
+    fn execute(mut self) -> TaskResult:
+        """Execute the task and return result."""
         var result = TaskResult()
         
         if self.executed:
@@ -101,7 +101,7 @@ struct AsyncTask(Copyable, Movable):
 # --- Event System ---
 
 struct EventFD:
-    """Wrapper for eventfd operations"""
+    """Wrapper for eventfd operations."""
     var fd: Int
     
     fn __init__(out self, initial_value: UInt64 = 0):
@@ -111,7 +111,7 @@ struct EventFD:
         return self.fd >= 0
     
     fn trigger(self, value: UInt64) -> Bool:
-        """Trigger the eventfd with a value"""
+        """Trigger the eventfd with a value."""
         if not self.is_valid():
             return False
             
@@ -129,14 +129,14 @@ struct EventFD:
         return bytes_written == 8
     
     fn close(self):
-        """Close the eventfd"""
+        """Close the eventfd."""
         if self.is_valid():
             _ = external_call["close", Int32](self.fd)
 
 # --- Main Reactor ---
 
 struct AsyncReactor:
-    """Async reactor using epoll for event handling"""
+    """Async reactor using epoll for event handling."""
     var epoll_fd: Int
     var tasks: List[AsyncTask]
     var next_task_id: Int
@@ -153,8 +153,8 @@ struct AsyncReactor:
     fn is_valid(self) -> Bool:
         return self.epoll_fd >= 0
     
-    fn create_task(self) -> TaskHandle:
-        """Create a new async task and return its handle"""
+    fn create_task(mut self) -> TaskHandle:
+        """Create a new async task and return its handle."""
         var handle = TaskHandle(task_id=-1, fd=-1)
         
         if not self.is_valid():
@@ -182,7 +182,7 @@ struct AsyncReactor:
         return handle
     
     fn trigger_task(self, handle: TaskHandle, value: UInt64) -> Bool:
-        """Trigger a task with a value"""
+        """Trigger a task with a value."""
         if not handle.is_valid():
             return False
         
@@ -199,8 +199,8 @@ struct AsyncReactor:
         value_ptr.free()
         return bytes_written == 8
     
-    fn poll_once(out self) -> Int:
-        """Poll for events once, returns number of tasks completed"""
+    fn poll_once(mut self) -> Int:
+        """Poll for events once, returns number of tasks completed."""
         if not self.is_valid():
             return 0
         
@@ -220,8 +220,8 @@ struct AsyncReactor:
         events_buffer.free()
         return completed
     
-    fn run_until_complete(self, max_iterations: Int = 100) -> Int:
-        """Run the event loop until all tasks complete or max iterations reached"""
+    fn run_until_complete(mut self, max_iterations: Int = 100) -> Int:
+        """Run the event loop until all tasks complete or max iterations reached."""
         var total_completed = 0
         var iterations = 0
         var active_tasks = self._count_active_tasks()
@@ -234,8 +234,8 @@ struct AsyncReactor:
         
         return total_completed
     
-    fn shutdown(out self):
-        """Clean shutdown of the reactor"""
+    fn shutdown(mut self):
+        """Clean shutdown of the reactor."""
         if self.is_valid():
             # Close all task fds
             for i in range(len(self.tasks)):
@@ -249,7 +249,7 @@ struct AsyncReactor:
     # --- Private Methods ---
     
     fn _add_to_epoll(self, task_id: Int, fd: Int) -> Bool:
-        """Add a file descriptor to epoll monitoring"""
+        """Add a file descriptor to epoll monitoring."""
         var event_buffer = UnsafePointer[UInt8].alloc(16)
         memset_zero(event_buffer, 16)
         
@@ -271,8 +271,8 @@ struct AsyncReactor:
         event_buffer.free()
         return result == 0
     
-    fn _process_events(out self, events_buffer: UnsafePointer[UInt8], nfds: Int32) -> Int:
-        """Process epoll events"""
+    fn _process_events(mut self, events_buffer: UnsafePointer[UInt8], nfds: Int32) -> Int:
+        """Process epoll events."""
         var completed = 0
         
         for i in range(nfds):
@@ -293,7 +293,7 @@ struct AsyncReactor:
         return completed
     
     fn _count_active_tasks(self) -> Int:
-        """Count tasks that haven't been executed yet"""
+        """Count tasks that haven't been executed yet."""
         var count = 0
         for i in range(len(self.tasks)):
             if not self.tasks[i].executed:
@@ -308,7 +308,7 @@ struct WorkerData(Copyable):
     var reactor_ptr: UnsafePointer[AsyncReactor]
 
 fn worker_thread_func(arg: UnsafePointer[UInt8]) -> UnsafePointer[UInt8]:
-    """Worker thread function"""
+    """Worker thread function."""
     var data_ptr = arg.bitcast[WorkerData]()
     var data = data_ptr[]
     var reactor_ptr = data.reactor_ptr
@@ -319,7 +319,7 @@ fn worker_thread_func(arg: UnsafePointer[UInt8]) -> UnsafePointer[UInt8]:
     return UnsafePointer[UInt8]()
 
 struct AsyncRuntime:
-    """High-level async runtime with thread pool"""
+    """High-level async runtime with thread pool."""
     var num_workers: Int
     var reactors: UnsafePointer[AsyncReactor]
     var threads: UnsafePointer[UInt64]
@@ -340,19 +340,19 @@ struct AsyncRuntime:
             self.reactors[i] = AsyncReactor()
     
     fn spawn_task(mut self) -> TaskHandle:
-        """Spawn a new task on the next available worker"""
+        """Spawn a new task on the next available worker."""
         var worker = self.next_worker
         self.next_worker = (self.next_worker + 1) % self.num_workers
         return self.reactors[worker].create_task()
     
     fn trigger(self, handle: TaskHandle, value: UInt64) -> Bool:
-        """Trigger a task with a value"""
+        """Trigger a task with a value."""
         # Find which reactor owns this task by checking task_id ranges
         var worker = handle.task_id % self.num_workers
         return self.reactors[worker].trigger_task(handle, value)
     
-    fn start(out self):
-        """Start all worker threads"""
+    fn start(mut self):
+        """Start all worker threads."""
         if self.started:
             return
         
@@ -372,7 +372,7 @@ struct AsyncRuntime:
         self.started = True
     
     fn wait(self):
-        """Wait for all worker threads to complete"""
+        """Wait for all worker threads to complete."""
         if not self.started:
             return
         
@@ -382,8 +382,8 @@ struct AsyncRuntime:
                 UnsafePointer[UInt8]()
             )
     
-    fn shutdown(out self):
-        """Shutdown the runtime"""
+    fn shutdown(mut self):
+        """Shutdown the runtime."""
         self.wait()
         
         for i in range(self.num_workers):
@@ -397,14 +397,14 @@ struct AsyncRuntime:
 # --- Example Usage ---
 
 fn example_single_threaded():
-    """Example of single-threaded reactor usage"""
+    """Example of single-threaded reactor usage."""
     print("=== Single-threaded example ===")
     
     var reactor = AsyncReactor()
     
     # Create some tasks
     var handles = List[TaskHandle]()
-    for i in range(3):
+    for _ in range(3):
         handles.append(reactor.create_task())
     
     # Trigger them with values
@@ -418,14 +418,14 @@ fn example_single_threaded():
     reactor.shutdown()
 
 fn example_multi_threaded():
-    """Example of multi-threaded runtime usage"""
+    """Example of multi-threaded runtime usage."""
     print("=== Multi-threaded example ===")
     
     var runtime = AsyncRuntime(num_workers=2)
     
     # Spawn tasks
     var handles = List[TaskHandle]()
-    for i in range(6):
+    for _ in range(6):
         handles.append(runtime.spawn_task())
     
     # Trigger tasks
