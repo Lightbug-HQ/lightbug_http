@@ -21,7 +21,6 @@ from lightbug_http._libc import (
     c_void,
     AddressFamily,
     SOCK_STREAM,
-    SOL_SOCKET,
     get_errno,
     EAGAIN,
     EWOULDBLOCK
@@ -61,9 +60,36 @@ alias EPOLL_CTL_ADD = 1
 alias EPOLL_CTL_DEL = 2
 alias EPOLL_CTL_MOD = 3
 
-# Socket options
-alias SO_REUSEADDR = 2
-alias SO_REUSEPORT = 15
+# Socket options - Linux specific values
+# Your libc code has macOS/BSD values, but we need Linux values for Ubuntu
+alias SO_REUSEADDR_LINUX = 2       # Linux value
+alias SO_REUSEPORT_LINUX = 15      # Linux value  
+alias SOL_SOCKET_LINUX = 1         # Linux value (not 0xFFFF which is BSD)
+
+# Check if SO_REUSEPORT is supported by testing with a temporary socket
+fn test_so_reuseport_support() -> Bool:
+    """Test if SO_REUSEPORT is supported on this system."""
+    try:
+        var test_fd = socket(AddressFamily.AF_INET.value, SOCK_STREAM, 0)
+        if test_fd < 0:
+            return False
+        # Try setting SO_REUSEPORT with direct external_call
+        var value = c_int(1)
+        var result = external_call["setsockopt", c_int, c_int, c_int, c_int, UnsafePointer[c_int], c_uint](
+            c_int(test_fd),
+            c_int(SOL_SOCKET_LINUX),
+            c_int(SO_REUSEPORT_LINUX),
+            UnsafePointer(to=value),
+            c_uint(sizeof[c_int]())
+        )
+        
+        var _ = close(test_fd)
+        return result == 0
+    except:
+        print("no")
+    return False
+    
+    
 
 # TODO: Add TCP_NODELAY and other socket options
 # alias TCP_NODELAY = 1
@@ -176,9 +202,30 @@ fn sys_sendto(sockfd: Int, buf: UnsafePointer[UInt8], len: Int, flags: Int, dest
     """Send data to socket."""
     return Int(external_call["sendto", c_int, c_int, UnsafePointer[UInt8], c_size_t, c_int, c_int, c_int](sockfd, buf, len, flags, dest_addr, addrlen))
 
-fn sys_setsockopt(sockfd: Int, level: Int, optname: Int, optval: UnsafePointer[c_int], optlen: Int) -> Int:
-    """Set socket options."""
-    return Int(external_call["setsockopt", c_int, c_int, c_int, c_int, UnsafePointer[c_int], c_uint](sockfd, level, optname, optval, optlen))
+# Linux-specific socket option functions
+fn set_so_reuseaddr_linux(fd: c_int) -> Bool:
+    """Set SO_REUSEADDR using Linux constants."""
+    var value = c_int(1)
+    var result = external_call["setsockopt", c_int, c_int, c_int, c_int, UnsafePointer[c_int], c_uint](
+        c_int(fd),
+        c_int(SOL_SOCKET_LINUX),
+        c_int(SO_REUSEADDR_LINUX),
+        UnsafePointer(to=value),
+        c_uint(sizeof[c_int]())
+    )
+    return result == 0
+
+fn set_so_reuseport_linux(fd: c_int) -> Bool:
+    """Set SO_REUSEPORT using Linux constants."""
+    var value = c_int(1)
+    var result = external_call["setsockopt", c_int, c_int, c_int, c_int, UnsafePointer[c_int], c_uint](
+        c_int(fd),
+        c_int(SOL_SOCKET_LINUX),
+        c_int(SO_REUSEPORT_LINUX),
+        UnsafePointer(to=value),
+        c_uint(sizeof[c_int]())
+    )
+    return result == 0
 
 # TODO: Add CPU affinity syscalls
 fn sys_set_cpu_affinity(cpu_core: Int) -> Bool:
@@ -218,8 +265,64 @@ fn sys_set_thread_name(name: String) -> Bool:
 # Socket setup functions (enhanced FaF version)
 # ===----------------------------------------------------------------------=== #
 
+fn get_listener_fd_with_reuseport(port: UInt16, worker_id: Int) raises -> (c_int, Bool, Bool):
+    """Create a socket with SO_REUSEPORT for multiple workers."""
+    print("Worker", worker_id, "creating socket with SO_REUSEPORT on port", port)
+    
+    var listener_fd = socket(AddressFamily.AF_INET.value, SOCK_STREAM, 0)
+    
+    if listener_fd < 0:
+        print("Worker", worker_id, "failed to create socket, errno:", get_errno())
+        return (-1, False, False)
+    
+    print("Worker", worker_id, "socket created successfully, fd:", listener_fd)
+    
+    # Try to set SO_REUSEADDR using Linux-specific constants
+    print("Worker", worker_id, "attempting to set SO_REUSEADDR with Linux constants...")
+    if set_so_reuseaddr_linux(listener_fd):
+        print("Worker", worker_id, "SO_REUSEADDR set successfully")
+    else:
+        print("Worker", worker_id, "failed to set SO_REUSEADDR, errno:", get_errno(), "- continuing anyway")
+    
+    # Try SO_REUSEPORT using Linux-specific constants
+    print("Worker", worker_id, "attempting to set SO_REUSEPORT with Linux constants...")
+    var reuseport_result = -1
+    if set_so_reuseport_linux(listener_fd):
+        print("Worker", worker_id, "SO_REUSEPORT set successfully")
+        reuseport_result = 0
+    else:
+        print("Worker", worker_id, "failed to set SO_REUSEPORT, errno:", get_errno())
+        reuseport_result = -1
+        if worker_id > 0:
+            print("Worker", worker_id, "SO_REUSEPORT failed and worker > 0, cannot bind to same port")
+            var _ = close(listener_fd)
+            return (-1, False, False)
+        else:
+            print("Worker", worker_id, "SO_REUSEPORT failed but worker 0, continuing without it")
+    
+    # Bind socket
+    var addr = sockaddr_in(Int(AddressFamily.AF_INET.value), port, 0)  # INADDR_ANY = 0
+    try:
+        bind(listener_fd, addr)
+        print("Worker", worker_id, "bound to port", port, "successfully")
+    except e:
+        print("Worker", worker_id, "failed to bind to port", port, ", error:", e)
+        var _ = close(listener_fd)
+        return (-1, False, False)
+    
+    # Listen
+    try:
+        listen(listener_fd, 128)
+        print("Worker", worker_id, "listening on port", port, "successfully")
+    except e:
+        print("Worker", worker_id, "failed to listen, error:", e)
+        var _ = close(listener_fd)
+        return (-1, False, False)
+    
+    return (listener_fd, True, True)
+
 fn get_listener_fd_simple(port: UInt16, worker_id: Int) raises -> (c_int, Bool, Bool):
-    """Create a simple listener socket without advanced options (for debugging)."""
+    """Create a simple listener socket without advanced options (fallback)."""
     print("Worker", worker_id, "creating simple socket on port", port)
     
     var listener_fd = socket(AddressFamily.AF_INET.value, SOCK_STREAM, 0)
@@ -230,15 +333,20 @@ fn get_listener_fd_simple(port: UInt16, worker_id: Int) raises -> (c_int, Bool, 
     
     print("Worker", worker_id, "socket created successfully, fd:", listener_fd)
     
-    # Try to set SO_REUSEADDR using the working lightbug approach
-    try:
-        setsockopt(listener_fd, SOL_SOCKET, SO_REUSEADDR, 1)
-        print("Worker", worker_id, "SO_REUSEADDR set successfully")
-    except e:
-        print("Worker", worker_id, "failed to set SO_REUSEADDR:", e, "- continuing anyway")
+    # Only worker 0 can bind without SO_REUSEPORT
+    if worker_id > 0:
+        print("Worker", worker_id, "cannot bind to same port without SO_REUSEPORT, exiting")
+        var _ = close(listener_fd)
+        return (-1, False, False)
     
-    # Skip SO_REUSEPORT for now since it's causing issues
-    print("Worker", worker_id, "skipping SO_REUSEPORT for compatibility")
+    # Try to set SO_REUSEADDR using Linux-specific constants
+    print("Worker", worker_id, "attempting to set SO_REUSEADDR with Linux constants...")
+    if set_so_reuseaddr_linux(listener_fd):
+        print("Worker", worker_id, "SO_REUSEADDR set successfully")
+    else:
+        print("Worker", worker_id, "failed to set SO_REUSEADDR, errno:", get_errno(), "- continuing anyway")
+    
+    print("Worker", worker_id, "skipping SO_REUSEPORT (simple mode)")
     
     # Bind socket
     var addr = sockaddr_in(Int(AddressFamily.AF_INET.value), port, 0)  # INADDR_ANY = 0
@@ -262,9 +370,14 @@ fn get_listener_fd_simple(port: UInt16, worker_id: Int) raises -> (c_int, Bool, 
     return (listener_fd, True, True)
 
 fn get_listener_fd_faf(port: UInt16, worker_id: Int) raises -> (c_int, Bool, Bool):
-    """Create and configure listener socket with FaF options - fallback to simple version."""
-    # For now, use the simple version that works
-    return get_listener_fd_simple(port, worker_id)
+    """Create and configure listener socket with FaF options - try SO_REUSEPORT first."""
+    # Try the SO_REUSEPORT version for multiple workers
+    try:
+        return get_listener_fd_with_reuseport(port, worker_id)
+    except e:
+        print("Worker", worker_id, "SO_REUSEPORT approach failed:", e)
+        print("Worker", worker_id, "falling back to simple socket (worker 0 only)")
+        return get_listener_fd_simple(port, worker_id)
 
 fn setup_connection_faf(fd: Int):
     """Set up connection options (FaF version)."""
@@ -585,10 +698,9 @@ struct FafAsyncRuntime:
     # TODO: Add proper global state when Mojo supports it
     
     fn __init__(out self, port: UInt16, num_workers: Int = 0):
-        # For proof of concept, limit to 1 worker initially to avoid SO_REUSEPORT issues
-        var actual_workers = 1  # TODO: Support multiple workers when SO_REUSEPORT is working
-        if num_workers > 0:
-            actual_workers = min(num_workers, 1)  # Limit to 1 for now
+        var actual_workers = num_workers if num_workers > 0 else num_logical_cores()
+        # Allow multiple workers for debugging
+        actual_workers = min(actual_workers, 4)  # Limit to 4 for debugging
         
         self.num_workers = actual_workers
         self.port = port
@@ -596,7 +708,15 @@ struct FafAsyncRuntime:
         self.worker_data = UnsafePointer[FafWorkerData].alloc(actual_workers)
         self.started = False
         
-        print("Note: Using", actual_workers, "worker(s) for proof of concept")
+        print("Note: Testing", actual_workers, "worker(s) for multi-worker debugging")
+        
+        # Test SO_REUSEPORT support at startup
+        print("Testing SO_REUSEPORT support on this system...")
+        if test_so_reuseport_support():
+            print("✅ SO_REUSEPORT is supported on this system")
+        else:
+            print("❌ SO_REUSEPORT is NOT supported on this system")
+            print("Multi-worker mode will be limited to single worker")
         
         # Initialize worker data with CPU affinity
         for i in range(actual_workers):
@@ -693,7 +813,7 @@ fn example_callback_faf(
 # Main FaF server function
 # ===----------------------------------------------------------------------=== #
 
-fn faf_go(port: UInt16):
+fn faf_go(port: UInt16, num_workers: Int = 0):
     """Main FaF server function - direct translation from Rust go() function."""
     print("Starting FaF HTTP server on port", port)
     
@@ -703,7 +823,7 @@ fn faf_go(port: UInt16):
         print("Warning: Could not set priority: setpriority: Permission denied")
     
     # Create FaF runtime
-    var faf_runtime = FafAsyncRuntime(port)
+    var faf_runtime = FafAsyncRuntime(port, num_workers)
     
     # Start worker threads
     faf_runtime.start_faf_workers()
@@ -725,7 +845,7 @@ fn faf_go(port: UInt16):
         if loop_count % 10 == 0:
             print("Server running... handled", loop_count, "date updates")
 
-# ===----------------------------------------------------------------------=== #
+# ===--------------------------------------- -------------------------------=== #
 # Proof of Concept Demo
 # ===----------------------------------------------------------------------=== #
 
@@ -759,4 +879,5 @@ fn main():
     print()
     
     # Start the server (this will run indefinitely)
-    faf_go(8080)
+    print("Testing with 2 workers to debug SO_REUSEPORT...")
+    faf_go(8080, 2)  # Test with 2 workers
