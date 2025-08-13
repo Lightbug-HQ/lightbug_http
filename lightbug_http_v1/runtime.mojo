@@ -1,6 +1,7 @@
 from sys import external_call
 from memory import UnsafePointer, memset_zero
 from collections import List
+from testing import assert_true, assert_false, assert_equal, assert_not_equal
 
 # System constants
 alias EPOLLIN = 1
@@ -639,9 +640,451 @@ fn example_custom_callbacks():
     
     reactor.shutdown()
 
-fn main():
-    example_single_threaded()
+#fn main():
+#    example_single_threaded()
+#    print()
+#    example_multi_threaded()
+#    print()
+#    example_custom_callbacks()
+
+
+
+# ===----------------------------------------------------------------------=== #
+# Basic Component Tests
+# ===----------------------------------------------------------------------=== #
+
+# CHECK-LABEL: test_task_handle
+fn test_task_handle() raises:
+    print("== test_task_handle")
+    
+    # Test valid handle
+    var valid_handle = runtime.TaskHandle(task_id=42, fd=10)
+    # CHECK: TaskHandle valid: True
+    print("TaskHandle valid:", valid_handle.is_valid())
+    assert_true(valid_handle.is_valid(), "Valid handle should return True")
+    assert_equal(valid_handle.task_id, 42, "Task ID should match")
+    assert_equal(valid_handle.fd, 10, "FD should match")
+    
+    # Test invalid handle
+    var invalid_handle = runtime.TaskHandle(task_id=-1, fd=-1)
+    # CHECK: TaskHandle invalid: False
+    print("TaskHandle invalid:", invalid_handle.is_valid())
+    assert_false(invalid_handle.is_valid(), "Invalid handle should return False")
+
+
+# CHECK-LABEL: test_task_result
+fn test_task_result() raises:
+    print("== test_task_result")
+    
+    # Test default construction
+    var default_result = runtime.TaskResult()
+    # CHECK: Default TaskResult success: False
+    print("Default TaskResult success:", default_result.success)
+    assert_false(default_result.success, "Default result should be unsuccessful")
+    assert_equal(default_result.value, 0, "Default value should be 0")
+    assert_equal(default_result.error_msg, "", "Default error message should be empty")
+    
+    # Test successful result
+    var success_result = runtime.TaskResult()
+    success_result.success = True
+    success_result.value = 123
+    # CHECK: Success TaskResult value: 123
+    print("Success TaskResult value:", success_result.value)
+    assert_true(success_result.success, "Success result should be successful")
+    assert_equal(success_result.value, 123, "Value should match")
+
+
+# CHECK-LABEL: test_eventfd
+fn test_eventfd() raises:
+    print("== test_eventfd")
+    
+    var eventfd = runtime.EventFD(0)
+    if eventfd.is_valid():
+        # CHECK: EventFD created successfully
+        print("EventFD created successfully")
+        assert_true(eventfd.is_valid(), "EventFD should be valid")
+        
+        # Test triggering with value
+        var trigger_success = eventfd.trigger(42)
+        # CHECK: EventFD trigger success: True
+        print("EventFD trigger success:", trigger_success)
+        assert_true(trigger_success, "EventFD trigger should succeed")
+        
+        eventfd.close()
+    else:
+        print("WARNING: EventFD creation failed - system may not support eventfd")
+
+
+# ===----------------------------------------------------------------------=== #
+# Callback Tests
+# ===----------------------------------------------------------------------=== #
+
+# CHECK-LABEL: test_default_callback
+fn test_default_callback() raises:
+    print("== test_default_callback")
+    
+    var result = runtime.default_callback(1, 100)
+    # CHECK: Default callback result: success=True, value=100
+    print("Default callback result: success=" + String(result.success) + ", value=" + String(result.value))
+    assert_true(result.success, "Default callback should succeed")
+    assert_equal(result.value, 100, "Default callback should return input value")
+
+
+# CHECK-LABEL: test_logging_callback
+fn test_logging_callback() raises:
+    print("== test_logging_callback")
+    
+    var result = runtime.logging_callback(2, 200)
+    # CHECK: CALLBACK: Task 2 completed with value 200
+    # CHECK: Logging callback result: success=True, value=200
+    print("Logging callback result: success=" + String(result.success) + ", value=" + String(result.value))
+    assert_true(result.success, "Logging callback should succeed")
+    assert_equal(result.value, 200, "Logging callback should return input value")
+
+
+# CHECK-LABEL: test_doubling_callback
+fn test_doubling_callback() raises:
+    print("== test_doubling_callback")
+    
+    var result = runtime.doubling_callback(3, 50)
+    # CHECK: CALLBACK: Task 3 doubling 50 -> 100
+    # CHECK: Doubling callback result: success=True, value=100
+    print("Doubling callback result: success=" + String(result.success) + ", value=" + String(result.value))
+    assert_true(result.success, "Doubling callback should succeed")
+    assert_equal(result.value, 100, "Doubling callback should double the value")
+
+
+
+# CHECK-LABEL: test_custom_callback_trait
+fn test_custom_callback_trait() raises:
+    print("== test_custom_callback_trait")
+    
+    var callback = runtime.CustomCallback(multiplier=3, print_enabled=True)
+    var result = callback.execute(5, 20)
+    # CHECK: Custom callback: Task 5 value 20 * multiplier 3
+    # CHECK: Custom callback trait result: success=True, value=60
+    print("Custom callback trait result: success=" + String(result.success) + ", value=" + String(result.value))
+    assert_true(result.success, "Custom callback trait should succeed")
+    assert_equal(result.value, 60, "Custom callback trait should multiply value")
+
+
+# ===----------------------------------------------------------------------=== #
+# Single-threaded Reactor Tests
+# ===----------------------------------------------------------------------=== #
+
+# CHECK-LABEL: test_reactor_creation
+fn test_reactor_creation() raises:
+    print("== test_reactor_creation")
+    
+    var reactor = runtime.AsyncReactor()
+    if reactor.is_valid():
+        # CHECK: Reactor created successfully
+        print("Reactor created successfully")
+        assert_true(reactor.is_valid(), "Reactor should be valid")
+        reactor.shutdown()
+    else:
+        print("WARNING: Reactor creation failed - system may not support epoll")
+
+
+# CHECK-LABEL: test_reactor_task_creation
+fn test_reactor_task_creation() raises:
+    print("== test_reactor_task_creation")
+    
+    var reactor = runtime.AsyncReactor()
+    if reactor.is_valid():
+        # Test creating task with default callback
+        var handle1 = reactor.create_task()
+        if handle1.is_valid():
+            # CHECK: Task 1 created successfully with ID: 0
+            print("Task 1 created successfully with ID:", handle1.task_id)
+            assert_true(handle1.is_valid(), "Task handle should be valid")
+            assert_equal(handle1.task_id, 0, "First task should have ID 0")
+        
+        # Test creating task with custom callback
+        var handle2 = reactor.create_task(runtime.logging_callback)
+        if handle2.is_valid():
+            # CHECK: Task 2 created successfully with ID: 1
+            print("Task 2 created successfully with ID:", handle2.task_id)
+            assert_true(handle2.is_valid(), "Task handle should be valid")
+            assert_equal(handle2.task_id, 1, "Second task should have ID 1")
+        
+        reactor.shutdown()
+    else:
+        print("WARNING: Reactor creation failed - skipping task creation test")
+
+
+# CHECK-LABEL: test_reactor_single_task_execution
+fn test_reactor_single_task_execution() raises:
+    print("== test_reactor_single_task_execution")
+    
+    var reactor = runtime.AsyncReactor()
+    if reactor.is_valid():
+        # Create a task with logging callback
+        var handle = reactor.create_task(runtime.logging_callback)
+        if handle.is_valid():
+            # Trigger the task
+            var trigger_success = reactor.trigger_task(handle, 150)
+            # CHECK: Triggering task with value 150: True
+            print("Triggering task with value 150:", trigger_success)
+            assert_true(trigger_success, "Task trigger should succeed")
+            
+            # Run event loop once
+            var completed = reactor.poll_once()
+            # CHECK: CALLBACK: Task 0 completed with value 150
+            # CHECK: Completed tasks: 1
+            print("Completed tasks:", completed)
+            assert_equal(completed, 1, "Should complete exactly 1 task")
+        
+        reactor.shutdown()
+    else:
+        print("WARNING: Reactor creation failed - skipping single task execution test")
+
+
+# CHECK-LABEL: test_reactor_multiple_tasks
+fn test_reactor_multiple_tasks() raises:
+    print("== test_reactor_multiple_tasks")
+    
+    var reactor = runtime.AsyncReactor()
+    if reactor.is_valid():
+        var handles = runtime.List[runtime.TaskHandle]()
+        
+        # Create multiple tasks with different callbacks
+        handles.append(reactor.create_task(runtime.default_callback))
+        handles.append(reactor.create_task(runtime.doubling_callback))
+        handles.append(reactor.create_task(runtime.logging_callback))
+        
+        var valid_handles = 0
+        for i in range(len(handles)):
+            if handles[i].is_valid():
+                valid_handles += 1
+        
+        # CHECK: Created 3 valid task handles
+        print("Created", valid_handles, "valid task handles")
+        assert_equal(valid_handles, 3, "Should create 3 valid handles")
+        
+        # Trigger all tasks
+        for i in range(len(handles)):
+            if handles[i].is_valid():
+                var trigger_success = reactor.trigger_task(handles[i], UInt64(100 + i))
+                assert_true(trigger_success, "Each task trigger should succeed")
+        
+        # Run until completion
+        var total_completed = reactor.run_until_complete(max_iterations=10)
+        # CHECK: CALLBACK: Task 1 doubling 101 -> 202
+        # CHECK: CALLBACK: Task 2 completed with value 102
+        # CHECK: Total completed tasks: 3
+        print("Total completed tasks:", total_completed)
+        assert_equal(total_completed, 3, "Should complete all 3 tasks")
+        
+        reactor.shutdown()
+    else:
+        print("WARNING: Reactor creation failed - skipping multiple tasks test")
+
+
+# ===----------------------------------------------------------------------=== #
+# Multi-threaded Runtime Tests
+# ===----------------------------------------------------------------------=== #
+
+# CHECK-LABEL: test_runtime_creation
+fn test_runtime_creation() raises:
+    print("== test_runtime_creation")
+    
+    var runtime_instance = runtime.AsyncRuntime(num_workers=2)
+    # CHECK: Runtime created with 2 workers
+    print("Runtime created with 2 workers")
+    assert_equal(runtime_instance.num_workers, 2, "Should have 2 workers")
+    assert_false(runtime_instance.started, "Runtime should not be started initially")
+    
+    runtime_instance.shutdown()
+
+
+# CHECK-LABEL: test_runtime_task_spawning
+fn test_runtime_task_spawning() raises:
+    print("== test_runtime_task_spawning")
+    
+    var runtime_instance = runtime.AsyncRuntime(num_workers=2)
+    
+    # Spawn tasks with different callbacks
+    var handles = runtime.List[runtime.TaskHandle]()
+    handles.append(runtime_instance.spawn_task(runtime.default_callback))
+    handles.append(runtime_instance.spawn_task(runtime.logging_callback))
+    handles.append(runtime_instance.spawn_task(runtime.doubling_callback))
+    
+    var valid_handles = 0
+    for i in range(len(handles)):
+        if handles[i].is_valid():
+            valid_handles += 1
+    
+    # CHECK: Spawned 3 valid tasks
+    print("Spawned", valid_handles, "valid tasks")
+    assert_equal(valid_handles, 3, "Should spawn 3 valid tasks")
+    
+    runtime_instance.shutdown()
+
+
+# ===----------------------------------------------------------------------=== #
+# Edge Cases and Error Handling Tests
+# ===----------------------------------------------------------------------=== #
+
+# CHECK-LABEL: test_invalid_handles
+fn test_invalid_handles() raises:
+    print("== test_invalid_handles")
+    
+    var reactor = runtime.AsyncReactor()
+    if reactor.is_valid():
+        # Test triggering invalid handle
+        var invalid_handle = runtime.TaskHandle(task_id=-1, fd=-1)
+        var trigger_result = reactor.trigger_task(invalid_handle, 100)
+        # CHECK: Triggering invalid handle: False
+        print("Triggering invalid handle:", trigger_result)
+        assert_false(trigger_result, "Triggering invalid handle should fail")
+        
+        reactor.shutdown()
+    else:
+        print("WARNING: Reactor creation failed - skipping invalid handles test")
+
+
+# CHECK-LABEL: test_reactor_shutdown
+fn test_reactor_shutdown() raises:
+    print("== test_reactor_shutdown")
+    
+    var reactor = runtime.AsyncReactor()
+    if reactor.is_valid():
+        # Create some tasks
+        var handle1 = reactor.create_task()
+        var handle2 = reactor.create_task()
+        
+        # Shutdown should clean up resources
+        reactor.shutdown()
+        # CHECK: Reactor shutdown completed
+        print("Reactor shutdown completed")
+        assert_false(reactor.is_valid(), "Reactor should be invalid after shutdown")
+    else:
+        print("WARNING: Reactor creation failed - skipping shutdown test")
+
+
+# CHECK-LABEL: test_task_execution_idempotency
+fn test_task_execution_idempotency() raises:
+    print("== test_task_execution_idempotency")
+    
+    # This tests internal task execution behavior
+    # Note: This is testing the AsyncTask.execute() method directly
+    var task = runtime.AsyncTask(1, -1, runtime.default_callback)  # Use invalid fd for safety
+    
+    # First execution should fail due to invalid fd
+    var result1 = task.execute()
+    # CHECK: First execution failed as expected
+    print("First execution failed as expected")
+    assert_false(result1.success, "First execution should fail with invalid fd")
+    assert_true(task.executed, "Task should be marked as executed")
+    
+    # Second execution should also fail (already executed)
+    var result2 = task.execute()
+    # CHECK: Second execution failed as expected
+    print("Second execution failed as expected")
+    assert_false(result2.success, "Second execution should fail (already executed)")
+    assert_not_equal(result2.error_msg, "", "Should have error message about already executed")
+
+
+# ===----------------------------------------------------------------------=== #
+# Integration Tests
+# ===----------------------------------------------------------------------=== #
+
+# CHECK-LABEL: test_end_to_end_workflow
+fn test_end_to_end_workflow() raises:
+    print("== test_end_to_end_workflow")
+    
+    var reactor = runtime.AsyncReactor()
+    if reactor.is_valid():
+        # Test complete workflow: create -> trigger -> execute -> verify
+        var handles = runtime.List[runtime.TaskHandle]()
+        
+        # Create tasks
+        handles.append(reactor.create_task(runtime.default_callback))
+        handles.append(reactor.create_task(runtime.doubling_callback))
+        
+        # Verify creation
+        var created_count = 0
+        for i in range(len(handles)):
+            if handles[i].is_valid():
+                created_count += 1
+        
+        # CHECK: End-to-end: Created 2 tasks
+        print("End-to-end: Created", created_count, "tasks")
+        assert_equal(created_count, 2, "Should create 2 tasks")
+        
+        # Trigger tasks
+        var triggered_count = 0
+        for i in range(len(handles)):
+            if handles[i].is_valid():
+                if reactor.trigger_task(handles[i], UInt64(50 * (i + 1))):
+                    triggered_count += 1
+        
+        # CHECK: End-to-end: Triggered 2 tasks
+        print("End-to-end: Triggered", triggered_count, "tasks")
+        assert_equal(triggered_count, 2, "Should trigger 2 tasks")
+        
+        # Execute tasks
+        var completed = reactor.run_until_complete(max_iterations=5)
+        # CHECK: CALLBACK: Task 1 doubling 100 -> 200
+        # CHECK: End-to-end: Completed 2 tasks
+        print("End-to-end: Completed", completed, "tasks")
+        assert_equal(completed, 2, "Should complete 2 tasks")
+        
+        reactor.shutdown()
+    else:
+        print("WARNING: Reactor creation failed - skipping end-to-end test")
+
+
+# ===----------------------------------------------------------------------=== #
+# Main Test Runner
+# ===----------------------------------------------------------------------=== #
+
+def main():
+    print("Starting custom async runtime tests...")
     print()
-    example_multi_threaded()
-    print()
-    example_custom_callbacks()
+    
+    try:
+        # Basic component tests
+        test_task_handle()
+        test_task_result()
+        test_eventfd()
+        print()
+        
+        # Callback tests
+        test_default_callback()
+        test_logging_callback()
+        test_doubling_callback()
+        # test_simple_callback_trait()
+        test_custom_callback_trait()
+        print()
+        
+        # Single-threaded reactor tests
+        test_reactor_creation()
+        test_reactor_task_creation()
+        test_reactor_single_task_execution()
+        test_reactor_multiple_tasks()
+        print()
+        
+        # Multi-threaded runtime tests
+        test_runtime_creation()
+        test_runtime_task_spawning()
+        print()
+        
+        # Edge cases and error handling
+        test_invalid_handles()
+        test_reactor_shutdown()
+        test_task_execution_idempotency()
+        print()
+        
+        # Integration tests
+        test_end_to_end_workflow()
+        print()
+        
+        # Performance tests
+        # test_many_tasks()
+        print()
+        
+        print("All custom async runtime tests completed!")
+    except e:
+        print("Test failed with error: ", e)
