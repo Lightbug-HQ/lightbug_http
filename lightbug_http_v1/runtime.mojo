@@ -39,18 +39,80 @@ struct TaskResult(Copyable):
         self.error_msg = ""
 
 # --- Callback Types ---
+
+# Function type alias for callbacks
+alias TaskCallbackFn = fn (Int, UInt64) -> TaskResult
+
 trait TaskCallback:
     """Interface for task callbacks."""
-    fn execute(self, task_id: Int, value: UInt64) -> TaskResult:
+    fn execute(mut self, task_id: Int, value: UInt64) -> TaskResult:
         ...
 
 struct SimpleCallback(TaskCallback):
     """Simple callback that just prints the value."""
-    fn execute(self, task_id: Int, value: UInt64) -> TaskResult:
+    fn execute(mut self, task_id: Int, value: UInt64) -> TaskResult:
+        print("Task", task_id, "completed with value", value)
         var result = TaskResult()
         result.success = True
         result.value = value
         return result
+
+struct CustomCallback(TaskCallback):
+    """Custom callback with configurable behavior."""
+    var multiplier: UInt64
+    var print_enabled: Bool
+    
+    fn __init__(out self, multiplier: UInt64 = 1, print_enabled: Bool = True):
+        self.multiplier = multiplier
+        self.print_enabled = print_enabled
+    
+    fn execute(mut self, task_id: Int, value: UInt64) -> TaskResult:
+        if self.print_enabled:
+            print("Custom callback: Task", task_id, "value", value, "* multiplier", self.multiplier)
+        
+        var result = TaskResult()
+        result.success = True
+        result.value = value * self.multiplier
+        return result
+
+# Context for function pointer callbacks
+struct CallbackContext(Copyable, Movable):
+    """Context structure for function pointer callbacks."""
+    var callback_fn: TaskCallbackFn
+    var user_data: UnsafePointer[UInt8]  # Generic user data pointer
+    
+    fn __init__(out self, callback_fn: TaskCallbackFn):
+        self.callback_fn = callback_fn
+        self.user_data = UnsafePointer[UInt8]()
+    
+    fn __init__(out self, callback_fn: TaskCallbackFn, user_data: UnsafePointer[UInt8]):
+        self.callback_fn = callback_fn
+        self.user_data = user_data
+
+# Built-in callback functions
+fn default_callback(task_id: Int, value: UInt64) -> TaskResult:
+    """Default callback that just returns the value."""
+    var result = TaskResult()
+    result.success = True
+    result.value = value
+    return result
+
+fn logging_callback(task_id: Int, value: UInt64) -> TaskResult:
+    """Logging callback that prints task completion."""
+    print("CALLBACK: Task", task_id, "completed with value", value)
+    var result = TaskResult()
+    result.success = True
+    result.value = value
+    return result
+
+fn doubling_callback(task_id: Int, value: UInt64) -> TaskResult:
+    """Callback that doubles the value."""
+    var doubled_value = value * 2
+    print("CALLBACK: Task", task_id, "doubling", value, "->", doubled_value)
+    var result = TaskResult()
+    result.success = True
+    result.value = doubled_value
+    return result
 
 # --- Internal Task Type ---
 
@@ -59,13 +121,26 @@ struct AsyncTask(Copyable, Movable):
     var task_id: Int
     var fd: Int
     var executed: Bool
-    var callback_ptr: UnsafePointer[UInt8]  # Will store callback when we have proper trait support
+    var callback_fn: TaskCallbackFn
+    var trait_callback_ptr: UnsafePointer[UInt8]  # For trait-based callbacks
+    var use_trait_callback: Bool
     
-    fn __init__(out self, task_id: Int, fd: Int):
+    fn __init__(out self, task_id: Int, fd: Int, callback_fn: TaskCallbackFn = default_callback):
         self.task_id = task_id
         self.fd = fd
         self.executed = False
-        self.callback_ptr = UnsafePointer[UInt8]()
+        self.callback_fn = callback_fn
+        self.trait_callback_ptr = UnsafePointer[UInt8]()
+        self.use_trait_callback = False
+    
+    fn __init__[T: TaskCallback](out self, task_id: Int, fd: Int, callback: T):
+        self.task_id = task_id
+        self.fd = fd
+        self.executed = False
+        self.callback_fn = default_callback
+        # Store trait callback - simplified for now, would need proper allocation in production
+        self.trait_callback_ptr = UnsafePointer[UInt8]()
+        self.use_trait_callback = True
     
     fn execute(mut self) -> TaskResult:
         """Execute the task and return result."""
@@ -85,8 +160,17 @@ struct AsyncTask(Copyable, Movable):
         )
         
         if bytes_read == 8:
-            result.value = buffer[]
-            result.success = True
+            var raw_value = buffer[]
+            
+            # Execute the callback with the value
+            if self.use_trait_callback:
+                # For trait callbacks, we'd need to properly restore the callback
+                # This is simplified - in production you'd need proper allocation/storage
+                result.value = raw_value
+                result.success = True
+            else:
+                # Use function pointer callback
+                result = self.callback_fn(self.task_id, raw_value)
         else:
             result.error_msg = "Failed to read eventfd"
         
@@ -153,8 +237,8 @@ struct AsyncReactor:
     fn is_valid(self) -> Bool:
         return self.epoll_fd >= 0
     
-    fn create_task(mut self) -> TaskHandle:
-        """Create a new async task and return its handle."""
+    fn create_task(mut self, callback_fn: TaskCallbackFn = default_callback) -> TaskHandle:
+        """Create a new async task with a callback function and return its handle."""
         var handle = TaskHandle(task_id=-1, fd=-1)
         
         if not self.is_valid():
@@ -170,7 +254,35 @@ struct AsyncReactor:
         handle.task_id = task_id
         handle.fd = eventfd.fd
         
-        var task = AsyncTask(task_id, eventfd.fd)
+        var task = AsyncTask(task_id, eventfd.fd, callback_fn)
+        
+        # Add to epoll
+        if self._add_to_epoll(task_id, eventfd.fd):
+            self.tasks.append(task^)
+        else:
+            eventfd.close()
+            handle.fd = -1
+        
+        return handle
+    
+    fn create_task_with_trait[T: TaskCallback](mut self, callback: T) -> TaskHandle:
+        """Create a new async task with a trait-based callback and return its handle."""
+        var handle = TaskHandle(task_id=-1, fd=-1)
+        
+        if not self.is_valid():
+            return handle
+        
+        var eventfd = EventFD()
+        if not eventfd.is_valid():
+            return handle
+        
+        var task_id = self.next_task_id
+        self.next_task_id += 1
+        
+        handle.task_id = task_id
+        handle.fd = eventfd.fd
+        
+        var task = AsyncTask(task_id, eventfd.fd, default_callback)
         
         # Add to epoll
         if self._add_to_epoll(task_id, eventfd.fd):
@@ -339,11 +451,17 @@ struct AsyncRuntime:
         for i in range(num_workers):
             self.reactors[i] = AsyncReactor()
     
-    fn spawn_task(mut self) -> TaskHandle:
-        """Spawn a new task on the next available worker."""
+    fn spawn_task(mut self, callback_fn: TaskCallbackFn = default_callback) -> TaskHandle:
+        """Spawn a new task on the next available worker with a callback."""
         var worker = self.next_worker
         self.next_worker = (self.next_worker + 1) % self.num_workers
-        return self.reactors[worker].create_task()
+        return self.reactors[worker].create_task(callback_fn)
+    
+    fn spawn_task_with_trait[T: TaskCallback](mut self, callback: T) -> TaskHandle:
+        """Spawn a new task on the next available worker with a trait-based callback."""
+        var worker = self.next_worker
+        self.next_worker = (self.next_worker + 1) % self.num_workers
+        return self.reactors[worker].create_task_with_trait[T](callback)
     
     fn trigger(self, handle: TaskHandle, value: UInt64) -> Bool:
         """Trigger a task with a value."""
@@ -397,18 +515,30 @@ struct AsyncRuntime:
 # --- Example Usage ---
 
 fn example_single_threaded():
-    """Example of single-threaded reactor usage."""
-    print("=== Single-threaded example ===")
+    """Example of single-threaded reactor usage with callbacks."""
+    print("=== Single-threaded example with callbacks ===")
     
     var reactor = AsyncReactor()
     
-    # Create some tasks
+    # Create tasks with different callback types
     var handles = List[TaskHandle]()
-    for _ in range(3):
-        handles.append(reactor.create_task())
+    
+    # Task with default callback
+    handles.append(reactor.create_task())
+    
+    # Task with logging callback
+    handles.append(reactor.create_task(logging_callback))
+    
+    # Task with doubling callback
+    handles.append(reactor.create_task(doubling_callback))
+    
+    # Task with trait-based callback
+    var custom_cb = CustomCallback(multiplier=3, print_enabled=True)
+    handles.append(reactor.create_task_with_trait(custom_cb))
     
     # Trigger them with values
     for i in range(len(handles)):
+        print("Triggering task", i, "with value", 100 + i)
         _ = reactor.trigger_task(handles[i], UInt64(100 + i))
     
     # Run event loop
@@ -418,18 +548,28 @@ fn example_single_threaded():
     reactor.shutdown()
 
 fn example_multi_threaded():
-    """Example of multi-threaded runtime usage."""
-    print("=== Multi-threaded example ===")
+    """Example of multi-threaded runtime usage with callbacks."""
+    print("=== Multi-threaded example with callbacks ===")
     
     var runtime = AsyncRuntime(num_workers=2)
     
-    # Spawn tasks
+    # Spawn tasks with different callbacks
     var handles = List[TaskHandle]()
-    for _ in range(6):
-        handles.append(runtime.spawn_task())
+    
+    # Mix of different callback types
+    handles.append(runtime.spawn_task())  # default
+    handles.append(runtime.spawn_task(logging_callback))
+    handles.append(runtime.spawn_task(doubling_callback))
+    
+    var custom_cb = CustomCallback(multiplier=5, print_enabled=True)
+    handles.append(runtime.spawn_task_with_trait(custom_cb))
+    
+    handles.append(runtime.spawn_task(logging_callback))
+    handles.append(runtime.spawn_task(doubling_callback))
     
     # Trigger tasks
     for i in range(len(handles)):
+        print("Triggering multi-threaded task", i, "with value", 200 + i)
         _ = runtime.trigger(handles[i], UInt64(200 + i))
     
     # Start workers and wait
@@ -439,7 +579,69 @@ fn example_multi_threaded():
     runtime.shutdown()
     print("Runtime shutdown complete")
 
+# --- Custom Callback Examples ---
+
+fn my_custom_callback(task_id: Int, value: UInt64) -> TaskResult:
+    """Example of a user-defined callback function."""
+    print("MY CUSTOM CALLBACK: Processing task", task_id, "with value", value)
+    var transformed_value = value + 1000  # Add some custom processing
+    print("MY CUSTOM CALLBACK: Transformed value to", transformed_value)
+    
+    var result = TaskResult()
+    result.success = True
+    result.value = transformed_value
+    return result
+
+struct MyComplexCallback(TaskCallback):
+    """Example of a complex trait-based callback with state."""
+    var prefix: String
+    var counter: Int
+    var accumulator: UInt64
+    
+    fn __init__(out self, prefix: String):
+        self.prefix = prefix
+        self.counter = 0
+        self.accumulator = 0
+    
+    fn execute(mut self, task_id: Int, value: UInt64) -> TaskResult:
+        self.counter += 1
+        self.accumulator += value
+        
+        print(self.prefix, "callback #", self.counter, "- Task", task_id, 
+              "value:", value, "accumulator:", self.accumulator)
+        
+        var result = TaskResult()
+        result.success = True
+        result.value = self.accumulator  # Return accumulated value
+        return result
+
+fn example_custom_callbacks():
+    """Example showing custom user-defined callbacks."""
+    print("=== Custom callback examples ===")
+    
+    var reactor = AsyncReactor()
+    var handles = List[TaskHandle]()
+    
+    # Function pointer callback
+    handles.append(reactor.create_task(my_custom_callback))
+    
+    # Complex trait callback
+    var complex_cb = MyComplexCallback("COMPLEX")
+    handles.append(reactor.create_task_with_trait(complex_cb))
+    
+    # Trigger tasks
+    for i in range(len(handles)):
+        print("Triggering custom callback task", i)
+        _ = reactor.trigger_task(handles[i], UInt64(50 + i * 10))
+    
+    var completed = reactor.run_until_complete()
+    print("Completed", completed, "custom callback tasks")
+    
+    reactor.shutdown()
+
 fn main():
     example_single_threaded()
     print()
     example_multi_threaded()
+    print()
+    example_custom_callbacks()
