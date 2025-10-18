@@ -13,6 +13,8 @@ from lightbug_http.strings import (
     lineBreak,
     to_string,
 )
+from lightbug_http.pico import PhrChunkedDecoder, phr_decode_chunked
+from memory import UnsafePointer
 
 
 struct StatusCode:
@@ -225,15 +227,31 @@ struct HTTPResponse(Writable, Stringable, Encodable, Sized):
         self.set_content_length(len(self.body_raw))
 
     fn read_chunks(mut self, chunks: Span[Byte]) raises:
-        var reader = ByteReader(chunks)
-        while True:
-            var size = atol(String(reader.read_line()), 16)
-            if size == 0:
-                break
-            var data = reader.read_bytes(size).to_bytes()
-            reader.skip_carriage_return()
-            self.set_content_length(self.content_length() + len(data))
-            self.body_raw += data
+        """Decode chunked transfer encoding using the pico parser."""
+        var decoder = PhrChunkedDecoder()
+        decoder.consume_trailer = True  # We want to consume trailing headers
+        
+        # Copy chunks to a mutable buffer
+        var buf_ptr = UnsafePointer[UInt8].alloc(len(chunks))
+        for i in range(len(chunks)):
+            buf_ptr[i] = chunks[i]
+        
+        var bufsz = len(chunks)
+        var result = phr_decode_chunked(decoder, buf_ptr, bufsz)
+        var ret = result[0]
+        var decoded_size = result[1]
+        
+        if ret < 0 and ret != -2:
+            buf_ptr.free()
+            raise Error("Failed to decode chunked response: Invalid chunk format")
+        
+        # Copy decoded data to body
+        self.body_raw.clear()
+        for i in range(decoded_size):
+            self.body_raw.append(buf_ptr[i])
+        
+        self.set_content_length(len(self.body_raw))
+        buf_ptr.free()
 
     fn write_to[T: Writer](self, mut writer: T):
         writer.write(self.protocol, whitespace, self.status_code, whitespace, self.status_text, lineBreak)
