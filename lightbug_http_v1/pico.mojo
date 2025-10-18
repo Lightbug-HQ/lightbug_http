@@ -6,31 +6,35 @@ from sys import simdwidthof
 from sys.info import sizeof
 from algorithm import vectorize
 import math
-from utils import StaticTuple
 
 # Constants
 alias IS_PRINTABLE_ASCII_MASK = 0o137
 
 # Token character map - represents which characters are valid in tokens
-alias TOKEN_CHAR_MAP = StaticTuple[Bool, 256](
-    False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False,
-    False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False,
-    False, True, False, True, True, True, True, True, False, False, True, True, False, True, True, False,
-    True, True, True, True, True, True, True, True, True, True, False, False, False, False, False, False,
-    False, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True,
-    True, True, True, True, True, True, True, True, True, True, True, False, False, False, True, True,
-    True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True,
-    True, True, True, True, True, True, True, True, True, True, True, False, True, False, True, False,
-    # Rest are False (128-255)
-    False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False,
-    False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False,
-    False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False,
-    False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False,
-    False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False,
-    False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False,
-    False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False,
-    False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False
-)
+# According to RFC 7230: token = 1*tchar
+# tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "." /
+#         "0"-"9" / "A"-"Z" / "^" / "_" / "`" / "a"-"z" / "|" / "~"
+@always_inline
+fn is_token_char(c: UInt8) -> Bool:
+    """Check if character is a valid token character.
+    
+    Optimized to be inlined and extremely fast - compiles to simple range checks.
+    """
+    # Alphanumeric ranges
+    if c >= UInt8(ord('0')) and c <= UInt8(ord('9')):  # 0-9
+        return True
+    if c >= UInt8(ord('A')) and c <= UInt8(ord('Z')):  # A-Z
+        return True
+    if c >= UInt8(ord('a')) and c <= UInt8(ord('z')):  # a-z
+        return True
+    
+    # Special characters allowed in tokens (ordered by ASCII value for branch prediction)
+    # !  #  $  %  &  '  *  +  -  .  ^  _  `  |  ~
+    return c == UInt8(ord('!')) or c == UInt8(ord('#')) or c == UInt8(ord('$')) or \
+           c == UInt8(ord('%')) or c == UInt8(ord('&')) or c == UInt8(ord("'")) or \
+           c == UInt8(ord('*')) or c == UInt8(ord('+')) or c == UInt8(ord('-')) or \
+           c == UInt8(ord('.')) or c == UInt8(ord('^')) or c == UInt8(ord('_')) or \
+           c == UInt8(ord('`')) or c == UInt8(ord('|')) or c == UInt8(ord('~'))
 
 # Chunked decoder states
 alias CHUNKED_IN_CHUNK_SIZE = 0
@@ -179,7 +183,7 @@ fn parse_token(
             token_len = Int(current) - Int(buf_start)
             token = create_string_from_ptr(buf_start, token_len)
             return current
-        elif not TOKEN_CHAR_MAP[Int(current[])]:
+        elif not is_token_char(current[]):
             ret = -1
             return UnsafePointer[UInt8]()
         current += 1
@@ -283,7 +287,8 @@ fn parse_headers(
                 break
             value_len -= 1
         
-        headers[num_headers].value = value
+        # Truncate the string to the trimmed length
+        headers[num_headers].value = value[:value_len] if value_len < len(value) else value
         headers[num_headers].value_len = value_len
         num_headers += 1
     
@@ -350,8 +355,13 @@ fn phr_parse_request(
     # Parse path
     var path_start = current
     while current < buf_end and current[] != UInt8(ord(' ')):
+        # Accept printable ASCII (32-126) and high-bit characters (>= 128)
+        # Reject control characters (< 32) and DEL (127)
         if not is_printable_ascii(current[]):
-            return -1
+            var c = current[]
+            if c < 0x20 or c == 0x7F:
+                return -1
+            # Otherwise, accept high-bit characters (>= 128)
         current += 1
     
     if current >= buf_end:
@@ -518,9 +528,14 @@ fn decode_hex(ch: UInt8) -> Int:
 fn phr_decode_chunked(
     mut decoder: PhrChunkedDecoder,
     buf: UnsafePointer[UInt8],
-    mut bufsz: Int
-) -> Int:
-    """Decode chunked transfer encoding."""
+    bufsz: Int
+) -> (Int, Int):
+    """Decode chunked transfer encoding.
+    
+    Returns (ret, new_bufsz) where:
+    - ret: number of bytes left after chunked data, -1 for error, -2 for incomplete
+    - new_bufsz: the new buffer size (decoded data length)
+    """
     var dst = 0
     var src = 0
     var ret = -2  # incomplete
@@ -533,16 +548,16 @@ fn phr_decode_chunked(
                 var v = decode_hex(buf[src])
                 if v == -1:
                     if decoder._hex_count == 0:
-                        return -1
+                        return (-1, dst)
                     # Check for valid characters after chunk size
                     var c = buf[src]
                     if c != UInt8(ord(' ')) and c != UInt8(ord('\t')) and c != UInt8(ord(';')) and 
                        c != UInt8(ord('\n')) and c != UInt8(ord('\r')):
-                        return -1
+                        return (-1, dst)
                     break
                 
                 if decoder._hex_count == 16:  # sizeof(size_t) * 2
-                    return -1
+                    return (-1, dst)
                 
                 decoder.bytes_left_in_chunk = decoder.bytes_left_in_chunk * 16 + v
                 decoder._hex_count += 1
@@ -559,7 +574,7 @@ fn phr_decode_chunked(
                 if buf[src] == UInt8(ord('\r')):
                     break
                 elif buf[src] == UInt8(ord('\n')):
-                    return -1
+                    return (-1, dst)
                 src += 1
             
             if src >= bufsz:
@@ -573,7 +588,7 @@ fn phr_decode_chunked(
                 break
             
             if buf[src] != UInt8(ord('\n')):
-                return -1
+                return (-1, dst)
             
             src += 1
             
@@ -610,7 +625,7 @@ fn phr_decode_chunked(
                 break
             
             if buf[src] != UInt8(ord('\r')):
-                return -1
+                return (-1, dst)
             
             src += 1
             decoder._state = CHUNKED_IN_CHUNK_DATA_EXPECT_LF
@@ -620,7 +635,7 @@ fn phr_decode_chunked(
                 break
             
             if buf[src] != UInt8(ord('\n')):
-                return -1
+                return (-1, dst)
             
             src += 1
             decoder._state = CHUNKED_IN_CHUNK_SIZE
@@ -657,7 +672,7 @@ fn phr_decode_chunked(
     if dst != src and src < bufsz:
         memmove(buf + dst, buf + src, bufsz - src)
     
-    bufsz = dst
+    var new_bufsz = dst
     
     # Check for excessive overhead
     if ret == -2:
@@ -666,7 +681,7 @@ fn phr_decode_chunked(
             decoder._total_read - decoder._total_overhead < decoder._total_read // 4):
             ret = -1
     
-    return ret
+    return (ret, new_bufsz)
 
 fn phr_decode_chunked_is_in_data(decoder: PhrChunkedDecoder) -> Bool:
     """Check if decoder is currently in chunk data state."""
@@ -713,14 +728,22 @@ fn memmove[T: Copyable](
             i -= 1
 
 fn create_string_from_ptr(ptr: UnsafePointer[UInt8], length: Int) -> String:
-    """Create a String from a pointer and length."""
+    """Create a String from a pointer and length.
+    
+    Copies raw bytes directly into the String. This may result in invalid UTF-8 for bytes >= 0x80,
+    but matches the behavior expected by the picohttpparser tests which were written for C.
+    """
     if length <= 0:
         return String()
     
+    # Copy raw bytes directly - this preserves the exact bytes from HTTP messages
     var result = String()
-    result.reserve(length)
+    var buf = List[UInt8](capacity=length)
     for i in range(length):
-        result += chr(Int(ptr[i]))
+        buf.append(ptr[i])
+    
+    result.write_bytes(buf)
+    
     return result
 
 fn bufis(s: String, t: String) -> Bool:
@@ -1165,14 +1188,16 @@ fn test_chunked_at_once(line: Int,
        buf_ptr[i] = buf[i]
    
    var bufsz = len(buf)
-   var ret = phr_decode_chunked(decoder, buf_ptr, bufsz)
+   var result = phr_decode_chunked(decoder, buf_ptr, bufsz)
+   var ret = result[0]
+   var new_bufsz = result[1]
    
    assert_equal(ret, expected)
-   assert_equal(bufsz, len(decoded))
+   assert_equal(new_bufsz, len(decoded))
    
    # Check decoded content
    var decoded_bytes = decoded.as_bytes()
-   for i in range(bufsz):
+   for i in range(new_bufsz):
        assert_equal(buf_ptr[i], decoded_bytes[i])
    
    buf_ptr.free()
@@ -1197,22 +1222,26 @@ fn test_chunked_per_byte(line: Int,
    for i in range(bytes_to_consume - 1):
        buf[bytes_ready] = encoded_bytes[i]
        var bufsz = 1
-       var ret = phr_decode_chunked(decoder, buf + bytes_ready, bufsz)
+       var result = phr_decode_chunked(decoder, buf + bytes_ready, bufsz)
+       var ret = result[0]
+       var new_bufsz = result[1]
        if ret != -2:
            assert_false(True, "Unexpected return value during byte-by-byte parsing")
            buf.free()
            return
-       bytes_ready += bufsz
+       bytes_ready += new_bufsz
    
    # Feed the last byte(s)
    for i in range(bytes_to_consume - 1, len(encoded)):
        buf[bytes_ready + i - (bytes_to_consume - 1)] = encoded_bytes[i]
    
    var bufsz = len(encoded) - (bytes_to_consume - 1)
-   var ret = phr_decode_chunked(decoder, buf + bytes_ready, bufsz)
+   var result = phr_decode_chunked(decoder, buf + bytes_ready, bufsz)
+   var ret = result[0]
+   var new_bufsz = result[1]
    
    assert_equal(ret, expected)
-   bytes_ready += bufsz
+   bytes_ready += new_bufsz
    assert_equal(bytes_ready, len(decoded))
    
    # Check decoded content
@@ -1231,7 +1260,8 @@ fn test_chunked_failure(line: Int, encoded: String, expected: Int) raises:
        buf_ptr[i] = buf[i]
    
    var bufsz = len(buf)
-   var ret = phr_decode_chunked(decoder, buf_ptr, bufsz)
+   var result = phr_decode_chunked(decoder, buf_ptr, bufsz)
+   var ret = result[0]
    assert_equal(ret, expected)
    buf_ptr.free()
    
@@ -1243,7 +1273,8 @@ fn test_chunked_failure(line: Int, encoded: String, expected: Int) raises:
    for i in range(len(encoded)):
        buf_ptr[0] = encoded_bytes[i]
        bufsz = 1
-       ret = phr_decode_chunked(decoder, buf_ptr, bufsz)
+       result = phr_decode_chunked(decoder, buf_ptr, bufsz)
+       ret = result[0]
        if ret == -1:
            assert_equal(ret, expected)
            buf_ptr.free()
@@ -1304,7 +1335,7 @@ fn test_chunked() raises:
    test_chunked_at_once(
        0, False,
        "6\r\nhello \r\n5\r\nworld\r\n0\r\na: b\r\nc: d\r\n\r\n",
-       "hello world", 19
+       "hello world", 14
    )
    
    # Test failures
@@ -1368,10 +1399,12 @@ fn test_chunked_leftdata() raises:
        buf_ptr[i] = buf[i]
    
    var bufsz = len(buf)
-   var ret = phr_decode_chunked(decoder, buf_ptr, bufsz)
+   var result = phr_decode_chunked(decoder, buf_ptr, bufsz)
+   var ret = result[0]
+   var new_bufsz = result[1]
    
    assert_true(ret >= 0)
-   assert_equal(bufsz, 5)
+   assert_equal(new_bufsz, 5)
    
    # Check decoded content
    var expected = "abcde"
@@ -1383,7 +1416,7 @@ fn test_chunked_leftdata() raises:
    assert_equal(ret, len(NEXT_REQ))
    var next_req_bytes = NEXT_REQ.as_bytes()
    for i in range(len(NEXT_REQ)):
-       assert_equal(buf_ptr[bufsz + i], next_req_bytes[i])
+       assert_equal(buf_ptr[new_bufsz + i], next_req_bytes[i])
    
    buf_ptr.free()
 
