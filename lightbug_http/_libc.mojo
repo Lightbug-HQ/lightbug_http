@@ -91,7 +91,7 @@ alias in_port_t = c_ushort
 # TODO: These might vary on each platform...we should confirm this.
 # Taken from: https://github.com/openbsd/src/blob/master/sys/sys/socket.h#L250
 # Address Family Constants
-@value
+@fieldwise_init
 @register_passable("trivial")
 struct AddressFamily(EqualityComparable & Copyable & Movable):
     var value: Int32
@@ -197,7 +197,7 @@ struct AddressFamily(EqualityComparable & Copyable & Movable):
         return self.value != other.value
 
 
-@value
+@fieldwise_init
 @register_passable("trivial")
 struct AddressLength:
     var value: Int
@@ -329,19 +329,18 @@ alias SO_PROTOCOL = 0x1025
 
 
 # --- ( Network Related Structs )-----------------------------------------------
-@value
+@fieldwise_init
 @register_passable("trivial")
 struct in_addr:
     var s_addr: in_addr_t
 
 
-@value
+@fieldwise_init
 @register_passable("trivial")
 struct in6_addr:
     var s6_addr: StaticTuple[c_char, 16]
 
 
-@value
 @register_passable("trivial")
 struct sockaddr:
     var sa_family: sa_family_t
@@ -352,7 +351,6 @@ struct sockaddr:
         self.sa_data = data
 
 
-@value
 @register_passable("trivial")
 struct sockaddr_in:
     var sin_family: sa_family_t
@@ -374,7 +372,7 @@ struct sockaddr_in:
         self.sin_zero = StaticTuple[c_char, 8](0, 0, 0, 0, 0, 0, 0, 0)
 
 
-@value
+@fieldwise_init
 @register_passable("trivial")
 struct sockaddr_in6:
     var sin6_family: sa_family_t
@@ -384,7 +382,7 @@ struct sockaddr_in6:
     var sin6_scope_id: c_uint
 
 
-@value
+@fieldwise_init
 @register_passable("trivial")
 struct addrinfo:
     var ai_flags: c_int

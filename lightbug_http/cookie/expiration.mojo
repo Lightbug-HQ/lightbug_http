@@ -1,15 +1,19 @@
 from collections import Optional
-from lightbug_http.external.small_time import SmallTime
+from lightbug_http.external.small_time import SmallTime, TimeZone
+from lightbug_http.external.small_time.small_time import strptime
 from lightbug_http.strings import to_string
 
 alias HTTP_DATE_FORMAT = "ddd, DD MMM YYYY HH:mm:ss ZZZ"
 alias TZ_GMT = TimeZone(0, "GMT")
 
 
-@value
-struct Expiration(Copyable, Movable):
+struct Expiration(Copyable, Movable, ImplicitlyCopyable):
     var variant: UInt8
     var datetime: Optional[SmallTime]
+
+    fn __init__(out self, variant: UInt8, datetime: Optional[SmallTime]):
+        self.variant = variant
+        self.datetime = datetime
 
     @staticmethod
     fn session() -> Self:

@@ -27,8 +27,8 @@ struct StatusCode:
     alias INTERNAL_ERROR = 500
 
 
-@value
-struct HTTPResponse(Writable, Stringable, Encodable, Sized):
+@fieldwise_init
+struct HTTPResponse(Writable, Stringable, Encodable, Sized, Movable):
     var headers: Headers
     var cookies: ResponseCookieJar
     var body_raw: Bytes
@@ -64,7 +64,7 @@ struct HTTPResponse(Writable, Stringable, Encodable, Sized):
                 status_text=status_text,
             )
         except e:
-            logger.error(e)
+            materialize[logger]().error(e)
             raise Error("Failed to read request body")
 
     @staticmethod
@@ -99,7 +99,7 @@ struct HTTPResponse(Writable, Stringable, Encodable, Sized):
             var buff = Bytes(capacity=default_buffer_size)
             try:
                 while conn.read(buff) > 0:
-                    b += buff
+                    b += buff.copy()
 
                     if (
                         buff[-5] == byte("0")
@@ -112,16 +112,16 @@ struct HTTPResponse(Writable, Stringable, Encodable, Sized):
 
                     buff.clear()
                 response.read_chunks(b)
-                return response
+                return response^
             except e:
-                logger.error(e)
+                materialize[logger]().error(e)
                 raise Error("Failed to read chunked response.")
 
         try:
             response.read_body(reader)
-            return response
+            return response^
         except e:
-            logger.error(e)
+            materialize[logger]().error(e)
             raise Error("Failed to read request body: ")
 
     fn __init__(
@@ -133,8 +133,8 @@ struct HTTPResponse(Writable, Stringable, Encodable, Sized):
         status_text: String = "OK",
         protocol: String = strHttp11,
     ):
-        self.headers = headers
-        self.cookies = cookies
+        self.headers = headers.copy()
+        self.cookies = cookies.copy()
         if HeaderKey.CONTENT_TYPE not in self.headers:
             self.headers[HeaderKey.CONTENT_TYPE] = "application/octet-stream"
         self.status_code = status_code
@@ -150,7 +150,7 @@ struct HTTPResponse(Writable, Stringable, Encodable, Sized):
                 var current_time = String(now(utc=True))
                 self.headers[HeaderKey.DATE] = current_time
             except:
-                logger.debug("DATE header not set, unable to get current time and it was instead omitted.")
+                materialize[logger]().debug("DATE header not set, unable to get current time and it was instead omitted.")
 
     fn __init__(
         out self,
@@ -161,8 +161,8 @@ struct HTTPResponse(Writable, Stringable, Encodable, Sized):
         status_text: String = "OK",
         protocol: String = strHttp11,
     ) raises:
-        self.headers = headers
-        self.cookies = cookies
+        self.headers = headers.copy()
+        self.cookies = cookies.copy()
         if HeaderKey.CONTENT_TYPE not in self.headers:
             self.headers[HeaderKey.CONTENT_TYPE] = "application/octet-stream"
         self.status_code = status_code
@@ -259,9 +259,9 @@ struct HTTPResponse(Writable, Stringable, Encodable, Sized):
         if HeaderKey.SERVER not in self.headers:
             writer.write("server: lightbug_http", lineBreak)
 
-        writer.write(self.headers, self.cookies, lineBreak, to_string(self.body_raw))
+        writer.write(self.headers, self.cookies, lineBreak, to_string(self.body_raw.copy()))
 
-    fn encode(owned self) -> Bytes:
+    fn encode(var self) -> Bytes:
         """Encodes response as bytes.
 
         This method consumes the data in this request and it should

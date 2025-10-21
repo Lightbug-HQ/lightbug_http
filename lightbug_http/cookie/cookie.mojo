@@ -2,7 +2,7 @@ from collections import Optional
 from lightbug_http.header import HeaderKey
 
 
-struct Cookie(Copyable, Movable):
+struct Cookie(Copyable, Movable, ImplicitlyCopyable):
     alias EXPIRES = "Expires"
     alias MAX_AGE = "Max-Age"
     alias DOMAIN = "Domain"
@@ -32,11 +32,11 @@ struct Cookie(Copyable, Movable):
         if len(parts) < 1:
             raise Error("invalid Cookie")
 
-        var cookie = Cookie("", parts[0], path=String("/"))
+        var cookie = Cookie("", String(parts[0]), path=String("/"))
         if Cookie.EQUAL in parts[0]:
             var name_value = parts[0].split(Cookie.EQUAL)
-            cookie.name = name_value[0]
-            cookie.value = name_value[1]
+            cookie.name = String(name_value[0])
+            cookie.value = String(name_value[1])
 
         for i in range(1, len(parts)):
             var part = parts[i]
@@ -100,7 +100,7 @@ struct Cookie(Copyable, Movable):
         self.same_site = existing.same_site
         self.partitioned = existing.partitioned
 
-    fn __moveinit__(out self: Cookie, owned existing: Cookie):
+    fn __moveinit__(out self: Cookie, deinit existing: Cookie):
         self.name = existing.name^
         self.value = existing.value^
         self.max_age = existing.max_age^

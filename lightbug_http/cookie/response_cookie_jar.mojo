@@ -4,8 +4,7 @@ from lightbug_http.header import HeaderKey, write_header
 from lightbug_http.io.bytes import ByteWriter
 
 
-@value
-struct ResponseCookieKey(KeyElement):
+struct ResponseCookieKey(Hashable, KeyElement, ImplicitlyCopyable):
     var name: String
     var domain: String
     var path: String
@@ -30,26 +29,34 @@ struct ResponseCookieKey(KeyElement):
             and self.path == other.path
         )
 
-    fn __moveinit__(out self: Self, owned existing: Self):
-        self.name = existing.name
-        self.domain = existing.domain
-        self.path = existing.path
+    fn __moveinit__(out self: Self, deinit existing: Self):
+        self.name = existing.name^
+        self.domain = existing.domain^
+        self.path = existing.path^
 
     fn __copyinit__(out self: Self, existing: Self):
         self.name = existing.name
         self.domain = existing.domain
         self.path = existing.path
 
-    fn __hash__(self: Self) -> UInt:
-        return hash(self.name + "~" + self.domain + "~" + self.path)
+    fn __hash__[H: _Hasher](self: Self, mut hasher: H):
+        # Implement hash by updating hasher with our fields
+        hash(self.name, hasher)
+        hash(self.domain, hasher)
+        hash(self.path, hasher)
 
 
-@value
 struct ResponseCookieJar(Copyable, Movable, Sized, Stringable, Writable):
     var _inner: Dict[ResponseCookieKey, Cookie]
 
     fn __init__(out self):
         self._inner = Dict[ResponseCookieKey, Cookie]()
+
+    fn __copyinit__(out self, existing: Self):
+        self._inner = existing._inner.copy()
+
+    fn __moveinit__(out self, deinit existing: Self):
+        self._inner = existing._inner^
 
     fn __init__(out self, *cookies: Cookie):
         self._inner = Dict[ResponseCookieKey, Cookie]()
@@ -66,7 +73,7 @@ struct ResponseCookieJar(Copyable, Movable, Sized, Stringable, Writable):
         self._inner[key] = value
 
     fn __getitem__(self, key: ResponseCookieKey) raises -> Cookie:
-        return self._inner[key]
+        return self._inner[key].copy()
 
     fn get(self, key: ResponseCookieKey) -> Optional[Cookie]:
         try:

@@ -1,5 +1,4 @@
-@value
-struct Duration:
+struct Duration(Copyable, Movable, ImplicitlyCopyable):
     var total_seconds: Int
 
     fn __init__(out self, seconds: Int = 0, minutes: Int = 0, hours: Int = 0, days: Int = 0):

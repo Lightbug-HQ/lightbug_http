@@ -100,7 +100,7 @@ Once you have a Mojo project set up locally,
     from lightbug_http.strings import to_string
     from lightbug_http.header import HeaderKey
 
-    @value
+    @fieldwise_init
     struct Printer(HTTPService):
         fn func(mut self, req: HTTPRequest) raises -> HTTPResponse:
             print("Request URI:", req.uri.request_uri)
@@ -137,7 +137,7 @@ Routing is not in scope for this library, but you can easily set up routes yours
 ```mojo
 from lightbug_http import *
 
-@value
+@fieldwise_init
 struct ExampleRouter(HTTPService):
     fn func(mut self, req: HTTPRequest) raises -> HTTPResponse:
         var body = req.body_raw
@@ -168,7 +168,7 @@ The default welcome screen shows an example of how to serve files like images or
 from lightbug_http import *
 from lightbug_http.io.bytes import Bytes
 
-@value
+@fieldwise_init
 struct Welcome(HTTPService):
     fn func(mut self, req: HTTPRequest) raises -> HTTPResponse:
         var uri = req.uri

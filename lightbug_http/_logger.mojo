@@ -46,8 +46,10 @@ mojo ... -D LB_LOG_LEVEL=DEBUG
 """
 
 
-@value
 struct Logger[level: Int]:
+    fn __init__(out self):
+        pass
+
     fn _log_message[event_level: Int](self, message: String):
         @parameter
         if level >= event_level:

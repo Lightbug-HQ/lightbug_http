@@ -2,8 +2,7 @@ from testing import assert_equal, assert_true, assert_false
 from memory import memset, memcmp, UnsafePointer
 import sys
 from memory import memcpy
-from sys import simdwidthof
-from sys.info import sizeof
+from sys import simdwidthof, size_of
 from algorithm import vectorize
 import math
 
@@ -704,7 +703,7 @@ fn memmove[T: Copyable](
     # Check if memory regions overlap
     var dest_addr = Int(dest)
     var src_addr = Int(src)
-    var element_size = sizeof[T]()
+    var element_size = size_of[T]()
     var total_bytes = count * element_size
     
     var dest_end = dest_addr + total_bytes
@@ -719,12 +718,12 @@ fn memmove[T: Copyable](
     elif dest_addr < src_addr:
         # Destination is before source - copy forwards (left to right)
         for i in range(count):
-            dest[i] = src[i]
+            (dest + i).init_pointee_copy((src + i)[])
     else:
         # Destination is after source - copy backwards (right to left)
         var i = count - 1
         while i >= 0:
-            dest[i] = src[i]
+            (dest + i).init_pointee_copy((src + i)[])
             i -= 1
 
 fn create_string_from_ptr(ptr: UnsafePointer[UInt8], length: Int) -> String:

@@ -17,7 +17,7 @@ from lightbug_http.strings import (
 )
 
 
-@value
+@fieldwise_init
 struct RequestMethod:
     var value: String
 
@@ -30,8 +30,8 @@ struct RequestMethod:
     alias options = RequestMethod("OPTIONS")
 
 
-@value
-struct HTTPRequest(Writable, Stringable, Encodable):
+@fieldwise_init
+struct HTTPRequest(Writable, Stringable, Encodable, Movable):
     var headers: Headers
     var cookies: RequestCookieJar
     var uri: URI
@@ -80,7 +80,7 @@ struct HTTPRequest(Writable, Stringable, Encodable):
             except e:
                 raise Error("HTTPRequest.from_bytes: Failed to read request body: " + String(e))
 
-        return request
+        return request^
 
     fn __init__(
         out self,
@@ -93,15 +93,15 @@ struct HTTPRequest(Writable, Stringable, Encodable):
         server_is_tls: Bool = False,
         timeout: Duration = Duration(),
     ):
-        self.headers = headers
-        self.cookies = cookies
+        self.headers = headers.copy()
+        self.cookies = cookies.copy()
         self.method = method
         self.protocol = protocol
-        self.uri = uri
-        self.body_raw = body
+        self.uri = uri.copy()
+        self.body_raw = body.copy()
         self.server_is_tls = server_is_tls
         self.timeout = timeout
-        self.set_content_length(len(body))
+        self.set_content_length(len(self.body_raw))
         if HeaderKey.CONNECTION not in self.headers:
             self.headers[HeaderKey.CONNECTION] = "keep-alive"
         if HeaderKey.HOST not in self.headers:
@@ -135,7 +135,7 @@ struct HTTPRequest(Writable, Stringable, Encodable):
             self.body_raw = r.read_bytes(content_length).to_bytes()
             self.set_content_length(len(self.body_raw))
         except OutOfBoundsError:
-            logger.debug(
+            materialize[logger]().debug(
                 "Failed to read full request body as per content-length header. Proceeding with the available bytes."
             )
             var available_bytes = len(r._inner) - r.read_pos
@@ -143,7 +143,7 @@ struct HTTPRequest(Writable, Stringable, Encodable):
                 self.body_raw = r.read_bytes(available_bytes).to_bytes()
                 self.set_content_length(len(self.body_raw))
             else:
-                logger.debug("No body bytes available. Setting content-length to 0.")
+                materialize[logger]().debug("No body bytes available. Setting content-length to 0.")
                 self.body_raw = Bytes()
                 self.set_content_length(0)
 
@@ -162,10 +162,10 @@ struct HTTPRequest(Writable, Stringable, Encodable):
             self.headers,
             self.cookies,
             lineBreak,
-            to_string(self.body_raw),
+            to_string(self.body_raw.copy()),
         )
 
-    fn encode(owned self) -> Bytes:
+    fn encode(var self) -> Bytes:
         """Encodes request as bytes.
 
         This method consumes the data in this request and it should
@@ -187,7 +187,7 @@ struct HTTPRequest(Writable, Stringable, Encodable):
             self.cookies,
             lineBreak,
         )
-        writer.consuming_write(self^.body_raw)
+        writer.consuming_write(self^.body_raw.copy())
         return writer^.consume()
 
     fn __str__(self) -> String:
@@ -207,6 +207,6 @@ struct HTTPRequest(Writable, Stringable, Encodable):
         return not self.__eq__(other)
 
     fn __isnot__(self, other: None) -> Bool:
-        if self.get_body() != "" or self.uri.request_uri != "":
+        if len(self.get_body()) != 0 or self.uri.request_uri != "":
             return True
         return False

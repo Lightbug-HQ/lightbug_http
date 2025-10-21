@@ -1,6 +1,8 @@
-@value
-struct SameSite(Stringable):
+struct SameSite(Stringable, Copyable, Movable, ImplicitlyCopyable):
     var value: UInt8
+
+    fn __init__(out self, value: UInt8):
+        self.value = value
 
     alias none = SameSite(0)
     alias lax = SameSite(1)

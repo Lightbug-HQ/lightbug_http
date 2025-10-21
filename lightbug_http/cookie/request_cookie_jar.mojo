@@ -6,8 +6,7 @@ from lightbug_http.header import HeaderKey, write_header
 from lightbug_http.io.bytes import ByteReader, ByteWriter, is_newline, is_space
 
 
-@value
-struct RequestCookieJar(Writable, Stringable):
+struct RequestCookieJar(Writable, Stringable, Copyable, Movable):
     var _inner: Dict[String, String]
 
     fn __init__(out self):
@@ -18,6 +17,12 @@ struct RequestCookieJar(Writable, Stringable):
         for cookie in cookies:
             self._inner[cookie.name] = cookie.value
 
+    fn __copyinit__(out self, existing: Self):
+        self._inner = existing._inner.copy()
+
+    fn __moveinit__(out self, deinit existing: Self):
+        self._inner = existing._inner^
+
     fn parse_cookies(mut self, headers: Headers) raises:
         var cookie_header = headers.get(HeaderKey.COOKIE)
         if not cookie_header:
@@ -27,11 +32,11 @@ struct RequestCookieJar(Writable, Stringable):
 
         for chunk in cookie_strings:
             var key = String("")
-            var value = chunk
+            var value = String(chunk)
             if "=" in chunk:
                 var key_value = chunk.split("=")
-                key = key_value[0]
-                value = key_value[1]
+                key = String(key_value[0])
+                value = String(key_value[1])
 
             # TODO value must be "unquoted"
             self._inner[key] = value

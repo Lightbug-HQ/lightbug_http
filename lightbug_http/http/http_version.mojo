@@ -1,5 +1,5 @@
 # TODO: Apply this to request/response structs
-@value
+@fieldwise_init
 @register_passable("trivial")
 struct HttpVersion(EqualityComparable, Stringable):
     var _v: Int

@@ -54,8 +54,8 @@ struct Server(Movable):
         else:
             self.max_concurrent_connections = max_concurrent_connections
 
-    fn __moveinit__(out self, owned other: Server):
-        self.error_handler = other.error_handler^
+    fn __moveinit__(out self, deinit other: Server):
+        self.error_handler = other.error_handler
         self.name = other.name^
         self._address = other._address^
         self.max_concurrent_connections = other.max_concurrent_connections

@@ -85,7 +85,7 @@ fn time() -> Int:
     return external_call["time", Int](Pointer(to=time))
 
 
-fn localtime(owned tv_sec: Int) -> Tm:
+fn localtime(var tv_sec: Int) -> Tm:
     """Converts a time value to a broken-down local time.
 
     Args:
@@ -114,7 +114,7 @@ fn strptime(time_str: String, time_format: String) -> Tm:
     return tm.take_pointee()
 
 
-fn gmtime(owned tv_sec: Int) -> Tm:
+fn gmtime(var tv_sec: Int) -> Tm:
     """Converts a time value to a broken-down UTC time.
 
     Args:

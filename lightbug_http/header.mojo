@@ -26,10 +26,13 @@ struct HeaderKey:
     alias COOKIE = "cookie"
 
 
-@value
-struct Header(Writable, Stringable):
+struct Header(Writable, Stringable, Copyable, Movable):
     var key: String
     var value: String
+
+    fn __init__(out self, key: String, value: String):
+        self.key = key
+        self.value = value
 
     fn __str__(self) -> String:
         return String.write(self)
@@ -43,8 +46,7 @@ fn write_header[T: Writer](mut writer: T, key: String, value: String):
     writer.write(key + ": ", value, lineBreak)
 
 
-@value
-struct Headers(Writable, Stringable):
+struct Headers(Writable, Stringable, Movable, Copyable):
     """Represents the header key/values in an http request/response.
 
     Header keys are normalized to lowercase
@@ -55,10 +57,16 @@ struct Headers(Writable, Stringable):
     fn __init__(out self):
         self._inner = Dict[String, String]()
 
-    fn __init__(out self, owned *headers: Header):
+    fn __init__(out self, *headers: Header):
         self._inner = Dict[String, String]()
         for header in headers:
             self[header.key.lower()] = header.value
+
+    fn __copyinit__(out self, existing: Self):
+        self._inner = existing._inner.copy()
+
+    fn __moveinit__(out self, deinit existing: Self):
+        self._inner = existing._inner^
 
     @always_inline
     fn empty(self) -> Bool:
@@ -209,7 +217,7 @@ struct Headers(Writable, Stringable):
         buf_ptr.free()
         phr_headers.free()
         
-        return (first, second, third, cookies)
+        return (first, second, third, cookies^)
 
     fn write_to[T: Writer, //](self, mut writer: T):
         for header in self._inner.items():

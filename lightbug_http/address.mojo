@@ -69,9 +69,11 @@ trait AnAddrInfo:
         ...
 
 
-@value
-struct NetworkType(EqualityComparable, Movable, Copyable):
+struct NetworkType(EqualityComparable, Movable, Copyable, ImplicitlyCopyable):
     var value: String
+
+    fn __init__(out self, value: String):
+        self.value = value
 
     alias empty = NetworkType("")
     alias tcp = NetworkType("tcp")
@@ -131,8 +133,7 @@ struct NetworkType(EqualityComparable, Movable, Copyable):
         return self in (NetworkType.tcp6, NetworkType.udp6, NetworkType.ip6)
 
 
-@value
-struct TCPAddr[network: NetworkType = NetworkType.tcp4](Addr):
+struct TCPAddr[network: NetworkType = NetworkType.tcp4](Addr, ImplicitlyCopyable):
     alias _type = "TCPAddr"
     var ip: String
     var port: UInt16
@@ -192,7 +193,7 @@ struct TCPAddr[network: NetworkType = NetworkType.tcp4](Addr):
         writer.write("TCPAddr(", "ip=", repr(self.ip), ", port=", String(self.port), ", zone=", repr(self.zone), ")")
 
 
-@value
+@fieldwise_init
 struct UDPAddr[network: NetworkType = NetworkType.udp4](Addr):
     alias _type = "UDPAddr"
     var ip: String
@@ -253,7 +254,7 @@ struct UDPAddr[network: NetworkType = NetworkType.udp4](Addr):
         writer.write("UDPAddr(", "ip=", repr(self.ip), ", port=", String(self.port), ", zone=", repr(self.zone), ")")
 
 
-@value
+@fieldwise_init
 @register_passable("trivial")
 struct addrinfo_macos(AnAddrInfo):
     """
@@ -314,7 +315,7 @@ struct addrinfo_macos(AnAddrInfo):
         return ip
 
 
-@value
+@fieldwise_init
 @register_passable("trivial")
 struct addrinfo_unix(AnAddrInfo):
     """Standard addrinfo struct for Unix systems.

@@ -9,7 +9,7 @@ trait HTTPService:
         ...
 
 
-@value
+@fieldwise_init
 struct Printer(HTTPService):
     fn func(mut self, req: HTTPRequest) raises -> HTTPResponse:
         print("Request URI:", req.uri.request_uri)
@@ -23,7 +23,7 @@ struct Printer(HTTPService):
         return OK(req.body_raw)
 
 
-@value
+@fieldwise_init
 struct Welcome(HTTPService):
     fn func(mut self, req: HTTPRequest) raises -> HTTPResponse:
         if req.uri.path == "/":
@@ -37,7 +37,7 @@ struct Welcome(HTTPService):
         return NotFound(req.uri.path)
 
 
-@value
+@fieldwise_init
 struct ExampleRouter(HTTPService):
     fn func(mut self, req: HTTPRequest) raises -> HTTPResponse:
         if req.uri.path == "/":
@@ -52,7 +52,7 @@ struct ExampleRouter(HTTPService):
         return OK(req.body_raw)
 
 
-@value
+@fieldwise_init
 struct TechEmpowerRouter(HTTPService):
     fn func(mut self, req: HTTPRequest) raises -> HTTPResponse:
         if req.uri.path == "/plaintext":
@@ -63,7 +63,7 @@ struct TechEmpowerRouter(HTTPService):
         return OK("Hello world!")  # text/plain is the default
 
 
-@value
+@fieldwise_init
 struct Counter(HTTPService):
     var counter: Int
 

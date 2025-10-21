@@ -1,6 +1,6 @@
 from time import sleep
 from memory import Span
-from sys.info import CompilationTarget.is_macos()
+from sys.info import CompilationTarget
 from lightbug_http.address import NetworkType
 from lightbug_http.io.bytes import Bytes, ByteView, bytes
 from lightbug_http.io.sync import Duration
@@ -62,7 +62,7 @@ struct NoTLSListener:
     fn __init__(out self) raises:
         self.socket = Socket[TCPAddr]()
 
-    fn __moveinit__(out self, owned existing: Self):
+    fn __moveinit__(out self, deinit existing: Self):
         self.socket = existing.socket^
 
     fn accept(self) raises -> TCPConnection:
@@ -94,7 +94,7 @@ struct ListenConfig:
         try:
             socket = Socket[TCPAddr]()
         except e:
-            logger.error(e)
+            materialize[logger]().error(e)
             raise Error("ListenConfig.listen: Failed to create listener due to socket creation failure.")
 
         @parameter
@@ -103,7 +103,7 @@ struct ListenConfig:
             try:
                 socket.set_socket_option(SO_REUSEADDR, 1)
             except e:
-                logger.warn("ListenConfig.listen: Failed to set socket as reusable", e)
+                materialize[logger]().warn("ListenConfig.listen: Failed to set socket as reusable", e)
 
         var bind_success = False
         var bind_fail_logged = False
@@ -121,14 +121,14 @@ struct ListenConfig:
                 try:
                     socket.shutdown()
                 except e:
-                    logger.error("ListenConfig.listen: Failed to shutdown socket:", e)
+                    materialize[logger]().error("ListenConfig.listen: Failed to shutdown socket:", e)
                     # TODO: Should shutdown failure be a hard failure? We can still ungracefully close the socket.
                 sleep(UInt(1))
 
         try:
             socket.listen(128)
         except e:
-            logger.error(e)
+            materialize[logger]().error(e)
             raise Error("ListenConfig.listen: Listen failed on sockfd: " + String(socket.fd))
 
         var listener = NoTLSListener(socket^)
@@ -145,7 +145,7 @@ struct TCPConnection(Connection):
     fn __init__(out self, owned socket: Socket[TCPAddr]):
         self.socket = socket^
 
-    fn __moveinit__(out self, owned existing: Self):
+    fn __moveinit__(out self, deinit existing: Self):
         self.socket = existing.socket^
 
     fn read(self, mut buf: Bytes) raises -> Int:
@@ -155,7 +155,7 @@ struct TCPConnection(Connection):
             if String(e) == "EOF":
                 raise e
             else:
-                logger.error(e)
+                materialize[logger]().error(e)
                 raise Error("TCPConnection.read: Failed to read data from connection.")
 
     fn write(self, buf: Span[Byte]) raises -> Int:
@@ -165,7 +165,7 @@ struct TCPConnection(Connection):
         try:
             return self.socket.send(buf)
         except e:
-            logger.error("TCPConnection.write: Failed to write data to connection.")
+            materialize[logger]().error("TCPConnection.write: Failed to write data to connection.")
             raise e
 
     fn close(mut self) raises:
@@ -194,7 +194,7 @@ struct UDPConnection[network: NetworkType]:
     fn __init__(out self, owned socket: Socket[UDPAddr[network]]):
         self.socket = socket^
 
-    fn __moveinit__(out self, owned existing: Self):
+    fn __moveinit__(out self, deinit existing: Self):
         self.socket = existing.socket^
 
     fn read_from(mut self, size: Int = default_buffer_size) raises -> (Bytes, String, UInt16):
@@ -289,11 +289,11 @@ fn create_connection(host: String, port: UInt16) raises -> TCPConnection:
     try:
         socket.connect(host, port)
     except e:
-        logger.error(e)
+        materialize[logger]().error(e)
         try:
             socket.shutdown()
         except e:
-            logger.error("Failed to shutdown socket: " + String(e))
+            materialize[logger]().error("Failed to shutdown socket: " + String(e))
         raise Error("Failed to establish a connection to the server.")
 
     return TCPConnection(socket^)

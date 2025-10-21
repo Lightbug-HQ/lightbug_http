@@ -5,7 +5,7 @@ from lightbug_http._owning_list import OwningList
 from lightbug_http.uri import Scheme
 
 
-@value
+@fieldwise_init
 struct PoolKey(Hashable, KeyElement, Writable, Stringable):
     var host: String
     var port: UInt16
