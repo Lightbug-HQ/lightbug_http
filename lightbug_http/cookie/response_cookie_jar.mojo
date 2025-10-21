@@ -1,4 +1,5 @@
 from collections import Optional, List, Dict, KeyElement
+from hashlib.hasher import Hasher
 from lightbug_http.strings import to_string
 from lightbug_http.header import HeaderKey, write_header
 from lightbug_http.io.bytes import ByteWriter
@@ -39,11 +40,11 @@ struct ResponseCookieKey(Hashable, KeyElement, ImplicitlyCopyable):
         self.domain = existing.domain
         self.path = existing.path
 
-    fn __hash__[H: _Hasher](self: Self, mut hasher: H):
+    fn __hash__[H: Hasher](self: Self, mut hasher: H):
         # Implement hash by updating hasher with our fields
-        hash(self.name, hasher)
-        hash(self.domain, hasher)
-        hash(self.path, hasher)
+        hasher.update(self.name)
+        hasher.update(self.domain)
+        hasher.update(self.path)
 
 
 struct ResponseCookieJar(Copyable, Movable, Sized, Stringable, Writable):

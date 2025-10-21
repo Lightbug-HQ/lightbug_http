@@ -134,6 +134,50 @@ struct URI(Writable, Stringable, Representable, Copyable, Movable):
     var username: String
     var password: String
 
+    fn __init__(out self):
+        """Default constructor."""
+        self._original_path = ""
+        self.scheme = ""
+        self.path = ""
+        self.query_string = ""
+        self.queries = QueryMap()
+        self._hash = ""
+        self.host = ""
+        self.port = None
+        self.full_uri = ""
+        self.request_uri = ""
+        self.username = ""
+        self.password = ""
+
+    fn __init__(
+        out self,
+        _original_path: String,
+        scheme: String,
+        path: String,
+        query_string: String,
+        queries: QueryMap,
+        _hash: String,
+        host: String,
+        port: Optional[UInt16],
+        full_uri: String,
+        request_uri: String,
+        username: String,
+        password: String,
+    ):
+        """Fieldwise constructor."""
+        self._original_path = _original_path
+        self.scheme = scheme
+        self.path = path
+        self.query_string = query_string
+        self.queries = queries
+        self._hash = _hash
+        self.host = host
+        self.port = port
+        self.full_uri = full_uri
+        self.request_uri = request_uri
+        self.username = username
+        self.password = password
+
     @staticmethod
     fn parse(var uri: String) raises -> URI:
         """Parses a URI which is defined using the following format.
