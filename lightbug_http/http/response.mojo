@@ -169,7 +169,6 @@ struct HTTPResponse(Writable, Stringable, Encodable, Sized, Movable):
         self.status_text = status_text
         self.protocol = protocol
         self.body_raw = reader.read_bytes().to_bytes()
-        self.set_content_length(len(self.body_raw))
         if HeaderKey.CONNECTION not in self.headers:
             self.set_connection_keep_alive()
         if HeaderKey.CONTENT_LENGTH not in self.headers:

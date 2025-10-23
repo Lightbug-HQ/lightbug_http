@@ -283,6 +283,8 @@ struct ByteReader[origin: Origin](Sized):
         for i in range(self.read_pos, len(self._inner)):
             if self._inner[i] == BytesConstant.rChar:
                 self.increment(2)
+            elif self._inner[i] == BytesConstant.nChar:
+                self.increment()
             else:
                 break
 
