@@ -280,10 +280,10 @@ struct ByteReader[origin: Origin](Sized):
 
     @always_inline
     fn skip_carriage_return(mut self):
-        for i in range(self.read_pos, len(self._inner)):
-            if self._inner[i] == BytesConstant.rChar:
+        while self.read_pos < len(self._inner):
+            if self._inner[self.read_pos] == BytesConstant.rChar:
                 self.increment(2)
-            elif self._inner[i] == BytesConstant.nChar:
+            elif self._inner[self.read_pos] == BytesConstant.nChar:
                 self.increment()
             else:
                 break
