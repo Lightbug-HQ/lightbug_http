@@ -106,7 +106,7 @@ struct Server(Movable):
         self.set_address(address)
         self.serve(listener^, handler)
 
-    fn serve[T: HTTPService](mut self, owned ln: NoTLSListener, mut handler: T) raises:
+    fn serve[T: HTTPService](mut self, var ln: NoTLSListener, mut handler: T) raises:
         """Serve HTTP requests.
 
         Parameters:

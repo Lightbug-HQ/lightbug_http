@@ -31,7 +31,7 @@ struct RequestMethod:
 
 
 @fieldwise_init
-struct HTTPRequest(Writable, Stringable, Encodable, Movable):
+struct HTTPRequest(Writable, Stringable, Encodable, Movable, Copyable):
     var headers: Headers
     var cookies: RequestCookieJar
     var uri: URI
@@ -111,6 +111,17 @@ struct HTTPRequest(Writable, Stringable, Encodable, Movable):
             else:
                 self.headers[HeaderKey.HOST] = uri.host
 
+    fn __copyinit__(out self, existing: Self):
+        """Copy constructor."""
+        self.headers = existing.headers.copy()
+        self.cookies = existing.cookies.copy()
+        self.method = existing.method
+        self.protocol = existing.protocol
+        self.uri = existing.uri.copy()
+        self.body_raw = existing.body_raw.copy()
+        self.server_is_tls = existing.server_is_tls
+        self.timeout = existing.timeout
+
     fn get_body(self) -> StringSlice[__origin_of(self.body_raw)]:
         return StringSlice(unsafe_from_utf8=Span(self.body_raw))
 
@@ -135,7 +146,7 @@ struct HTTPRequest(Writable, Stringable, Encodable, Movable):
             self.body_raw = r.read_bytes(content_length).to_bytes()
             self.set_content_length(len(self.body_raw))
         except OutOfBoundsError:
-            materialize[logger]().debug(
+            logger.debug(
                 "Failed to read full request body as per content-length header. Proceeding with the available bytes."
             )
             var available_bytes = len(r._inner) - r.read_pos
@@ -143,7 +154,7 @@ struct HTTPRequest(Writable, Stringable, Encodable, Movable):
                 self.body_raw = r.read_bytes(available_bytes).to_bytes()
                 self.set_content_length(len(self.body_raw))
             else:
-                materialize[logger]().debug("No body bytes available. Setting content-length to 0.")
+                logger.debug("No body bytes available. Setting content-length to 0.")
                 self.body_raw = Bytes()
                 self.set_content_length(0)
 

@@ -28,7 +28,7 @@ struct StatusCode:
 
 
 @fieldwise_init
-struct HTTPResponse(Writable, Stringable, Encodable, Sized, Movable):
+struct HTTPResponse(Writable, Stringable, Encodable, Sized, Movable, Copyable):
     var headers: Headers
     var cookies: ResponseCookieJar
     var body_raw: Bytes
@@ -64,7 +64,7 @@ struct HTTPResponse(Writable, Stringable, Encodable, Sized, Movable):
                 status_text=status_text,
             )
         except e:
-            materialize[logger]().error(e)
+            logger.error(e)
             raise Error("Failed to read request body")
 
     @staticmethod
@@ -114,14 +114,14 @@ struct HTTPResponse(Writable, Stringable, Encodable, Sized, Movable):
                 response.read_chunks(b)
                 return response^
             except e:
-                materialize[logger]().error(e)
+                logger.error(e)
                 raise Error("Failed to read chunked response.")
 
         try:
             response.read_body(reader)
             return response^
         except e:
-            materialize[logger]().error(e)
+            logger.error(e)
             raise Error("Failed to read request body: ")
 
     fn __init__(
@@ -150,7 +150,7 @@ struct HTTPResponse(Writable, Stringable, Encodable, Sized, Movable):
                 var current_time = String(now(utc=True))
                 self.headers[HeaderKey.DATE] = current_time
             except:
-                materialize[logger]().debug("DATE header not set, unable to get current time and it was instead omitted.")
+                logger.debug("DATE header not set, unable to get current time and it was instead omitted.")
 
     fn __init__(
         out self,
@@ -179,6 +179,15 @@ struct HTTPResponse(Writable, Stringable, Encodable, Sized, Movable):
                 self.headers[HeaderKey.DATE] = current_time
             except:
                 pass
+
+    fn __copyinit__(out self, existing: Self):
+        """Copy constructor."""
+        self.headers = existing.headers.copy()
+        self.cookies = existing.cookies.copy()
+        self.body_raw = existing.body_raw.copy()
+        self.status_code = existing.status_code
+        self.status_text = existing.status_text
+        self.protocol = existing.protocol
 
     fn __len__(self) -> Int:
         return len(self.body_raw)

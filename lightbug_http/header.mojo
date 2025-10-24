@@ -46,7 +46,7 @@ fn write_header[T: Writer](mut writer: T, key: String, value: String):
     writer.write(key + ": ", value, lineBreak)
 
 
-struct Headers(Writable, Stringable, Movable, Copyable):
+struct Headers(Writable, Stringable, Movable, Copyable, ImplicitlyCopyable):
     """Represents the header key/values in an http request/response.
 
     Header keys are normalized to lowercase

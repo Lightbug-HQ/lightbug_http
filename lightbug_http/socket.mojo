@@ -1,6 +1,6 @@
 from memory import stack_allocation
 from utils import StaticTuple
-from sys import sizeof, external_call
+from sys import size_of, external_call
 from sys.info import CompilationTarget
 from memory import Pointer, UnsafePointer
 from lightbug_http._libc import (
@@ -165,12 +165,12 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
             try:
                 self.shutdown()
             except e:
-                materialize[logger]().debug("Socket.teardown: Failed to shutdown socket: " + String(e))
+                logger.debug("Socket.teardown: Failed to shutdown socket: " + String(e))
 
         if not self._closed:
             self.close()
 
-    fn __enter__(owned self) -> Self:
+    fn __enter__(var self) -> Self:
         return self^
 
     fn __del__(deinit self):
@@ -178,7 +178,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
         try:
             self.teardown()
         except e:
-            materialize[logger]().debug("Socket.__del__: Failed to close socket during deletion:", e)
+            logger.debug("Socket.__del__: Failed to close socket during deletion:", e)
 
     fn __str__(self) -> String:
         return String.write(self)
@@ -261,7 +261,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
         try:
             new_socket_fd = accept(self.fd)
         except e:
-            materialize[logger]().error(e)
+            logger.error(e)
             raise Error("Socket.accept: Failed to accept connection, system `accept()` returned an error.")
 
         var new_socket = Socket(
@@ -286,7 +286,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
         try:
             listen(self.fd, backlog)
         except e:
-            materialize[logger]().error(e)
+            logger.error(e)
             raise Error("Socket.listen: Failed to listen for connections.")
 
     fn bind(mut self, address: String, port: UInt16) raises:
@@ -311,7 +311,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
         try:
             binary_ip = inet_pton[address_family](address)
         except e:
-            materialize[logger]().error(e)
+            logger.error(e)
             raise Error("ListenConfig.listen: Failed to convert IP address to binary form.")
 
         var local_address = sockaddr_in(
@@ -322,7 +322,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
         try:
             bind(self.fd, local_address)
         except e:
-            materialize[logger]().error(e)
+            logger.error(e)
             raise Error("Socket.bind: Binding socket failed.")
 
         var local = self.get_sock_name()
@@ -346,10 +346,10 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
             getsockname(
                 self.fd,
                 local_address,
-                Pointer(to=socklen_t(sizeof[sockaddr]())),
+                Pointer(to=socklen_t(size_of[sockaddr]())),
             )
         except e:
-            materialize[logger]().error(e)
+            logger.error(e)
             raise Error("get_sock_name: Failed to get address of local socket.")
 
         var addr_in = local_address.bitcast[sockaddr_in]().take_pointee()
@@ -374,7 +374,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
         try:
             addr_in = getpeername(self.fd)
         except e:
-            materialize[logger]().error(e)
+            logger.error(e)
             raise Error("get_peer_name: Failed to get address of remote socket.")
 
         return binary_ip_to_string[address_family](addr_in.sin_addr.s_addr), UInt16(
@@ -397,10 +397,10 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
             return getsockopt(self.fd, SOL_SOCKET, option_name)
         except e:
             # TODO: Should this be a warning or an error?
-            materialize[logger]().warn("Socket.get_socket_option: Failed to get socket option.")
+            logger.warn("Socket.get_socket_option: Failed to get socket option.")
             raise e
 
-    fn set_socket_option(self, option_name: Int, owned option_value: Byte = 1) raises:
+    fn set_socket_option(self, option_name: Int, var option_value: Byte = 1) raises:
         """Return the value of the given socket option.
 
         Args:
@@ -414,7 +414,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
             setsockopt(self.fd, SOL_SOCKET, option_name, option_value)
         except e:
             # TODO: Should this be a warning or an error?
-            materialize[logger]().warn("Socket.set_socket_option: Failed to set socket option.")
+            logger.warn("Socket.set_socket_option: Failed to set socket option.")
             raise e
 
     fn connect(mut self, address: String, port: UInt16) raises -> None:
@@ -438,7 +438,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
         try:
             connect(self.fd, addr)
         except e:
-            materialize[logger]().error("Socket.connect: Failed to establish a connection to the server.")
+            logger.error("Socket.connect: Failed to establish a connection to the server.")
             raise e
 
         var remote = self.get_peer_name()
@@ -451,7 +451,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
         try:
             return send(self.fd, buffer.unsafe_ptr(), len(buffer), 0)
         except e:
-            materialize[logger]().error("Socket.send: Failed to write data to connection.")
+            logger.error("Socket.send: Failed to write data to connection.")
             raise e
 
     fn send_all(self, src: Span[Byte], max_attempts: Int = 3) raises -> None:
@@ -476,7 +476,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
             try:
                 sent = self.send(src[total_bytes_sent:])
             except e:
-                materialize[logger]().error(e)
+                logger.error(e)
                 raise Error(
                     "Socket.send_all: Failed to send message, wrote"
                     + String(total_bytes_sent)
@@ -537,7 +537,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
             )
             buffer._len += bytes_received
         except e:
-            materialize[logger]().error(e)
+            logger.error(e)
             raise Error("Socket.receive: Failed to read data from connection.")
 
         if bytes_received == 0:
@@ -595,7 +595,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
             )
             buffer._len += bytes_received
         except e:
-            materialize[logger]().error(e)
+            logger.error(e)
             raise Error("Socket._receive_from: Failed to read data from connection.")
 
         if bytes_received == 0:
@@ -646,9 +646,9 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
             # For the other errors, either the socket is already closed or the descriptor is invalid.
             # At that point we can feasibly say that the socket is already shut down.
             if String(e) == ShutdownInvalidArgumentError:
-                materialize[logger]().error("Socket.shutdown: Failed to shutdown socket.")
+                logger.error("Socket.shutdown: Failed to shutdown socket.")
                 raise e
-            materialize[logger]().debug(e)
+            logger.debug(e)
 
         self._connected = False
 
@@ -666,9 +666,9 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
             # If the file descriptor is invalid, then it was most likely already closed.
             # Other errors indicate a failure while attempting to close the socket.
             if String(e) != CloseInvalidDescriptorError:
-                materialize[logger]().error("Socket.close: Failed to close socket.")
+                logger.error("Socket.close: Failed to close socket.")
                 raise e
-            materialize[logger]().debug(e)
+            logger.debug(e)
 
         self._closed = True
 
@@ -676,7 +676,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
         """Return the timeout value for the socket."""
         return self.get_socket_option(SO_RCVTIMEO)
 
-    fn set_timeout(self, owned duration: Int) raises:
+    fn set_timeout(self, var duration: Int) raises:
         """Set the timeout value for the socket.
 
         Args:

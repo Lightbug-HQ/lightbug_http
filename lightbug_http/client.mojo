@@ -29,7 +29,7 @@ struct Client:
         self.allow_redirects = allow_redirects
         self._connections = PoolManager[TCPConnection](cached_connections)
 
-    fn do(mut self, owned request: HTTPRequest) raises -> HTTPResponse:
+    fn do(mut self, var request: HTTPRequest) raises -> HTTPResponse:
         """The `do` method is responsible for sending an HTTP request to a server and receiving the corresponding response.
 
         It performs the following steps:
@@ -86,7 +86,7 @@ struct Client:
 
         var bytes_sent: Int
         try:
-            bytes_sent = conn.write(encode(request))
+            bytes_sent = conn.write(encode(request.copy()))
         except e:
             # Maybe peer reset ungracefully, so try a fresh connection
             if String(e) == "SendError: Connection reset by peer.":
@@ -132,10 +132,10 @@ struct Client:
         # Otherwise, persist the connection by giving it back to the pool manager.
         else:
             self._connections.give(pool_key, conn^)
-        return response
+        return response.copy()
 
     fn _handle_redirect(
-        mut self, owned original_request: HTTPRequest, owned original_response: HTTPResponse
+        mut self, var original_request: HTTPRequest, var original_response: HTTPResponse
     ) raises -> HTTPResponse:
         var new_uri: URI
         var new_location: String
@@ -151,7 +151,7 @@ struct Client:
                 raise Error("Client._handle_redirect: Failed to parse the new URI: " + String(e))
             original_request.headers[HeaderKey.HOST] = new_uri.host
         else:
-            new_uri = original_request.uri
+            new_uri = original_request.uri.copy()
             new_uri.path = new_location
-        original_request.uri = new_uri
+        original_request.uri = new_uri.copy()
         return self.do(original_request^)

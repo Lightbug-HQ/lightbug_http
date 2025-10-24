@@ -46,7 +46,7 @@ mojo ... -D LB_LOG_LEVEL=DEBUG
 """
 
 
-struct Logger[level: Int]:
+struct Logger[level: Int](ImplicitlyCopyable):
     fn __init__(out self):
         pass
 

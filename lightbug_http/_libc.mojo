@@ -1,6 +1,6 @@
 from utils import StaticTuple
 from sys.ffi import external_call, c_char, c_int, c_size_t, c_ssize_t, c_uchar, c_ushort, c_uint
-from sys.info import sizeof, CompilationTarget
+from sys.info import size_of, CompilationTarget
 from memory import memcpy, UnsafePointer, stack_allocation
 from lightbug_http.io.bytes import Bytes
 
@@ -618,7 +618,7 @@ fn _inet_pton(af: c_int, src: UnsafePointer[c_char, mut=False], dst: UnsafePoint
     ](af, src, dst)
 
 
-fn inet_pton[address_family: AddressFamily](owned src: String) raises -> c_uint:
+fn inet_pton[address_family: AddressFamily](var src: String) raises -> c_uint:
     """Libc POSIX `inet_pton` function. Converts a presentation format address (that is, printable form as held in a character string)
     to network format (usually a struct in_addr or some other internal binary representation, in network byte order).
 
@@ -823,7 +823,7 @@ fn setsockopt(
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/setsockopt.3p.html .
     """
-    var result = _setsockopt(socket, level, option_name, Pointer(to=option_value), sizeof[Int]())
+    var result = _setsockopt(socket, level, option_name, Pointer(to=option_value), size_of[Int]())
     if result == -1:
         var errno = get_errno()
         if errno == EBADF:
@@ -914,7 +914,7 @@ fn getsockopt(
     * Reference: https://man7.org/linux/man-pages/man3/getsockopt.3p.html .
     """
     var option_value = stack_allocation[1, c_void]()
-    var option_len: socklen_t = sizeof[Int]()
+    var option_len: socklen_t = size_of[Int]()
     var result = _getsockopt(socket, level, option_name, option_value, Pointer(to=option_len))
     if result == -1:
         var errno = get_errno()
@@ -1065,7 +1065,7 @@ fn getpeername(file_descriptor: c_int) raises -> sockaddr_in:
     * Reference: https://man7.org/linux/man-pages/man2/getpeername.2.html .
     """
     var remote_address = stack_allocation[1, sockaddr]()
-    var result = _getpeername(file_descriptor, remote_address, Pointer(to=socklen_t(sizeof[sockaddr]())))
+    var result = _getpeername(file_descriptor, remote_address, Pointer(to=socklen_t(size_of[sockaddr]())))
     if result == -1:
         var errno = get_errno()
         if errno == EBADF:
@@ -1149,7 +1149,7 @@ fn bind(socket: c_int, address: sockaddr_in) raises:
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/bind.3p.html .
     """
-    var result = _bind(socket, Pointer(to=address), sizeof[sockaddr_in]())
+    var result = _bind(socket, Pointer(to=address), size_of[sockaddr_in]())
     if result == -1:
         var errno = get_errno()
         if errno == EACCES:
@@ -1306,7 +1306,7 @@ fn accept(socket: c_int) raises -> c_int:
     * Reference: https://man7.org/linux/man-pages/man3/accept.3p.html .
     """
     var remote_address = sockaddr()
-    var result = _accept(socket, Pointer(to=remote_address), Pointer(to=socklen_t(sizeof[socklen_t]())))
+    var result = _accept(socket, Pointer(to=remote_address), Pointer(to=socklen_t(size_of[socklen_t]())))
     if result == -1:
         var errno = get_errno()
         if Int(errno) in [EAGAIN, EWOULDBLOCK]:
@@ -1408,7 +1408,7 @@ fn connect(socket: c_int, address: sockaddr_in) raises:
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/connect.3p.html .
     """
-    var result = _connect(socket, Pointer(to=address), sizeof[sockaddr_in]())
+    var result = _connect(socket, Pointer(to=address), size_of[sockaddr_in]())
     if result == -1:
         var errno = get_errno()
         if errno == EACCES:
@@ -1635,7 +1635,7 @@ fn recvfrom(
         * `MSG_WAITALL`: On SOCK_STREAM sockets this requests that the function block until the full amount of data can be returned. The function may return the smaller amount of data if the socket is a message-based socket, if a signal is caught, if the connection is terminated, if MSG_PEEK was specified, or if an error is pending for the socket.
 
     """
-    var result = _recvfrom(socket, buffer, length, flags, address, Pointer[socklen_t](to=sizeof[sockaddr]()))
+    var result = _recvfrom(socket, buffer, length, flags, address, Pointer[socklen_t](to=size_of[sockaddr]()))
     if result == -1:
         var errno = get_errno()
         if Int(errno) in [EAGAIN, EWOULDBLOCK]:
@@ -1896,7 +1896,7 @@ fn sendto(
         * `MSG_NOSIGNAL`: Requests not to send the SIGPIPE signal if an attempt to send is made on a stream-oriented socket that is no longer connected. The [EPIPE] error shall still be returned.
 
     """
-    var result = _sendto(socket, message, length, flags, dest_addr, sizeof[sockaddr]())
+    var result = _sendto(socket, message, length, flags, dest_addr, size_of[sockaddr]())
     if result == -1:
         var errno = get_errno()
         if errno == EAFNOSUPPORT:

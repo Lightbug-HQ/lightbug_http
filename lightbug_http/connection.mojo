@@ -56,7 +56,7 @@ struct NoTLSListener:
 
     var socket: Socket[TCPAddr]
 
-    fn __init__(out self, owned socket: Socket[TCPAddr]):
+    fn __init__(out self, var socket: Socket[TCPAddr]):
         self.socket = socket^
 
     fn __init__(out self) raises:
@@ -94,7 +94,7 @@ struct ListenConfig:
         try:
             socket = Socket[TCPAddr]()
         except e:
-            materialize[logger]().error(e)
+            logger.error(e)
             raise Error("ListenConfig.listen: Failed to create listener due to socket creation failure.")
 
         @parameter
@@ -103,7 +103,7 @@ struct ListenConfig:
             try:
                 socket.set_socket_option(SO_REUSEADDR, 1)
             except e:
-                materialize[logger]().warn("ListenConfig.listen: Failed to set socket as reusable", e)
+                logger.warn("ListenConfig.listen: Failed to set socket as reusable", e)
 
         var bind_success = False
         var bind_fail_logged = False
@@ -121,14 +121,14 @@ struct ListenConfig:
                 try:
                     socket.shutdown()
                 except e:
-                    materialize[logger]().error("ListenConfig.listen: Failed to shutdown socket:", e)
+                    logger.error("ListenConfig.listen: Failed to shutdown socket:", e)
                     # TODO: Should shutdown failure be a hard failure? We can still ungracefully close the socket.
                 sleep(UInt(1))
 
         try:
             socket.listen(128)
         except e:
-            materialize[logger]().error(e)
+            logger.error(e)
             raise Error("ListenConfig.listen: Listen failed on sockfd: " + String(socket.fd))
 
         var listener = NoTLSListener(socket^)
@@ -142,7 +142,7 @@ struct ListenConfig:
 struct TCPConnection(Connection):
     var socket: Socket[TCPAddr]
 
-    fn __init__(out self, owned socket: Socket[TCPAddr]):
+    fn __init__(out self, var socket: Socket[TCPAddr]):
         self.socket = socket^
 
     fn __moveinit__(out self, deinit existing: Self):
@@ -155,7 +155,7 @@ struct TCPConnection(Connection):
             if String(e) == "EOF":
                 raise e
             else:
-                materialize[logger]().error(e)
+                logger.error(e)
                 raise Error("TCPConnection.read: Failed to read data from connection.")
 
     fn write(self, buf: Span[Byte]) raises -> Int:
@@ -165,7 +165,7 @@ struct TCPConnection(Connection):
         try:
             return self.socket.send(buf)
         except e:
-            materialize[logger]().error("TCPConnection.write: Failed to write data to connection.")
+            logger.error("TCPConnection.write: Failed to write data to connection.")
             raise e
 
     fn close(mut self) raises:
@@ -191,7 +191,7 @@ struct TCPConnection(Connection):
 struct UDPConnection[network: NetworkType]:
     var socket: Socket[UDPAddr[network]]
 
-    fn __init__(out self, owned socket: Socket[UDPAddr[network]]):
+    fn __init__(out self, var socket: Socket[UDPAddr[network]]):
         self.socket = socket^
 
     fn __moveinit__(out self, deinit existing: Self):
@@ -289,11 +289,11 @@ fn create_connection(host: String, port: UInt16) raises -> TCPConnection:
     try:
         socket.connect(host, port)
     except e:
-        materialize[logger]().error(e)
+        logger.error(e)
         try:
             socket.shutdown()
         except e:
-            materialize[logger]().error("Failed to shutdown socket: " + String(e))
+            logger.error("Failed to shutdown socket: " + String(e))
         raise Error("Failed to establish a connection to the server.")
 
     return TCPConnection(socket^)

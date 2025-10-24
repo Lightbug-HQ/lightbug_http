@@ -455,11 +455,11 @@ def test_indexing():
 #     fn __copyinit__(out self, existing: Self, /):
 #         self.payload = existing.payload
 
-#     fn __moveinit__(out self, owned existing: Self, /):
+#     fn __moveinit__(out self, var existing: Self, /):
 #         self.payload = existing.payload
 #         existing.payload = 0
 
-#     fn __del__(owned self):
+#     fn __del__(var self):
 #         pass
 
 

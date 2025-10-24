@@ -47,7 +47,7 @@ struct ResponseCookieKey(Hashable, KeyElement, ImplicitlyCopyable):
         hasher.update(self.path)
 
 
-struct ResponseCookieJar(Copyable, Movable, Sized, Stringable, Writable):
+struct ResponseCookieJar(Copyable, Movable, Sized, Stringable, Writable, ImplicitlyCopyable):
     var _inner: Dict[ResponseCookieKey, Cookie]
 
     fn __init__(out self):

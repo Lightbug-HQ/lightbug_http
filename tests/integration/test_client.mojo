@@ -15,7 +15,7 @@ fn test_mojo_client_redirect_external_req_google() raises:
         method="GET",
     )
     try:
-        var res = client.do(req)
+        var res = client.do(req.copy())
         testing.assert_equal(res.status_code, 200)
     except e:
         print(e)
@@ -29,7 +29,7 @@ fn test_mojo_client_redirect_external_req_302() raises:
         method="GET",
     )
     try:
-        var res = client.do(req)
+        var res = client.do(req.copy())
         testing.assert_equal(res.status_code, 200)
     except e:
         print(e)
@@ -43,7 +43,7 @@ fn test_mojo_client_redirect_external_req_308() raises:
         method="GET",
     )
     try:
-        var res = client.do(req)
+        var res = client.do(req.copy())
         testing.assert_equal(res.status_code, 200)
     except e:
         print(e)
@@ -57,7 +57,7 @@ fn test_mojo_client_redirect_external_req_307() raises:
         method="GET",
     )
     try:
-        var res = client.do(req)
+        var res = client.do(req.copy())
         testing.assert_equal(res.status_code, 200)
     except e:
         print(e)
@@ -71,7 +71,7 @@ fn test_mojo_client_redirect_external_req_301() raises:
         method="GET",
     )
     try:
-        var res = client.do(req)
+        var res = client.do(req.copy())
         testing.assert_equal(res.status_code, 200)
         testing.assert_equal(res.headers.content_length(), 228)
     except e:
@@ -86,7 +86,7 @@ fn test_mojo_client_lightbug_external_req_200() raises:
                 Header("Connection", "close")),
             method="GET",
         )
-        var res = client.do(req)
+        var res = client.do(req.copy())
         testing.assert_equal(res.status_code, 200)
     except e:
         print(e)

@@ -1,4 +1,5 @@
 from collections import Optional, Dict
+from hashlib.hasher import Hasher
 from lightbug_http.io.bytes import Bytes, bytes, ByteReader
 from lightbug_http.strings import (
     find_all,
@@ -94,13 +95,13 @@ struct PortBounds:
 
 
 @fieldwise_init
-struct Scheme(Hashable, EqualityComparable, Representable, Stringable, Writable):
+struct Scheme(Hashable, EqualityComparable, Representable, Stringable, Writable, ImplicitlyCopyable):
     var value: String
     alias HTTP = Self("http")
     alias HTTPS = Self("https")
 
-    fn __hash__(self) -> UInt:
-        return hash(self.value)
+    fn __hash__[H: Hasher](self, mut hasher: H) -> None:
+        hasher.update(self.value)
 
     fn __eq__(self, other: Self) -> Bool:
         return self.value == other.value
@@ -169,7 +170,7 @@ struct URI(Writable, Stringable, Representable, Copyable, Movable):
         self.scheme = scheme
         self.path = path
         self.query_string = query_string
-        self.queries = queries
+        self.queries = queries.copy()
         self._hash = _hash
         self.host = host
         self.port = port
@@ -177,6 +178,21 @@ struct URI(Writable, Stringable, Representable, Copyable, Movable):
         self.request_uri = request_uri
         self.username = username
         self.password = password
+
+    fn __copyinit__(out self, existing: Self):
+        """Copy constructor."""
+        self._original_path = existing._original_path
+        self.scheme = existing.scheme
+        self.path = existing.path
+        self.query_string = existing.query_string
+        self.queries = existing.queries.copy()
+        self._hash = existing._hash
+        self.host = existing.host
+        self.port = existing.port
+        self.full_uri = existing.full_uri
+        self.request_uri = existing.request_uri
+        self.username = existing.username
+        self.password = existing.password
 
     @staticmethod
     fn parse(var uri: String) raises -> URI:

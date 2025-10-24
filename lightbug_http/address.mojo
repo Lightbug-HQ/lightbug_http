@@ -1,6 +1,6 @@
 from memory import UnsafePointer, Span
 from collections import Optional
-from sys.ffi import external_call, OpaquePointer
+from sys.ffi import external_call
 from lightbug_http.strings import to_string
 from lightbug_http._logger import logger
 from lightbug_http.socket import Socket
@@ -35,7 +35,7 @@ struct AddressConstants:
     alias EMPTY = ""
 
 
-trait Addr(Stringable, Representable, Writable, EqualityComparable, Movable, Copyable):
+trait Addr(Stringable, Representable, Writable, EqualityComparable, Movable, Copyable, ImplicitlyCopyable):
     alias _type: StaticString
 
     fn __init__(out self):
@@ -524,7 +524,7 @@ fn binary_port_to_int(port: UInt16) -> Int:
     return Int(ntohs(port))
 
 
-fn binary_ip_to_string[address_family: AddressFamily](owned ip_address: UInt32) raises -> String:
+fn binary_ip_to_string[address_family: AddressFamily](var ip_address: UInt32) raises -> String:
     """Convert a binary IP address to a string by calling `inet_ntop`.
 
     Parameters:
@@ -590,7 +590,7 @@ fn _getaddrinfo[
 
 fn getaddrinfo[
     T: AnAddrInfo, //
-](owned node: String, owned service: String, hints: T, mut res: UnsafePointer[T]) raises:
+](var node: String, var service: String, hints: T, mut res: UnsafePointer[T]) raises:
     """Libc POSIX `getaddrinfo` function.
 
     Args:
@@ -620,8 +620,8 @@ fn getaddrinfo[
     * Reference: https://man7.org/linux/man-pages/man3/getaddrinfo.3p.html.
     """
     var result = _getaddrinfo(
-        node.unsafe_cstr_ptr().origin_cast[mut=False](),
-        service.unsafe_cstr_ptr().origin_cast[mut=False](),
+        node.unsafe_cstr_ptr().origin_cast[False](),
+        service.unsafe_cstr_ptr().origin_cast[False](),
         Pointer(to=hints),
         Pointer(to=res),
     )

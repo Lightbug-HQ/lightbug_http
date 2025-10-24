@@ -6,7 +6,7 @@ from lightbug_http.header import HeaderKey, write_header
 from lightbug_http.io.bytes import ByteReader, ByteWriter, is_newline, is_space
 
 
-struct RequestCookieJar(Writable, Stringable, Copyable, Movable):
+struct RequestCookieJar(Writable, Stringable, Copyable, Movable, ImplicitlyCopyable):
     var _inner: Dict[String, String]
 
     fn __init__(out self):

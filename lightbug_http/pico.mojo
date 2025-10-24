@@ -555,7 +555,7 @@ fn phr_decode_chunked(
                         return (-1, dst)
                     break
                 
-                if decoder._hex_count == 16:  # sizeof(size_t) * 2
+                if decoder._hex_count == 16:  # size_of(size_t) * 2
                     return (-1, dst)
                 
                 decoder.bytes_left_in_chunk = decoder.bytes_left_in_chunk * 16 + v
