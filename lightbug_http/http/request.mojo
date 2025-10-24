@@ -17,7 +17,7 @@ from lightbug_http.strings import (
 )
 
 
-@value
+@fieldwise_init
 struct RequestMethod:
     var value: String
 
@@ -30,8 +30,8 @@ struct RequestMethod:
     alias options = RequestMethod("OPTIONS")
 
 
-@value
-struct HTTPRequest(Writable, Stringable, Encodable):
+@fieldwise_init
+struct HTTPRequest(Writable, Stringable, Encodable, Movable, Copyable):
     var headers: Headers
     var cookies: RequestCookieJar
     var uri: URI
@@ -80,7 +80,7 @@ struct HTTPRequest(Writable, Stringable, Encodable):
             except e:
                 raise Error("HTTPRequest.from_bytes: Failed to read request body: " + String(e))
 
-        return request
+        return request^
 
     fn __init__(
         out self,
@@ -93,12 +93,12 @@ struct HTTPRequest(Writable, Stringable, Encodable):
         server_is_tls: Bool = False,
         timeout: Duration = Duration(),
     ):
-        self.headers = headers
-        self.cookies = cookies
+        self.headers = headers.copy()
+        self.cookies = cookies.copy()
         self.method = method
         self.protocol = protocol
-        self.uri = uri
-        self.body_raw = body
+        self.uri = uri.copy()
+        self.body_raw = body.copy()
         self.server_is_tls = server_is_tls
         self.timeout = timeout
         self.set_content_length(len(body))
@@ -162,10 +162,10 @@ struct HTTPRequest(Writable, Stringable, Encodable):
             self.headers,
             self.cookies,
             lineBreak,
-            to_string(self.body_raw),
+            to_string(self.body_raw.copy()),
         )
 
-    fn encode(owned self) -> Bytes:
+    fn encode(var self) -> Bytes:
         """Encodes request as bytes.
 
         This method consumes the data in this request and it should
@@ -187,7 +187,7 @@ struct HTTPRequest(Writable, Stringable, Encodable):
             self.cookies,
             lineBreak,
         )
-        writer.consuming_write(self^.body_raw)
+        writer.consuming_write(self^.body_raw.copy())
         return writer^.consume()
 
     fn __str__(self) -> String:
@@ -207,6 +207,5 @@ struct HTTPRequest(Writable, Stringable, Encodable):
         return not self.__eq__(other)
 
     fn __isnot__(self, other: None) -> Bool:
-        if self.get_body() != "" or self.uri.request_uri != "":
-            return True
-        return False
+        return self.get_body() or self.uri.request_uri
+

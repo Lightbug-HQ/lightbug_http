@@ -42,7 +42,7 @@ struct Server(Movable):
         max_request_uri_length: UInt = default_max_request_uri_length,
         tcp_keep_alive: Bool = False,
     ) raises:
-        self.error_handler = error_handler
+        self.error_handler = error_handler.copy()
         self.name = name
         self._address = address
         self.max_requests_per_connection = max_requests_per_connection
@@ -54,7 +54,7 @@ struct Server(Movable):
         else:
             self.max_concurrent_connections = max_concurrent_connections
 
-    fn __moveinit__(out self, owned other: Server):
+    fn __moveinit__(out self, deinit other: Server):
         self.error_handler = other.error_handler^
         self.name = other.name^
         self._address = other._address^
@@ -106,7 +106,7 @@ struct Server(Movable):
         self.set_address(address)
         self.serve(listener^, handler)
 
-    fn serve[T: HTTPService](mut self, owned ln: NoTLSListener, mut handler: T) raises:
+    fn serve[T: HTTPService](mut self, var ln: NoTLSListener, mut handler: T) raises:
         """Serve HTTP requests.
 
         Parameters:
@@ -163,7 +163,7 @@ struct Server(Movable):
                     request_buffer.extend(temp_buffer^)
                     logger.debug("Total buffer size:", len(request_buffer))
 
-                    if BytesConstant.DOUBLE_CRLF in ByteView(request_buffer):
+                    if materialize[BytesConstant.DOUBLE_CRLF]() in ByteView(request_buffer):
                         logger.debug("Found end of headers")
                         break
 

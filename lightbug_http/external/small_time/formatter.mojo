@@ -56,7 +56,7 @@ alias formatter = _Formatter()
 """Default formatter instance."""
 
 
-struct _Formatter:
+struct _Formatter(ImplicitlyCopyable):
     """SmallTime formatter."""
 
     var _sub_chrs: StaticTuple[Int, 128]

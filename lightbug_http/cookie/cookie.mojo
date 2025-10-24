@@ -32,11 +32,11 @@ struct Cookie(Copyable, Movable):
         if len(parts) < 1:
             raise Error("invalid Cookie")
 
-        var cookie = Cookie("", parts[0], path=String("/"))
+        var cookie = Cookie("", String(parts[0]), path=String("/"))
         if Cookie.EQUAL in parts[0]:
             var name_value = parts[0].split(Cookie.EQUAL)
-            cookie.name = name_value[0]
-            cookie.value = name_value[1]
+            cookie.name = String(name_value[0])
+            cookie.value = String(name_value[1])
 
         for i in range(1, len(parts)):
             var part = parts[i]
@@ -57,9 +57,9 @@ struct Cookie(Copyable, Movable):
             elif part.startswith(Cookie.EXPIRES):
                 var expires = Expiration.from_string(String(part.removeprefix(Cookie.EXPIRES + Cookie.EQUAL)))
                 if expires:
-                    cookie.expires = expires.value()
+                    cookie.expires = expires.value().copy()
 
-        return cookie
+        return cookie^
 
     fn __init__(
         out self,
@@ -76,7 +76,7 @@ struct Cookie(Copyable, Movable):
     ):
         self.name = name
         self.value = value
-        self.expires = expires
+        self.expires = expires.copy()
         self.max_age = max_age
         self.domain = domain
         self.path = path
@@ -92,7 +92,7 @@ struct Cookie(Copyable, Movable):
         self.name = existing.name
         self.value = existing.value
         self.max_age = existing.max_age
-        self.expires = existing.expires
+        self.expires = existing.expires.copy()
         self.domain = existing.domain
         self.path = existing.path
         self.secure = existing.secure
@@ -100,7 +100,7 @@ struct Cookie(Copyable, Movable):
         self.same_site = existing.same_site
         self.partitioned = existing.partitioned
 
-    fn __moveinit__(out self: Cookie, owned existing: Cookie):
+    fn __moveinit__(out self: Cookie, deinit existing: Cookie):
         self.name = existing.name^
         self.value = existing.value^
         self.max_age = existing.max_age^

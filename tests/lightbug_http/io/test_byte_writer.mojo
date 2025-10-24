@@ -16,11 +16,11 @@ def test_write_byte():
 def test_consuming_write():
     var w = ByteWriter()
     var my_string: String = "World"
-    w.consuming_write(List[Byte, True]("Hello ".as_bytes()))
-    w.consuming_write(List[Byte, True](my_string.as_bytes()))
+    w.consuming_write(List[Byte]("Hello ".as_bytes()))
+    w.consuming_write(List[Byte](my_string.as_bytes()))
     var result = w^.consume()
 
-    testing.assert_equal(to_string(result), "Hello World")
+    testing.assert_equal(to_string(result^), "Hello World")
 
 
 def test_write():

@@ -3,7 +3,7 @@ from lightbug_http.strings import BytesConstant
 from lightbug_http.connection import default_buffer_size
 
 
-alias Bytes = List[Byte, True]
+alias Bytes = List[Byte]
 
 
 @always_inline
@@ -56,14 +56,14 @@ struct ByteWriter(Writer):
             args[i].write_to(self)
 
     @always_inline
-    fn consuming_write(mut self, owned b: Bytes):
+    fn consuming_write(mut self, var b: Bytes):
         self._inner.extend(b^)
 
     @always_inline
     fn write_byte(mut self, b: Byte):
         self._inner.append(b)
 
-    fn consume(owned self) -> Bytes:
+    fn consume(var self) -> Bytes:
         var ret = self._inner^
         self._inner = Bytes()
         return ret^
@@ -73,7 +73,6 @@ alias EndOfReaderError = "No more bytes to read."
 alias OutOfBoundsError = "Tried to read past the end of the ByteReader."
 
 
-@value
 struct ByteView[origin: Origin](Sized, Stringable):
     """Convenience wrapper around a Span of Bytes."""
 
@@ -292,5 +291,5 @@ struct ByteReader[origin: Origin](Sized):
         self.read_pos += v
 
     @always_inline
-    fn consume(owned self, bytes_len: Int = -1) -> Bytes:
+    fn consume(var self, bytes_len: Int = -1) -> Bytes:
         return Bytes(self^._inner[self.read_pos : self.read_pos + len(self) + 1])

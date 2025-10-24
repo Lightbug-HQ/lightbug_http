@@ -30,7 +30,7 @@ struct IntegrationTest:
         try:
             var res = self.client.do(HTTPRequest(u("redirect"), headers=h))
             assert_equal(res.status_code, StatusCode.OK)
-            assert_equal(to_string(res.body_raw), "yay you made it")
+            assert_equal(to_string(res.body_raw.copy()), "yay you made it")
             var conn = res.headers.get(HeaderKey.CONNECTION)
             if conn:
                 assert_equal(conn.value(), "keep-alive")
@@ -48,7 +48,7 @@ struct IntegrationTest:
         try:
             var res = self.client.do(HTTPRequest(u("close-connection"), headers=h))
             assert_equal(res.status_code, StatusCode.OK)
-            assert_equal(to_string(res.body_raw), "connection closed")
+            assert_equal(to_string(res.body_raw.copy()), "connection closed")
             assert_equal(res.headers[HeaderKey.CONNECTION], "close")
             self.mark_successful(name)
         except e:
@@ -77,7 +77,7 @@ struct IntegrationTest:
         self.test_close_connection()
         self.test_server_error()
 
-        return self.results
+        return self.results.copy()
 
 
 fn main():

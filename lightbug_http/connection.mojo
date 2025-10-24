@@ -1,6 +1,6 @@
 from time import sleep
 from memory import Span
-from sys.info import os_is_macos
+from sys.info import CompilationTarget
 from lightbug_http.address import NetworkType
 from lightbug_http.io.bytes import Bytes, ByteView, bytes
 from lightbug_http.io.sync import Duration
@@ -56,13 +56,13 @@ struct NoTLSListener:
 
     var socket: Socket[TCPAddr]
 
-    fn __init__(out self, owned socket: Socket[TCPAddr]):
+    fn __init__(out self, var socket: Socket[TCPAddr]):
         self.socket = socket^
 
     fn __init__(out self) raises:
         self.socket = Socket[TCPAddr]()
 
-    fn __moveinit__(out self, owned existing: Self):
+    fn __moveinit__(out self, deinit existing: Self):
         self.socket = existing.socket^
 
     fn accept(self) raises -> TCPConnection:
@@ -99,7 +99,7 @@ struct ListenConfig:
 
         @parameter
         # TODO: do we want to add SO_REUSEPORT on linux? Doesn't work on some systems
-        if os_is_macos():
+        if CompilationTarget.is_macos():
             try:
                 socket.set_socket_option(SO_REUSEADDR, 1)
             except e:
@@ -142,10 +142,10 @@ struct ListenConfig:
 struct TCPConnection(Connection):
     var socket: Socket[TCPAddr]
 
-    fn __init__(out self, owned socket: Socket[TCPAddr]):
+    fn __init__(out self, var socket: Socket[TCPAddr]):
         self.socket = socket^
 
-    fn __moveinit__(out self, owned existing: Self):
+    fn __moveinit__(out self, deinit existing: Self):
         self.socket = existing.socket^
 
     fn read(self, mut buf: Bytes) raises -> Int:
@@ -191,10 +191,10 @@ struct TCPConnection(Connection):
 struct UDPConnection[network: NetworkType]:
     var socket: Socket[UDPAddr[network]]
 
-    fn __init__(out self, owned socket: Socket[UDPAddr[network]]):
+    fn __init__(out self, var socket: Socket[UDPAddr[network]]):
         self.socket = socket^
 
-    fn __moveinit__(out self, owned existing: Self):
+    fn __moveinit__(out self, deinit existing: Self):
         self.socket = existing.socket^
 
     fn read_from(mut self, size: Int = default_buffer_size) raises -> (Bytes, String, UInt16):

@@ -1,7 +1,7 @@
 from lightbug_http import *
 
 
-@value
+@fieldwise_init
 struct IntegrationTestService(HTTPService):
     fn func(mut self, req: HTTPRequest) raises -> HTTPResponse:
         var p = req.uri.path

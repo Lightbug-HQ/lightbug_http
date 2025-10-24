@@ -20,8 +20,8 @@ struct HeaderKey:
     alias COOKIE = "cookie"
 
 
-@value
-struct Header(Writable, Stringable):
+@fieldwise_init
+struct Header(Writable, Stringable, Copyable, Movable):
     var key: String
     var value: String
 
@@ -37,8 +37,8 @@ fn write_header[T: Writer](mut writer: T, key: String, value: String):
     writer.write(key + ": ", value, lineBreak)
 
 
-@value
-struct Headers(Writable, Stringable):
+@fieldwise_init
+struct Headers(Writable, Stringable, Copyable, Movable):
     """Represents the header key/values in an http request/response.
 
     Header keys are normalized to lowercase
@@ -49,7 +49,7 @@ struct Headers(Writable, Stringable):
     fn __init__(out self):
         self._inner = Dict[String, String]()
 
-    fn __init__(out self, owned *headers: Header):
+    fn __init__(out self, var *headers: Header):
         self._inner = Dict[String, String]()
         for header in headers:
             self[header.key.lower()] = header.value
@@ -108,7 +108,7 @@ struct Headers(Writable, Stringable):
                 continue
 
             self._inner[k] = String(value)
-        return (String(first), String(second), String(third), cookies)
+        return (String(first), String(second), String(third), cookies^)
 
     fn write_to[T: Writer, //](self, mut writer: T):
         for header in self._inner.items():

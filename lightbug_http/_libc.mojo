@@ -1,6 +1,6 @@
 from utils import StaticTuple
 from sys.ffi import external_call, c_char, c_int, c_size_t, c_ssize_t, c_uchar, c_ushort, c_uint
-from sys.info import sizeof, os_is_windows, os_is_macos, os_is_linux
+from sys.info import size_of, CompilationTarget
 from memory import memcpy, UnsafePointer, stack_allocation
 from lightbug_http.io.bytes import Bytes
 
@@ -55,31 +55,31 @@ alias EPIPE = 32
 alias EDOM = 33
 alias ERANGE = 34
 alias EWOULDBLOCK = EAGAIN
-alias EINPROGRESS = 36 if os_is_macos() else 115
-alias EALREADY = 37 if os_is_macos() else 114
-alias ENOTSOCK = 38 if os_is_macos() else 88
-alias EDESTADDRREQ = 39 if os_is_macos() else 89
-alias EMSGSIZE = 40 if os_is_macos() else 90
-alias ENOPROTOOPT = 42 if os_is_macos() else 92
-alias EAFNOSUPPORT = 47 if os_is_macos() else 97
-alias EADDRINUSE = 48 if os_is_macos() else 98
-alias EADDRNOTAVAIL = 49 if os_is_macos() else 99
-alias ENETDOWN = 50 if os_is_macos() else 100
-alias ENETUNREACH = 51 if os_is_macos() else 101
-alias ECONNABORTED = 53 if os_is_macos() else 103
-alias ECONNRESET = 54 if os_is_macos() else 104
-alias ENOBUFS = 55 if os_is_macos() else 105
-alias EISCONN = 56 if os_is_macos() else 106
-alias ENOTCONN = 57 if os_is_macos() else 107
-alias ETIMEDOUT = 60 if os_is_macos() else 110
-alias ECONNREFUSED = 61 if os_is_macos() else 111
-alias ELOOP = 62 if os_is_macos() else 40
-alias ENAMETOOLONG = 63 if os_is_macos() else 36
-alias EHOSTUNREACH = 65 if os_is_macos() else 113
-alias EDQUOT = 69 if os_is_macos() else 122
-alias ENOMSG = 91 if os_is_macos() else 42
-alias EPROTO = 100 if os_is_macos() else 71
-alias EOPNOTSUPP = 102 if os_is_macos() else 95
+alias EINPROGRESS = 36 if CompilationTarget.is_macos() else 115
+alias EALREADY = 37 if CompilationTarget.is_macos() else 114
+alias ENOTSOCK = 38 if CompilationTarget.is_macos() else 88
+alias EDESTADDRREQ = 39 if CompilationTarget.is_macos() else 89
+alias EMSGSIZE = 40 if CompilationTarget.is_macos() else 90
+alias ENOPROTOOPT = 42 if CompilationTarget.is_macos() else 92
+alias EAFNOSUPPORT = 47 if CompilationTarget.is_macos() else 97
+alias EADDRINUSE = 48 if CompilationTarget.is_macos() else 98
+alias EADDRNOTAVAIL = 49 if CompilationTarget.is_macos() else 99
+alias ENETDOWN = 50 if CompilationTarget.is_macos() else 100
+alias ENETUNREACH = 51 if CompilationTarget.is_macos() else 101
+alias ECONNABORTED = 53 if CompilationTarget.is_macos() else 103
+alias ECONNRESET = 54 if CompilationTarget.is_macos() else 104
+alias ENOBUFS = 55 if CompilationTarget.is_macos() else 105
+alias EISCONN = 56 if CompilationTarget.is_macos() else 106
+alias ENOTCONN = 57 if CompilationTarget.is_macos() else 107
+alias ETIMEDOUT = 60 if CompilationTarget.is_macos() else 110
+alias ECONNREFUSED = 61 if CompilationTarget.is_macos() else 111
+alias ELOOP = 62 if CompilationTarget.is_macos() else 40
+alias ENAMETOOLONG = 63 if CompilationTarget.is_macos() else 36
+alias EHOSTUNREACH = 65 if CompilationTarget.is_macos() else 113
+alias EDQUOT = 69 if CompilationTarget.is_macos() else 122
+alias ENOMSG = 91 if CompilationTarget.is_macos() else 42
+alias EPROTO = 100 if CompilationTarget.is_macos() else 71
+alias EOPNOTSUPP = 102 if CompilationTarget.is_macos() else 95
 
 # --- ( Network Related Constants )---------------------------------------------
 alias sa_family_t = c_ushort
@@ -91,7 +91,7 @@ alias in_port_t = c_ushort
 # TODO: These might vary on each platform...we should confirm this.
 # Taken from: https://github.com/openbsd/src/blob/master/sys/sys/socket.h#L250
 # Address Family Constants
-@value
+@fieldwise_init
 @register_passable("trivial")
 struct AddressFamily(EqualityComparable & Copyable & Movable):
     var value: Int32
@@ -197,7 +197,7 @@ struct AddressFamily(EqualityComparable & Copyable & Movable):
         return self.value != other.value
 
 
-@value
+@fieldwise_init
 @register_passable("trivial")
 struct AddressLength:
     var value: Int
@@ -329,19 +329,18 @@ alias SO_PROTOCOL = 0x1025
 
 
 # --- ( Network Related Structs )-----------------------------------------------
-@value
+@fieldwise_init
 @register_passable("trivial")
 struct in_addr:
     var s_addr: in_addr_t
 
 
-@value
+@fieldwise_init
 @register_passable("trivial")
 struct in6_addr:
     var s6_addr: StaticTuple[c_char, 16]
 
 
-@value
 @register_passable("trivial")
 struct sockaddr:
     var sa_family: sa_family_t
@@ -352,7 +351,7 @@ struct sockaddr:
         self.sa_data = data
 
 
-@value
+@fieldwise_init
 @register_passable("trivial")
 struct sockaddr_in:
     var sin_family: sa_family_t
@@ -374,7 +373,7 @@ struct sockaddr_in:
         self.sin_zero = StaticTuple[c_char, 8](0, 0, 0, 0, 0, 0, 0, 0)
 
 
-@value
+@fieldwise_init
 @register_passable("trivial")
 struct sockaddr_in6:
     var sin6_family: sa_family_t
@@ -384,7 +383,7 @@ struct sockaddr_in6:
     var sin6_scope_id: c_uint
 
 
-@value
+@fieldwise_init
 @register_passable("trivial")
 struct addrinfo:
     var ai_flags: c_int
@@ -620,7 +619,7 @@ fn _inet_pton(af: c_int, src: UnsafePointer[c_char, mut=False], dst: UnsafePoint
     ](af, src, dst)
 
 
-fn inet_pton[address_family: AddressFamily](owned src: String) raises -> c_uint:
+fn inet_pton[address_family: AddressFamily](var src: String) raises -> c_uint:
     """Libc POSIX `inet_pton` function. Converts a presentation format address (that is, printable form as held in a character string)
     to network format (usually a struct in_addr or some other internal binary representation, in network byte order).
 
@@ -657,7 +656,7 @@ fn inet_pton[address_family: AddressFamily](owned src: String) raises -> c_uint:
     else:
         ip_buffer = stack_allocation[4, c_void]()
 
-    var result = _inet_pton(address_family.value, src.unsafe_cstr_ptr().origin_cast[mut=False](), ip_buffer)
+    var result = _inet_pton(address_family.value, src.unsafe_cstr_ptr().origin_cast[False](), ip_buffer)
     if result == 0:
         raise Error("inet_pton Error: The input is not a valid address.")
     elif result == -1:
@@ -825,7 +824,7 @@ fn setsockopt(
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/setsockopt.3p.html .
     """
-    var result = _setsockopt(socket, level, option_name, Pointer(to=option_value), sizeof[Int]())
+    var result = _setsockopt(socket, level, option_name, Pointer(to=option_value), size_of[Int]())
     if result == -1:
         var errno = get_errno()
         if errno == EBADF:
@@ -916,7 +915,7 @@ fn getsockopt(
     * Reference: https://man7.org/linux/man-pages/man3/getsockopt.3p.html .
     """
     var option_value = stack_allocation[1, c_void]()
-    var option_len: socklen_t = sizeof[Int]()
+    var option_len: socklen_t = size_of[Int]()
     var result = _getsockopt(socket, level, option_name, option_value, Pointer(to=option_len))
     if result == -1:
         var errno = get_errno()
@@ -1067,7 +1066,7 @@ fn getpeername(file_descriptor: c_int) raises -> sockaddr_in:
     * Reference: https://man7.org/linux/man-pages/man2/getpeername.2.html .
     """
     var remote_address = stack_allocation[1, sockaddr]()
-    var result = _getpeername(file_descriptor, remote_address, Pointer(to=socklen_t(sizeof[sockaddr]())))
+    var result = _getpeername(file_descriptor, remote_address, Pointer(to=socklen_t(size_of[sockaddr]())))
     if result == -1:
         var errno = get_errno()
         if errno == EBADF:
@@ -1151,7 +1150,7 @@ fn bind(socket: c_int, address: sockaddr_in) raises:
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/bind.3p.html .
     """
-    var result = _bind(socket, Pointer(to=address), sizeof[sockaddr_in]())
+    var result = _bind(socket, Pointer(to=address), size_of[sockaddr_in]())
     if result == -1:
         var errno = get_errno()
         if errno == EACCES:
@@ -1308,7 +1307,7 @@ fn accept(socket: c_int) raises -> c_int:
     * Reference: https://man7.org/linux/man-pages/man3/accept.3p.html .
     """
     var remote_address = sockaddr()
-    var result = _accept(socket, Pointer(to=remote_address), Pointer(to=socklen_t(sizeof[socklen_t]())))
+    var result = _accept(socket, Pointer(to=remote_address), Pointer(to=socklen_t(size_of[socklen_t]())))
     if result == -1:
         var errno = get_errno()
         if Int(errno) in [EAGAIN, EWOULDBLOCK]:
@@ -1349,7 +1348,7 @@ fn accept(socket: c_int) raises -> c_int:
             raise Error("accept: Protocol error.")
 
         @parameter
-        if os_is_linux():
+        if CompilationTarget.is_linux():
             if errno == EPERM:
                 raise Error("accept: Firewall rules forbid connection.")
         raise Error("accept: An error occurred while listening on the socket. Error code: " + String(errno))
@@ -1410,7 +1409,7 @@ fn connect(socket: c_int, address: sockaddr_in) raises:
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/connect.3p.html .
     """
-    var result = _connect(socket, Pointer(to=address), sizeof[sockaddr_in]())
+    var result = _connect(socket, Pointer(to=address), size_of[sockaddr_in]())
     if result == -1:
         var errno = get_errno()
         if errno == EACCES:
@@ -1637,7 +1636,7 @@ fn recvfrom(
         * `MSG_WAITALL`: On SOCK_STREAM sockets this requests that the function block until the full amount of data can be returned. The function may return the smaller amount of data if the socket is a message-based socket, if a signal is caught, if the connection is terminated, if MSG_PEEK was specified, or if an error is pending for the socket.
 
     """
-    var result = _recvfrom(socket, buffer, length, flags, address, Pointer[socklen_t](to=sizeof[sockaddr]()))
+    var result = _recvfrom(socket, buffer, length, flags, address, Pointer[socklen_t](to=size_of[sockaddr]()))
     if result == -1:
         var errno = get_errno()
         if Int(errno) in [EAGAIN, EWOULDBLOCK]:
@@ -1898,7 +1897,7 @@ fn sendto(
         * `MSG_NOSIGNAL`: Requests not to send the SIGPIPE signal if an attempt to send is made on a stream-oriented socket that is no longer connected. The [EPIPE] error shall still be returned.
 
     """
-    var result = _sendto(socket, message, length, flags, dest_addr, sizeof[sockaddr]())
+    var result = _sendto(socket, message, length, flags, dest_addr, size_of[sockaddr]())
     if result == -1:
         var errno = get_errno()
         if errno == EAFNOSUPPORT:
@@ -2118,10 +2117,10 @@ fn get_errno() -> c_int:
     """
 
     @parameter
-    if os_is_windows():
+    if CompilationTarget.is_windows():
         var errno = stack_allocation[1, c_int]()
         _ = external_call["_get_errno", c_void](errno)
         return errno[]
     else:
-        alias loc = "__error" if os_is_macos() else "__errno_location"
+        alias loc = "__error" if CompilationTarget.is_macos() else "__errno_location"
         return external_call[loc, UnsafePointer[c_int]]()[]

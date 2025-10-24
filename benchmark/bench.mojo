@@ -23,7 +23,7 @@ fn run_benchmark():
     try:
         var config = BenchConfig()
         config.verbose_timing = True
-        var m = Bench(config)
+        var m = Bench(config^)
         m.bench_function[lightbug_benchmark_header_encode](BenchId("HeaderEncode"))
         m.bench_function[lightbug_benchmark_header_parse](BenchId("HeaderParse"))
         m.bench_function[lightbug_benchmark_request_encode](BenchId("RequestEncode"))
@@ -35,7 +35,7 @@ fn run_benchmark():
         print("failed to start benchmark")
 
 
-var headers_struct = Headers(
+alias headers_struct = Headers(
     Header("Content-Type", "application/json"),
     Header("Content-Length", "1234"),
     Header("Connection", "close"),
@@ -49,7 +49,7 @@ fn lightbug_benchmark_response_encode(mut b: Bencher):
     @always_inline
     @parameter
     fn response_encode():
-        var res = HTTPResponse(body.as_bytes(), headers=headers_struct)
+        var res = HTTPResponse(body.as_bytes(), headers=materialize[headers_struct]())
         _ = encode(res^)
 
     b.iter[response_encode]()
@@ -89,8 +89,8 @@ fn lightbug_benchmark_request_encode(mut b: Bencher):
         var uri = URI.parse("http://127.0.0.1:8080/some-path")
         var req = HTTPRequest(
             uri=uri,
-            headers=headers_struct,
-            body=body_bytes,
+            headers=materialize[headers_struct](),
+            body=materialize[body_bytes](),
         )
         _ = encode(req^)
 
@@ -106,7 +106,7 @@ fn lightbug_benchmark_header_encode(mut b: Bencher):
     @parameter
     fn header_encode():
         var b = ByteWriter()
-        b.write(headers_struct)
+        b.write(materialize[headers_struct]())
 
     b.iter[header_encode]()
 

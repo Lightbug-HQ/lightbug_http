@@ -1,5 +1,5 @@
-@value
-struct SameSite(Stringable):
+@fieldwise_init
+struct SameSite(Stringable, Copyable, Movable):
     var value: UInt8
 
     alias none = SameSite(0)
@@ -13,11 +13,11 @@ struct SameSite(Stringable):
     @staticmethod
     fn from_string(str: String) -> Optional[Self]:
         if str == SameSite.NONE:
-            return SameSite.none
+            return materialize[SameSite.none]()
         elif str == SameSite.LAX:
-            return SameSite.lax
+            return materialize[SameSite.lax]()
         elif str == SameSite.STRICT:
-            return SameSite.strict
+            return materialize[SameSite.strict]()
         return None
 
     fn __eq__(self, other: Self) -> Bool:
@@ -25,8 +25,8 @@ struct SameSite(Stringable):
 
     fn __str__(self) -> String:
         if self.value == 0:
-            return SameSite.NONE
+            return materialize[SameSite.NONE]()
         elif self.value == 1:
-            return SameSite.LAX
+            return materialize[SameSite.LAX]()
         else:
-            return SameSite.STRICT
+            return materialize[SameSite.STRICT]()
