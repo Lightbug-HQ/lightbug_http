@@ -5,10 +5,10 @@ from .http_version import HttpVersion
 
 
 trait Encodable:
-    fn encode(owned self) -> Bytes:
+    fn encode(var self) -> Bytes:
         ...
 
 
 @always_inline
-fn encode[T: Encodable](owned data: T) -> Bytes:
+fn encode[T: Encodable](var data: T) -> Bytes:
     return data^.encode()

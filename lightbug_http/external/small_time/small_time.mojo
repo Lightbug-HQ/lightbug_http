@@ -110,7 +110,7 @@ alias MAX_TIMESTAMP_US = MAX_TIMESTAMP * 1_000_000
 """Maximum timestamp in microseconds."""
 
 
-fn normalize_timestamp(owned timestamp: Float64) raises -> Float64:
+fn normalize_timestamp(var timestamp: Float64) raises -> Float64:
     """Normalize millisecond and microsecond timestamps into normal timestamps.
     
     Args:
@@ -374,8 +374,7 @@ fn from_ordinal(ordinal: Int) -> SmallTime:
     return SmallTime(year, month, n + 1)
 
 
-@value
-struct SmallTime(Stringable, Writable, Representable):
+struct SmallTime(Stringable, Writable, Representable, Copyable, Movable):
     """Datetime representation."""
     var year: Int
     """Year."""

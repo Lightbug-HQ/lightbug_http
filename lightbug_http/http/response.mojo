@@ -25,8 +25,8 @@ struct StatusCode:
     alias INTERNAL_ERROR = 500
 
 
-@value
-struct HTTPResponse(Writable, Stringable, Encodable, Sized):
+@fieldwise_init
+struct HTTPResponse(Writable, Stringable, Encodable, Sized, Movable):
     var headers: Headers
     var cookies: ResponseCookieJar
     var body_raw: Bytes
@@ -97,7 +97,7 @@ struct HTTPResponse(Writable, Stringable, Encodable, Sized):
             var buff = Bytes(capacity=default_buffer_size)
             try:
                 while conn.read(buff) > 0:
-                    b += buff
+                    b += buff.copy()
 
                     if (
                         buff[-5] == byte("0")
@@ -108,16 +108,16 @@ struct HTTPResponse(Writable, Stringable, Encodable, Sized):
                     ):
                         break
 
-                    buff.clear()
+                    # buff.clear()
                 response.read_chunks(b)
-                return response
+                return response^
             except e:
                 logger.error(e)
                 raise Error("Failed to read chunked response.")
 
         try:
             response.read_body(reader)
-            return response
+            return response^
         except e:
             logger.error(e)
             raise Error("Failed to read request body: ")
@@ -131,8 +131,8 @@ struct HTTPResponse(Writable, Stringable, Encodable, Sized):
         status_text: String = "OK",
         protocol: String = strHttp11,
     ):
-        self.headers = headers
-        self.cookies = cookies
+        self.headers = headers.copy()
+        self.cookies = cookies.copy()
         if HeaderKey.CONTENT_TYPE not in self.headers:
             self.headers[HeaderKey.CONTENT_TYPE] = "application/octet-stream"
         self.status_code = status_code
@@ -159,8 +159,8 @@ struct HTTPResponse(Writable, Stringable, Encodable, Sized):
         status_text: String = "OK",
         protocol: String = strHttp11,
     ) raises:
-        self.headers = headers
-        self.cookies = cookies
+        self.headers = headers.copy()
+        self.cookies = cookies.copy()
         if HeaderKey.CONTENT_TYPE not in self.headers:
             self.headers[HeaderKey.CONTENT_TYPE] = "application/octet-stream"
         self.status_code = status_code
@@ -233,7 +233,7 @@ struct HTTPResponse(Writable, Stringable, Encodable, Sized):
             var data = reader.read_bytes(size).to_bytes()
             reader.skip_carriage_return()
             self.set_content_length(self.content_length() + len(data))
-            self.body_raw += data
+            self.body_raw += data^
 
     fn write_to[T: Writer](self, mut writer: T):
         writer.write(self.protocol, whitespace, self.status_code, whitespace, self.status_text, lineBreak)
@@ -241,9 +241,9 @@ struct HTTPResponse(Writable, Stringable, Encodable, Sized):
         if HeaderKey.SERVER not in self.headers:
             writer.write("server: lightbug_http", lineBreak)
 
-        writer.write(self.headers, self.cookies, lineBreak, to_string(self.body_raw))
+        writer.write(self.headers, self.cookies, lineBreak, to_string(self.body_raw.copy()))
 
-    fn encode(owned self) -> Bytes:
+    fn encode(var self) -> Bytes:
         """Encodes response as bytes.
 
         This method consumes the data in this request and it should

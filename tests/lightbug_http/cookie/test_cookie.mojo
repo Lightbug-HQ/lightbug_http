@@ -14,7 +14,7 @@ fn test_set_cookie() raises:
         domain=String("localhost"),
         secure=True,
         http_only=True,
-        same_site=SameSite.none,
+        same_site=materialize[SameSite.none](),
         partitioned=False,
     )
     var header = cookie.to_header()
@@ -25,7 +25,7 @@ fn test_set_cookie() raises:
 
 
 fn test_set_cookie_partial_arguments() raises:
-    cookie = Cookie(name="mycookie", value="myvalue", same_site=SameSite.lax)
+    cookie = Cookie(name="mycookie", value="myvalue", same_site=materialize[SameSite.lax]())
     var header = cookie.to_header()
     var header_value = header.value
     var expected = "mycookie=myvalue; SameSite=lax"

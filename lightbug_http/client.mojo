@@ -29,7 +29,7 @@ struct Client:
         self.allow_redirects = allow_redirects
         self._connections = PoolManager[TCPConnection](cached_connections)
 
-    fn do(mut self, owned request: HTTPRequest) raises -> HTTPResponse:
+    fn do(mut self, var request: HTTPRequest) raises -> HTTPResponse:
         """The `do` method is responsible for sending an HTTP request to a server and receiving the corresponding response.
 
         It performs the following steps:
@@ -55,10 +55,10 @@ struct Client:
 
         # TODO (@thatstoasty): Implement TLS support.
         # var is_tls = False
-        var scheme = Scheme.HTTP
+        var scheme = materialize[Scheme.HTTP]()
         if request.uri.is_https():
             # is_tls = True
-            scheme = Scheme.HTTPS
+            scheme = materialize[Scheme.HTTPS]()
 
         var port: UInt16
         if request.uri.port:
@@ -71,7 +71,7 @@ struct Client:
             else:
                 raise Error("Client.do: Invalid scheme received in the URI.")
 
-        var pool_key = PoolKey(request.uri.host, port, scheme)
+        var pool_key = PoolKey(request.uri.host, port, scheme^)
         var cached_connection = False
         var conn: TCPConnection
         try:
@@ -84,9 +84,8 @@ struct Client:
                 logger.error(e)
                 raise Error("Client.do: Failed to create a connection to host.")
 
-        var bytes_sent: Int
         try:
-            bytes_sent = conn.write(encode(request))
+            _ = conn.write(encode(request.copy()))
         except e:
             # Maybe peer reset ungracefully, so try a fresh connection
             if String(e) == "SendError: Connection reset by peer.":
@@ -132,10 +131,10 @@ struct Client:
         # Otherwise, persist the connection by giving it back to the pool manager.
         else:
             self._connections.give(pool_key, conn^)
-        return response
+        return response^
 
     fn _handle_redirect(
-        mut self, owned original_request: HTTPRequest, owned original_response: HTTPResponse
+        mut self, var original_request: HTTPRequest, var original_response: HTTPResponse
     ) raises -> HTTPResponse:
         var new_uri: URI
         var new_location: String
@@ -151,7 +150,7 @@ struct Client:
                 raise Error("Client._handle_redirect: Failed to parse the new URI: " + String(e))
             original_request.headers[HeaderKey.HOST] = new_uri.host
         else:
-            new_uri = original_request.uri
+            new_uri = original_request.uri.copy()
             new_uri.path = new_location
-        original_request.uri = new_uri
+        original_request.uri = new_uri^
         return self.do(original_request^)

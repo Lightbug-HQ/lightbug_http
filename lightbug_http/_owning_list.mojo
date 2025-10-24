@@ -1,5 +1,5 @@
 from os import abort
-from sys import sizeof
+from sys import size_of
 from sys.intrinsics import _type_is_eq
 
 from memory import Pointer, UnsafePointer, memcpy, Span
@@ -12,13 +12,13 @@ from collections import Optional
 # ===-----------------------------------------------------------------------===#
 
 
-@value
+@fieldwise_init
 struct _OwningListIter[
     list_mutability: Bool, //,
     T: Movable,
     list_origin: Origin[list_mutability],
     forward: Bool = True,
-]:
+](Copyable, Movable):
     """Iterator for List.
 
     Parameters:
@@ -34,7 +34,7 @@ struct _OwningListIter[
     var src: Pointer[Self.list_type, list_origin]
 
     fn __iter__(self) -> Self:
-        return self
+        return self.copy()
 
     fn __next__(
         mut self,
@@ -97,7 +97,7 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
         self.size = 0
         self.capacity = capacity
 
-    fn __moveinit__(out self, owned existing: Self):
+    fn __moveinit__(out self, deinit existing: Self):
         """Move data of an existing list into a new one.
 
         Args:
@@ -107,7 +107,7 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
         self.size = existing.size
         self.capacity = existing.capacity
 
-    fn __del__(owned self):
+    fn __del__(deinit self):
         """Destroy all elements in the list and free its memory."""
         for i in range(self.size):
             (self.data + i).destroy_pointee()
@@ -237,7 +237,7 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
         Returns:
             The bytecount of the List.
         """
-        return len(self) * sizeof[T]()
+        return len(self) * size_of[T]()
 
     fn _realloc(mut self, new_capacity: Int):
         var new_data = UnsafePointer[T].alloc(new_capacity)
@@ -253,7 +253,7 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
         self.data = new_data
         self.capacity = new_capacity
 
-    fn append(mut self, owned value: T):
+    fn append(mut self, var value: T):
         """Appends a value to this list.
 
         Args:
@@ -264,7 +264,7 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
         (self.data + self.size).init_pointee_move(value^)
         self.size += 1
 
-    fn insert(mut self, i: Int, owned value: T):
+    fn insert(mut self, i: Int, var value: T):
         """Inserts a value to the list at the given index.
         `a.insert(len(a), value)` is equivalent to `a.append(value)`.
 
@@ -287,13 +287,13 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
             var later_ptr = self.data + later_idx
 
             var tmp = earlier_ptr.take_pointee()
-            later_ptr.move_pointee_into(earlier_ptr)
+            earlier_ptr.init_pointee_move_from(later_ptr)
             later_ptr.init_pointee_move(tmp^)
 
             earlier_idx -= 1
             later_idx -= 1
 
-    fn extend(mut self, owned other: OwningList[T, *_]):
+    fn extend(mut self, var other: OwningList[T, *_]):
         """Extends this list by consuming the elements of `other`.
 
         Args:
@@ -325,7 +325,7 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
             # `other` list into this list using a single `T.__moveinit()__`
             # call, without moving into an intermediate temporary value
             # (avoiding an extra redundant move constructor call).
-            src_ptr.move_pointee_into(dest_ptr)
+            dest_ptr.init_pointee_move_from(src_ptr)
 
             dest_ptr = dest_ptr + 1
 
@@ -350,7 +350,7 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
 
         var ret_val = (self.data + normalized_idx).take_pointee()
         for j in range(normalized_idx + 1, self.size):
-            (self.data + j).move_pointee_into(self.data + j - 1)
+            (self.data + j - 1).init_pointee_move_from(self.data + j)
         self.size -= 1
         if self.size * 4 < self.capacity:
             if self.capacity > 1:
@@ -501,4 +501,5 @@ fn _clip(value: Int, start: Int, end: Int) -> Int:
 
 fn _move_pointee_into_many_elements[T: Movable](dest: UnsafePointer[T], src: UnsafePointer[T], size: Int):
     for i in range(size):
-        (src + i).move_pointee_into(dest + i)
+        (dest + i).init_pointee_move_from(src + i)
+        # (src + i).move_pointee_into(dest + i)

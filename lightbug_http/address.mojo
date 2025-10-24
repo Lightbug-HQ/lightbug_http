@@ -1,6 +1,6 @@
 from memory import UnsafePointer, Span
 from collections import Optional
-from sys.ffi import external_call, OpaquePointer
+from sys.ffi import external_call
 from lightbug_http.strings import to_string
 from lightbug_http._logger import logger
 from lightbug_http.socket import Socket
@@ -69,8 +69,8 @@ trait AnAddrInfo:
         ...
 
 
-@value
-struct NetworkType(EqualityComparable, Movable, Copyable):
+@fieldwise_init
+struct NetworkType(EqualityComparable, Movable, ImplicitlyCopyable):
     var value: String
 
     alias empty = NetworkType("")
@@ -131,8 +131,8 @@ struct NetworkType(EqualityComparable, Movable, Copyable):
         return self in (NetworkType.tcp6, NetworkType.udp6, NetworkType.ip6)
 
 
-@value
-struct TCPAddr[network: NetworkType = NetworkType.tcp4](Addr):
+@fieldwise_init
+struct TCPAddr[network: NetworkType = NetworkType.tcp4](Addr, ImplicitlyCopyable):
     alias _type = "TCPAddr"
     var ip: String
     var port: UInt16
@@ -192,8 +192,8 @@ struct TCPAddr[network: NetworkType = NetworkType.tcp4](Addr):
         writer.write("TCPAddr(", "ip=", repr(self.ip), ", port=", String(self.port), ", zone=", repr(self.zone), ")")
 
 
-@value
-struct UDPAddr[network: NetworkType = NetworkType.udp4](Addr):
+@fieldwise_init
+struct UDPAddr[network: NetworkType = NetworkType.udp4](Addr, ImplicitlyCopyable):
     alias _type = "UDPAddr"
     var ip: String
     var port: UInt16
@@ -253,7 +253,7 @@ struct UDPAddr[network: NetworkType = NetworkType.udp4](Addr):
         writer.write("UDPAddr(", "ip=", repr(self.ip), ", port=", String(self.port), ", zone=", repr(self.zone), ")")
 
 
-@value
+@fieldwise_init
 @register_passable("trivial")
 struct addrinfo_macos(AnAddrInfo):
     """
@@ -314,7 +314,7 @@ struct addrinfo_macos(AnAddrInfo):
         return ip
 
 
-@value
+@fieldwise_init
 @register_passable("trivial")
 struct addrinfo_unix(AnAddrInfo):
     """Standard addrinfo struct for Unix systems.
@@ -523,7 +523,7 @@ fn binary_port_to_int(port: UInt16) -> Int:
     return Int(ntohs(port))
 
 
-fn binary_ip_to_string[address_family: AddressFamily](owned ip_address: UInt32) raises -> String:
+fn binary_ip_to_string[address_family: AddressFamily](var ip_address: UInt32) raises -> String:
     """Convert a binary IP address to a string by calling `inet_ntop`.
 
     Parameters:
@@ -589,7 +589,7 @@ fn _getaddrinfo[
 
 fn getaddrinfo[
     T: AnAddrInfo, //
-](owned node: String, owned service: String, hints: T, mut res: UnsafePointer[T]) raises:
+](var node: String, var service: String, hints: T, mut res: UnsafePointer[T]) raises:
     """Libc POSIX `getaddrinfo` function.
 
     Args:
@@ -619,8 +619,8 @@ fn getaddrinfo[
     * Reference: https://man7.org/linux/man-pages/man3/getaddrinfo.3p.html.
     """
     var result = _getaddrinfo(
-        node.unsafe_cstr_ptr().origin_cast[mut=False](),
-        service.unsafe_cstr_ptr().origin_cast[mut=False](),
+        node.unsafe_cstr_ptr().origin_cast[False](),
+        service.unsafe_cstr_ptr().origin_cast[False](),
         Pointer(to=hints),
         Pointer(to=res),
     )

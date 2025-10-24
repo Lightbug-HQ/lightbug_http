@@ -1,11 +1,12 @@
 from collections import Optional, List, Dict, KeyElement
+from hashlib.hash import Hasher
 from lightbug_http.strings import to_string
 from lightbug_http.header import HeaderKey, write_header
 from lightbug_http.io.bytes import ByteWriter
 
 
-@value
-struct ResponseCookieKey(KeyElement):
+@fieldwise_init
+struct ResponseCookieKey(KeyElement, ImplicitlyCopyable):
     var name: String
     var domain: String
     var path: String
@@ -30,7 +31,7 @@ struct ResponseCookieKey(KeyElement):
             and self.path == other.path
         )
 
-    fn __moveinit__(out self: Self, owned existing: Self):
+    fn __moveinit__(out self: Self, deinit existing: Self):
         self.name = existing.name
         self.domain = existing.domain
         self.path = existing.path
@@ -40,11 +41,10 @@ struct ResponseCookieKey(KeyElement):
         self.domain = existing.domain
         self.path = existing.path
 
-    fn __hash__(self: Self) -> UInt:
-        return hash(self.name + "~" + self.domain + "~" + self.path)
+    fn __hash__[H: Hasher](self: Self, mut hasher: H):
+        hasher.update(self.name + "~" + self.domain + "~" + self.path)
 
-
-@value
+@fieldwise_init
 struct ResponseCookieJar(Copyable, Movable, Sized, Stringable, Writable):
     var _inner: Dict[ResponseCookieKey, Cookie]
 
@@ -63,10 +63,10 @@ struct ResponseCookieJar(Copyable, Movable, Sized, Stringable, Writable):
 
     @always_inline
     fn __setitem__(mut self, key: ResponseCookieKey, value: Cookie):
-        self._inner[key] = value
+        self._inner[key] = value.copy()
 
     fn __getitem__(self, key: ResponseCookieKey) raises -> Cookie:
-        return self._inner[key]
+        return self._inner[key].copy()
 
     fn get(self, key: ResponseCookieKey) -> Optional[Cookie]:
         try:

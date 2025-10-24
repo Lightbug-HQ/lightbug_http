@@ -9,7 +9,7 @@ trait HTTPService:
         ...
 
 
-@value
+@fieldwise_init
 struct Printer(HTTPService):
     fn func(mut self, req: HTTPRequest) raises -> HTTPResponse:
         print("Request URI:", req.uri.request_uri)
@@ -18,12 +18,12 @@ struct Printer(HTTPService):
         if HeaderKey.CONTENT_TYPE in req.headers:
             print("Request Content-Type:", req.headers[HeaderKey.CONTENT_TYPE])
         if req.body_raw:
-            print("Request Body:", to_string(req.body_raw))
+            print("Request Body:", to_string(req.body_raw.copy()))
 
         return OK(req.body_raw)
 
 
-@value
+@fieldwise_init
 struct Welcome(HTTPService):
     fn func(mut self, req: HTTPRequest) raises -> HTTPResponse:
         if req.uri.path == "/":
@@ -37,7 +37,7 @@ struct Welcome(HTTPService):
         return NotFound(req.uri.path)
 
 
-@value
+@fieldwise_init
 struct ExampleRouter(HTTPService):
     fn func(mut self, req: HTTPRequest) raises -> HTTPResponse:
         if req.uri.path == "/":
@@ -47,12 +47,12 @@ struct ExampleRouter(HTTPService):
         elif req.uri.path == "/second":
             print("I'm on /second!")
         elif req.uri.path == "/echo":
-            print(to_string(req.body_raw))
+            print(to_string(req.body_raw.copy()))
 
         return OK(req.body_raw)
 
 
-@value
+@fieldwise_init
 struct TechEmpowerRouter(HTTPService):
     fn func(mut self, req: HTTPRequest) raises -> HTTPResponse:
         if req.uri.path == "/plaintext":
@@ -63,7 +63,7 @@ struct TechEmpowerRouter(HTTPService):
         return OK("Hello world!")  # text/plain is the default
 
 
-@value
+@fieldwise_init
 struct Counter(HTTPService):
     var counter: Int
 

@@ -1,4 +1,5 @@
 from collections import Optional, Dict
+from hashlib.hash import Hasher
 from lightbug_http.io.bytes import Bytes, bytes, ByteReader
 from lightbug_http.strings import (
     find_all,
@@ -93,14 +94,14 @@ struct PortBounds:
     alias ZERO: UInt8 = ord("0")
 
 
-@value
-struct Scheme(Hashable, EqualityComparable, Representable, Stringable, Writable):
+@fieldwise_init
+struct Scheme(Hashable, EqualityComparable, Representable, Stringable, Writable, ImplicitlyCopyable, Movable):
     var value: String
     alias HTTP = Self("http")
     alias HTTPS = Self("https")
 
-    fn __hash__(self) -> UInt:
-        return hash(self.value)
+    fn __hash__[H: Hasher](self, mut hasher: H):
+        hasher.update(self.value)
 
     fn __eq__(self, other: Self) -> Bool:
         return self.value == other.value
@@ -118,8 +119,8 @@ struct Scheme(Hashable, EqualityComparable, Representable, Stringable, Writable)
         return self.value.upper()
 
 
-@value
-struct URI(Writable, Stringable, Representable):
+@fieldwise_init
+struct URI(Writable, Stringable, Representable, Copyable, Movable):
     var _original_path: String
     var scheme: String
     var path: String
@@ -136,7 +137,7 @@ struct URI(Writable, Stringable, Representable):
     var password: String
 
     @staticmethod
-    fn parse(owned uri: String) raises -> URI:
+    fn parse(var uri: String) raises -> URI:
         """Parses a URI which is defined using the following format.
 
         `[scheme:][//[user_info@]host][/]path[?query][#fragment]`
@@ -209,19 +210,19 @@ struct URI(Writable, Stringable, Representable):
 
             for item in query_items:
                 var key_val = item.split(QueryDelimiters.ITEM_ASSIGN, 1)
-                var key = unquote[expand_plus=True](key_val[0])
+                var key = unquote[expand_plus=True](String(key_val[0]))
 
                 if key:
                     queries[key] = ""
                     if len(key_val) == 2:
-                        queries[key] = unquote[expand_plus=True](key_val[1])
+                        queries[key] = unquote[expand_plus=True](String(key_val[1]))
 
         return URI(
             _original_path=original_path,
             scheme=scheme,
             path=path,
             query_string=query,
-            queries=queries,
+            queries=queries^,
             _hash="",
             host=host,
             port=port,

@@ -6,7 +6,7 @@ alias HTTP_DATE_FORMAT = "ddd, DD MMM YYYY HH:mm:ss ZZZ"
 alias TZ_GMT = TimeZone(0, "GMT")
 
 
-@value
+@fieldwise_init
 struct Expiration(Copyable, Movable):
     var variant: UInt8
     var datetime: Optional[SmallTime]
@@ -16,8 +16,8 @@ struct Expiration(Copyable, Movable):
         return Self(variant=0, datetime=None)
 
     @staticmethod
-    fn from_datetime(time: SmallTime) -> Self:
-        return Self(variant=1, datetime=time)
+    fn from_datetime(var time: SmallTime) -> Self:
+        return Self(variant=1, datetime=time^)
 
     @staticmethod
     fn from_string(str: String) -> Optional[Expiration]:
@@ -41,7 +41,7 @@ struct Expiration(Copyable, Movable):
             return Optional[String](None)
 
         # TODO fix this it breaks time and space (replacing timezone might add or remove something sometimes)
-        var dt = self.datetime.value()
+        var dt = self.datetime.value().copy()
         dt.tz = TZ_GMT
         return Optional[String](dt.format(HTTP_DATE_FORMAT))
 

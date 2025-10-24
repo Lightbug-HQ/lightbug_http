@@ -1,7 +1,7 @@
 from memory import stack_allocation
 from utils import StaticTuple
-from sys import sizeof, external_call
-from sys.info import os_is_macos
+from sys import size_of, external_call
+from sys.info import CompilationTarget
 from memory import Pointer, UnsafePointer
 from lightbug_http._libc import (
     socket,
@@ -59,7 +59,7 @@ from lightbug_http._logger import logger
 alias SocketClosedError = "Socket: Socket is already closed"
 
 
-struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_INET](
+struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily = AddressFamily.AF_INET](
     Representable, Stringable, Writable
 ):
     """Represents a network file descriptor. Wraps around a file descriptor and provides network functions.
@@ -139,7 +139,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
         self._closed = False
         self._connected = True
 
-    fn __moveinit__(out self, owned existing: Self):
+    fn __moveinit__(out self, deinit existing: Self):
         """Initialize a new socket object by moving the data from an existing socket object.
 
         Args:
@@ -150,14 +150,10 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
         self.protocol = existing.protocol
 
         self._local_address = existing._local_address^
-        existing._local_address = AddrType()
         self._remote_address = existing._remote_address^
-        existing._remote_address = AddrType()
 
         self._closed = existing._closed
-        existing._closed = True
         self._connected = existing._connected
-        existing._connected = False
 
     fn teardown(mut self) raises:
         """Close the socket and free the file descriptor."""
@@ -170,10 +166,10 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
         if not self._closed:
             self.close()
 
-    fn __enter__(owned self) -> Self:
+    fn __enter__(var self) -> Self:
         return self^
 
-    fn __del__(owned self):
+    fn __del__(deinit self):
         """Close the socket when the object is deleted."""
         try:
             self.teardown()
@@ -346,7 +342,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
             getsockname(
                 self.fd,
                 local_address,
-                Pointer(to=socklen_t(sizeof[sockaddr]())),
+                Pointer(to=socklen_t(size_of[sockaddr]())),
             )
         except e:
             logger.error(e)
@@ -400,7 +396,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
             logger.warn("Socket.get_socket_option: Failed to get socket option.")
             raise e
 
-    fn set_socket_option(self, option_name: Int, owned option_value: Byte = 1) raises:
+    fn set_socket_option(self, option_name: Int, var option_value: Byte = 1) raises:
         """Return the value of the given socket option.
 
         Args:
@@ -429,7 +425,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
         """
 
         @parameter
-        if os_is_macos():
+        if CompilationTarget.is_macos():
             ip = addrinfo_macos().get_ip_address(address)
         else:
             ip = addrinfo_unix().get_ip_address(address)
@@ -503,7 +499,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
         """
 
         @parameter
-        if os_is_macos():
+        if CompilationTarget.is_macos():
             ip = addrinfo_macos().get_ip_address(address)
         else:
             ip = addrinfo_unix().get_ip_address(address)
@@ -545,7 +541,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
 
         return bytes_received
 
-    fn receive(self, size: Int = default_buffer_size) raises -> List[Byte, True]:
+    fn receive(self, size: Int = default_buffer_size) raises -> List[Byte]:
         """Receive data from the socket into the buffer with capacity of `size` bytes.
 
         Args:
@@ -556,7 +552,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
         """
         var buffer = Bytes(capacity=size)
         _ = self._receive(buffer)
-        return buffer
+        return buffer^
 
     fn receive(self, mut buffer: Bytes) raises -> UInt:
         """Receive data from the socket into the buffer.
@@ -608,7 +604,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
             UInt16(binary_port_to_int(addr_in.sin_port)),
         )
 
-    fn receive_from(mut self, size: Int = default_buffer_size) raises -> (List[Byte, True], String, UInt16):
+    fn receive_from(mut self, size: Int = default_buffer_size) raises -> (List[Byte], String, UInt16):
         """Receive data from the socket into the buffer dest.
 
         Args:
@@ -622,9 +618,9 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
         """
         var buffer = Bytes(capacity=size)
         _, host, port = self._receive_from(buffer)
-        return buffer, host, port
+        return buffer^, host, port
 
-    fn receive_from(mut self, mut dest: List[Byte, True]) raises -> (UInt, String, UInt16):
+    fn receive_from(mut self, mut dest: List[Byte]) raises -> (UInt, String, UInt16):
         """Receive data from the socket into the buffer dest.
 
         Args:
@@ -676,7 +672,7 @@ struct Socket[AddrType: Addr, address_family: AddressFamily = AddressFamily.AF_I
         """Return the timeout value for the socket."""
         return self.get_socket_option(SO_RCVTIMEO)
 
-    fn set_timeout(self, owned duration: Int) raises:
+    fn set_timeout(self, var duration: Int) raises:
         """Set the timeout value for the socket.
 
         Args:

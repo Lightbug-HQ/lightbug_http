@@ -14,7 +14,7 @@ fn test_string_literal_to_bytes() raises:
     cases["HTTP/1.1 200 OK"] = Bytes(72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75)
 
     for c in cases.items():
-        testing.assert_equal(to_string(Bytes(c.key.as_bytes())), to_string(c.value))
+        testing.assert_equal(to_string(Bytes(c.key.as_bytes())), to_string(c.copy().value.copy()))
 
 
 fn test_string_to_bytes() raises:
@@ -27,4 +27,4 @@ fn test_string_to_bytes() raises:
     cases[String("HTTP/1.1 200 OK")] = Bytes(72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75)
 
     for c in cases.items():
-        testing.assert_equal(to_string(Bytes(c.key.as_bytes())), to_string(c.value))
+        testing.assert_equal(to_string(Bytes(c.key.as_bytes())), to_string(c.copy().value.copy()))

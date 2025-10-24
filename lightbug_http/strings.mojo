@@ -46,7 +46,7 @@ fn to_string(b: Span[UInt8]) -> String:
     return String(StringSlice(unsafe_from_utf8=b))
 
 
-fn to_string(owned bytes: Bytes) -> String:
+fn to_string(var bytes: Bytes) -> String:
     """Creates a String from the provided List of bytes.
     If you do not transfer ownership of the List, the List will be copied.
 
