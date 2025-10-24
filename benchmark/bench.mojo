@@ -50,7 +50,8 @@ fn lightbug_benchmark_response_encode(mut b: Bencher):
     @always_inline
     @parameter
     fn response_encode():
-        var res = HTTPResponse(body.as_bytes(), headers=get_headers_struct())
+        var body_data = body.as_bytes()
+        var res = HTTPResponse(body_data, headers=get_headers_struct())
         _ = encode(res^)
 
     b.iter[response_encode]()
@@ -62,7 +63,8 @@ fn lightbug_benchmark_response_parse(mut b: Bencher):
     @parameter
     fn response_parse():
         try:
-            _ = HTTPResponse.from_bytes(Response.as_bytes())
+            var response_data = Response.as_bytes()
+            _ = HTTPResponse.from_bytes(response_data)
         except:
             pass
 
@@ -75,7 +77,8 @@ fn lightbug_benchmark_request_parse(mut b: Bencher):
     @parameter
     fn request_parse():
         try:
-            _ = HTTPRequest.from_bytes("127.0.0.1/path", default_max_request_body_size, default_max_request_uri_length, Request.as_bytes())
+            var request_data = Request.as_bytes()
+            _ = HTTPRequest.from_bytes("127.0.0.1/path", default_max_request_body_size, default_max_request_uri_length, request_data)
         except:
             pass
 
@@ -120,7 +123,8 @@ fn lightbug_benchmark_header_parse(mut b: Bencher):
     fn header_parse():
         try:
             var header = Headers()
-            var reader = ByteReader(headers.as_bytes())
+            var headers_data = headers.as_bytes()
+            var reader = ByteReader(headers_data)
             _ = header.parse_raw(reader)
         except e:
             print("failed", e)
