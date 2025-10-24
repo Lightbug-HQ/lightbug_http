@@ -166,7 +166,7 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         if not self._closed:
             self.close()
 
-    fn __enter__(owned self) -> Self:
+    fn __enter__(var self) -> Self:
         return self^
 
     fn __del__(deinit self):
@@ -672,7 +672,7 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         """Return the timeout value for the socket."""
         return self.get_socket_option(SO_RCVTIMEO)
 
-    fn set_timeout(self, owned duration: Int) raises:
+    fn set_timeout(self, var duration: Int) raises:
         """Set the timeout value for the socket.
 
         Args:

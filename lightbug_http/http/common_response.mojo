@@ -28,7 +28,7 @@ fn OK(
 
 
 fn SeeOther(
-    location: String, content_type: String, owned cookies: List[Cookie] = []
+    location: String, content_type: String, var cookies: List[Cookie] = []
 ) -> HTTPResponse:
     return HTTPResponse(
         bytes("See Other"),

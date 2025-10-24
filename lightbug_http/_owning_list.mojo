@@ -18,7 +18,7 @@ struct _OwningListIter[
     T: Movable,
     list_origin: Origin[list_mutability],
     forward: Bool = True,
-]:
+](Copyable, Movable):
     """Iterator for List.
 
     Parameters:
@@ -34,7 +34,7 @@ struct _OwningListIter[
     var src: Pointer[Self.list_type, list_origin]
 
     fn __iter__(self) -> Self:
-        return self
+        return self.copy()
 
     fn __next__(
         mut self,

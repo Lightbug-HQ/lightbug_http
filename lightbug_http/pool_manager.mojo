@@ -102,7 +102,7 @@ struct PoolManager[ConnectionType: Connection]():
     fn __contains__(self, key: PoolKey) -> Bool:
         return key in self.mapping
 
-    fn __setitem__(mut self, key: PoolKey, owned value: ConnectionType) raises -> None:
+    fn __setitem__(mut self, key: PoolKey, var value: ConnectionType) raises -> None:
         if key in self.mapping:
             self._connections[self.mapping[key]] = value^
         else:
