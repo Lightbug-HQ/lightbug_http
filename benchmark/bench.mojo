@@ -88,10 +88,11 @@ fn lightbug_benchmark_request_encode(mut b: Bencher):
     @parameter
     fn request_encode() raises:
         var uri = URI.parse("http://127.0.0.1:8080/some-path")
+        var body_data = bytes(body)
         var req = HTTPRequest(
             uri=uri,
             headers=get_headers_struct(),
-            body=materialize[body_bytes](),
+            body=body_data,
         )
         _ = encode(req^)
 
