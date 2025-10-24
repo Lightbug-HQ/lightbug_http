@@ -35,8 +35,9 @@ fn run_benchmark():
         print("failed to start benchmark")
 
 
-fn get_headers_struct() -> Headers:
-    return Headers(
+@parameter
+fn lightbug_benchmark_response_encode(mut b: Bencher):
+    var headers_struct = Headers(
         Header("Content-Type", "application/json"),
         Header("Content-Length", "1234"),
         Header("Connection", "close"),
@@ -44,14 +45,11 @@ fn get_headers_struct() -> Headers:
         Header("SomeHeader", "SomeValue"),
     )
 
-
-@parameter
-fn lightbug_benchmark_response_encode(mut b: Bencher):
     @always_inline
     @parameter
     fn response_encode():
         var body_data = body.as_bytes()
-        var res = HTTPResponse(body_data, headers=get_headers_struct())
+        var res = HTTPResponse(body_data, headers=headers_struct)
         _ = encode(res^)
 
     b.iter[response_encode]()
@@ -87,6 +85,14 @@ fn lightbug_benchmark_request_parse(mut b: Bencher):
 
 @parameter
 fn lightbug_benchmark_request_encode(mut b: Bencher):
+    var headers_struct = Headers(
+        Header("Content-Type", "application/json"),
+        Header("Content-Length", "1234"),
+        Header("Connection", "close"),
+        Header("Date", "some-datetime"),
+        Header("SomeHeader", "SomeValue"),
+    )
+
     @always_inline
     @parameter
     fn request_encode() raises:
@@ -94,7 +100,7 @@ fn lightbug_benchmark_request_encode(mut b: Bencher):
         var body_data = bytes(body)
         var req = HTTPRequest(
             uri=uri,
-            headers=get_headers_struct(),
+            headers=headers_struct,
             body=body_data,
         )
         _ = encode(req^)
@@ -107,11 +113,19 @@ fn lightbug_benchmark_request_encode(mut b: Bencher):
 
 @parameter
 fn lightbug_benchmark_header_encode(mut b: Bencher):
+    var headers_struct = Headers(
+        Header("Content-Type", "application/json"),
+        Header("Content-Length", "1234"),
+        Header("Connection", "close"),
+        Header("Date", "some-datetime"),
+        Header("SomeHeader", "SomeValue"),
+    )
+
     @always_inline
     @parameter
     fn header_encode():
         var b = ByteWriter()
-        b.write(get_headers_struct())
+        b.write(headers_struct)
 
     b.iter[header_encode]()
 

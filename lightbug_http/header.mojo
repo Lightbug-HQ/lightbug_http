@@ -38,15 +38,15 @@ struct Header(Writable, Stringable, Copyable, Movable):
         return String.write(self)
 
     fn write_to[T: Writer, //](self, mut writer: T):
-        writer.write(self.key + ": ", self.value, lineBreak)
+        writer.write(self.key, ": ", self.value, lineBreak)
 
 
 @always_inline
 fn write_header[T: Writer](mut writer: T, key: String, value: String):
-    writer.write(key + ": ", value, lineBreak)
+    writer.write(key, ": ", value, lineBreak)
 
 
-struct Headers(Writable, Stringable, Movable, Copyable, ImplicitlyCopyable):
+struct Headers(Writable, Stringable, Movable, Copyable):
     """Represents the header key/values in an http request/response.
 
     Header keys are normalized to lowercase
@@ -57,7 +57,7 @@ struct Headers(Writable, Stringable, Movable, Copyable, ImplicitlyCopyable):
     fn __init__(out self):
         self._inner = Dict[String, String]()
 
-    fn __init__(out self, *headers: Header):
+    fn __init__(out self, owned *headers: Header):
         self._inner = Dict[String, String]()
         for header in headers:
             self[header.key.lower()] = header.value
