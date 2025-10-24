@@ -751,7 +751,7 @@ fn bufis(s: String, t: String) -> Bool:
 
 # Test helper structures
 @fieldwise_init
-struct ParseRequestResult(Copyable):
+struct ParseRequestResult(Copyable, ImplicitlyCopyable):
     var ret: Int
     var method: String
     var method_len: Int
@@ -761,7 +761,7 @@ struct ParseRequestResult(Copyable):
     var num_headers: Int
 
 @fieldwise_init
-struct ParseResponseResult(Copyable):
+struct ParseResponseResult(Copyable, ImplicitlyCopyable):
     var ret: Int
     var minor_version: Int
     var status: Int
@@ -770,7 +770,7 @@ struct ParseResponseResult(Copyable):
     var num_headers: Int
 
 @fieldwise_init
-struct ParseHeadersResult(Copyable):
+struct ParseHeadersResult(Copyable, ImplicitlyCopyable):
     var ret: Int
     var num_headers: Int
 
@@ -1419,7 +1419,7 @@ fn test_chunked_leftdata() raises:
    
    buf_ptr.free()
 
-fn main():
+fn run_tests():
    """Run all tests."""
    print("Running picohttpparser tests...")
    

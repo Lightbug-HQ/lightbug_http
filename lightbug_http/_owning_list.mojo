@@ -18,7 +18,7 @@ struct _OwningListIter[
     T: Movable,
     list_origin: Origin[list_mutability],
     forward: Bool = True,
-]:
+](ImplicitlyCopyable):
     """Iterator for List.
 
     Parameters:

@@ -1,4 +1,5 @@
-from memory.span import Span, _SpanIter, UnsafePointer
+from memory.span import Span, _SpanIter
+from memory import UnsafePointer
 from lightbug_http.strings import BytesConstant
 from lightbug_http.connection import default_buffer_size
 
