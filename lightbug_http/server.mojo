@@ -163,7 +163,7 @@ struct Server(Movable):
                     request_buffer.extend(temp_buffer^)
                     logger.debug("Total buffer size:", len(request_buffer))
 
-                    if BytesConstant.DOUBLE_CRLF in ByteView(request_buffer):
+                    if materialize[BytesConstant.DOUBLE_CRLF]() in ByteView(request_buffer):
                         logger.debug("Found end of headers")
                         break
 
