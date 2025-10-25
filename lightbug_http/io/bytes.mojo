@@ -239,7 +239,11 @@ struct ByteReader[origin: Origin](Sized):
         self.read_pos += count
         return self._inner[start : start + count]
 
+
     fn read_until(mut self, char: Byte) -> ByteView[origin]:
+        """Read bytes until a specific character is found.
+
+        """
         var start = self.read_pos
         for i in range(start, len(self._inner)):
             if self._inner[i] == char:
@@ -250,9 +254,15 @@ struct ByteReader[origin: Origin](Sized):
 
     @always_inline
     fn read_word(mut self) -> ByteView[origin]:
+        """Read bytes until whitespace is found.
+
+        """
         return self.read_until(BytesConstant.whitespace)
 
     fn read_line(mut self) -> ByteView[origin]:
+        """Read bytes until newline (CRLF or LF) is found.
+
+        """
         var start = self.read_pos
         for i in range(start, len(self._inner)):
             if is_newline(self._inner[i]):
