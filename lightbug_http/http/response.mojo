@@ -1,8 +1,12 @@
 from collections import Optional
+from memory import UnsafePointer
 from lightbug_http.external.small_time.small_time import now
 from lightbug_http.uri import URI
 from lightbug_http.io.bytes import Bytes, bytes, byte, ByteReader, ByteWriter
 from lightbug_http.connection import TCPConnection, default_buffer_size
+from lightbug_http.header import Headers, HeaderKey
+from lightbug_http.cookie import ResponseCookieJar
+from lightbug_http._logger import logger
 from lightbug_http.strings import (
     strHttp11,
     strHttp,
@@ -13,6 +17,7 @@ from lightbug_http.strings import (
     lineBreak,
     to_string,
 )
+from lightbug_http.pico import PhrChunkedDecoder, phr_decode_chunked
 
 
 struct StatusCode:
@@ -93,14 +98,22 @@ struct HTTPResponse(Writable, Stringable, Encodable, Sized, Movable):
 
         var transfer_encoding = response.headers.get(HeaderKey.TRANSFER_ENCODING)
         if transfer_encoding and transfer_encoding.value() == "chunked":
+            # Use pico's chunked decoder for proper RFC-compliant parsing
+            var decoder = PhrChunkedDecoder()
+            decoder.consume_trailer = True  # Consume trailing headers
+
             var b = reader.read_bytes().to_bytes()
             var buff = Bytes(capacity=default_buffer_size)
+
             try:
+                # Read chunks from connection
                 while conn.read(buff) > 0:
                     b += buff.copy()
 
+                    # Check if we've reached the end of chunked data (0\r\n\r\n)
                     if (
-                        buff[-5] == byte("0")
+                        len(buff) >= 5
+                        and buff[-5] == byte("0")
                         and buff[-4] == byte("\r")
                         and buff[-3] == byte("\n")
                         and buff[-2] == byte("\r")
@@ -108,8 +121,8 @@ struct HTTPResponse(Writable, Stringable, Encodable, Sized, Movable):
                     ):
                         break
 
-                    # buff.clear()
-                response.read_chunks(b)
+                # Decode chunks using pico
+                response._decode_chunks_pico(decoder, b)
                 return response^
             except e:
                 logger.error(e)
@@ -224,16 +237,36 @@ struct HTTPResponse(Writable, Stringable, Encodable, Sized, Movable):
         self.body_raw = r.read_bytes(self.content_length()).to_bytes()
         self.set_content_length(len(self.body_raw))
 
-    fn read_chunks(mut self, chunks: Span[Byte]) raises:
-        var reader = ByteReader(chunks)
-        while True:
-            var size = atol(String(reader.read_line()), 16)
-            if size == 0:
-                break
-            var data = reader.read_bytes(size).to_bytes()
-            reader.skip_carriage_return()
-            self.set_content_length(self.content_length() + len(data))
-            self.body_raw += data^
+    fn _decode_chunks_pico(mut self, mut decoder: PhrChunkedDecoder, var chunks: Bytes) raises:
+        """Decode chunked transfer encoding using picohttpparser.
+
+        Args:
+            decoder: The chunked decoder state machine.
+            chunks: The raw chunked data to decode.
+        """
+        # Convert Bytes to UnsafePointer for pico API
+        var buf_ptr = UnsafePointer[UInt8].alloc(len(chunks))
+        for i in range(len(chunks)):
+            buf_ptr[i] = chunks[i]
+
+        var bufsz = len(chunks)
+        var result = phr_decode_chunked(decoder, buf_ptr, bufsz)
+        var ret = result[0]
+        var decoded_size = result[1]
+
+        if ret == -1:
+            buf_ptr.free()
+            raise Error("HTTPResponse._decode_chunks_pico: Invalid chunked encoding")
+        # ret == -2 means incomplete, but we'll proceed with what we have
+        # ret >= 0 means complete, with ret bytes of trailing data
+
+        # Copy decoded data to body
+        self.body_raw = Bytes(capacity=decoded_size)
+        for i in range(decoded_size):
+            self.body_raw.append(buf_ptr[i])
+
+        self.set_content_length(len(self.body_raw))
+        buf_ptr.free()
 
     fn write_to[T: Writer](self, mut writer: T):
         writer.write(self.protocol, whitespace, self.status_code, whitespace, self.status_text, lineBreak)
