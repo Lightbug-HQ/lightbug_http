@@ -239,14 +239,10 @@ struct ByteReader[origin: Origin](Sized):
         self.read_pos += count
         return self._inner[start : start + count]
 
-    # NOTE: The following methods (read_until, read_word, read_line) are deprecated
-    # in favor of picohttpparser-based parsing in header.mojo. They are kept here
-    # for backward compatibility with other parts of the codebase that may still use them.
 
     fn read_until(mut self, char: Byte) -> ByteView[origin]:
         """Read bytes until a specific character is found.
 
-        DEPRECATED: Consider using picohttpparser for HTTP parsing instead.
         """
         var start = self.read_pos
         for i in range(start, len(self._inner)):
@@ -260,14 +256,12 @@ struct ByteReader[origin: Origin](Sized):
     fn read_word(mut self) -> ByteView[origin]:
         """Read bytes until whitespace is found.
 
-        DEPRECATED: Consider using picohttpparser for HTTP parsing instead.
         """
         return self.read_until(BytesConstant.whitespace)
 
     fn read_line(mut self) -> ByteView[origin]:
         """Read bytes until newline (CRLF or LF) is found.
 
-        DEPRECATED: Consider using picohttpparser for HTTP parsing instead.
         """
         var start = self.read_pos
         for i in range(start, len(self._inner)):
