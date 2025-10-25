@@ -121,16 +121,21 @@ struct Headers(Writable, Stringable, Copyable, Movable):
             and buf_span[4] == ord('/')
         )
 
+        var bytes_consumed: Int
         var result: (String, String, String, List[String])
         if is_response:
-            result = self._parse_raw_response(buf_ptr, len(buf_span))
+            var parse_result = self._parse_raw_response(buf_ptr, len(buf_span))
+            bytes_consumed = parse_result[0]
+            result = parse_result[1]
         else:
-            result = self._parse_raw_request(buf_ptr, len(buf_span))
+            var parse_result = self._parse_raw_request(buf_ptr, len(buf_span))
+            bytes_consumed = parse_result[0]
+            result = parse_result[1]
 
         buf_ptr.free()
 
-        # Advance ByteReader position (we consumed the entire buffer)
-        r.read_pos = len(r._inner)
+        # Advance ByteReader position to start of body (after headers end)
+        r.read_pos += bytes_consumed
 
         return result
 
@@ -138,7 +143,7 @@ struct Headers(Writable, Stringable, Copyable, Movable):
         mut self,
         buf_ptr: UnsafePointer[UInt8],
         buf_len: Int
-    ) raises -> (String, String, String, List[String]):
+    ) raises -> (Int, (String, String, String, List[String])):
         """Parse HTTP request using picohttpparser."""
         var method = String()
         var method_len = 0
@@ -185,13 +190,13 @@ struct Headers(Writable, Stringable, Copyable, Movable):
         var protocol = "HTTP/1." + String(minor_version)
 
         headers.free()
-        return (method, path, protocol, cookies^)
+        return (ret, (method, path, protocol, cookies^))
 
     fn _parse_raw_response(
         mut self,
         buf_ptr: UnsafePointer[UInt8],
         buf_len: Int
-    ) raises -> (String, String, String, List[String]):
+    ) raises -> (Int, (String, String, String, List[String])):
         """Parse HTTP response using picohttpparser."""
         var minor_version = -1
         var status = 0
@@ -237,7 +242,7 @@ struct Headers(Writable, Stringable, Copyable, Movable):
         var protocol = "HTTP/1." + String(minor_version)
 
         headers.free()
-        return (protocol, String(status), msg, cookies^)
+        return (ret, (protocol, String(status), msg, cookies^))
 
     fn write_to[T: Writer, //](self, mut writer: T):
         for header in self._inner.items():
