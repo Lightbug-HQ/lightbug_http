@@ -441,9 +441,6 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         self._remote_address = AddrType(remote[0], remote[1])
 
     fn send(self, buffer: Span[Byte]) raises -> Int:
-        if buffer[-1] == 0:
-            raise Error("Socket.send: Buffer must not be null-terminated.")
-
         try:
             return send(self.fd, buffer.unsafe_ptr(), len(buffer), 0)
         except e:
