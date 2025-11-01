@@ -159,9 +159,6 @@ struct TCPConnection(Connection):
                 raise Error("TCPConnection.read: Failed to read data from connection.")
 
     fn write(self, buf: Span[Byte]) raises -> Int:
-        if buf[-1] == 0:
-            raise Error("TCPConnection.write: Buffer must not be null-terminated.")
-
         try:
             return self.socket.send(buf)
         except e:
