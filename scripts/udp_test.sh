@@ -7,8 +7,8 @@ kill_server() {
     wait $pid 2>/dev/null
 }
 
-(magic run mojo build -D LB_LOG_LEVEL=DEBUG -I . --debug-level full tests/integration/udp/udp_server.mojo)
-(magic run mojo build -D LB_LOG_LEVEL=DEBUG -I . --debug-level full tests/integration/udp/udp_client.mojo)
+(pixi run mojo build -D LB_LOG_LEVEL=DEBUG -I . --debug-level full tests/integration/udp/udp_server.mojo)
+(pixi run mojo build -D LB_LOG_LEVEL=DEBUG -I . --debug-level full tests/integration/udp/udp_client.mojo)
 
 echo "[INFO] Starting UDP server..."
 ./udp_server &

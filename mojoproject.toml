@@ -1,4 +1,4 @@
-[project]
+[workspace]
 authors = ["saviorand"]
 channels = ["conda-forge", "https://conda.modular.com/max", "https://repo.prefix.dev/modular-community"]
 description = "Simple and fast HTTP framework for Mojo!"
@@ -9,18 +9,18 @@ version = "0.25.6"
 [tasks]
 build = { cmd = "rattler-build build --recipe recipes -c https://conda.modular.com/max -c conda-forge --skip-existing=all", env = {MODULAR_MOJO_IMPORT_PATH = "$CONDA_PREFIX/lib/mojo"} }
 publish = { cmd = "bash scripts/publish.sh", env = { PREFIX_API_KEY = "$PREFIX_API_KEY" } }
-format = { cmd = "magic run mojo format -l 120 lightbug_http" }
+format = { cmd = "pixi run mojo format -l 120 lightbug_http" }
 
 [feature.unit-tests.tasks]
-test = { cmd = "magic run mojo test -I . tests/lightbug_http" }
+test = { cmd = "pixi run mojo test -I . tests/lightbug_http" }
 
 [feature.integration-tests.tasks]
 integration_tests_py = { cmd = "bash scripts/integration_test.sh" }
-integration_tests_external = { cmd = "magic run mojo test -I . tests/integration" }
+integration_tests_external = { cmd = "pixi run mojo test -I . tests/integration" }
 integration_tests_udp = { cmd = "bash scripts/udp_test.sh" }
 
 [feature.bench.tasks]
-bench = { cmd = "magic run mojo -I . benchmark/bench.mojo" }
+bench = { cmd = "pixi run mojo -I . benchmark/bench.mojo" }
 bench_server = { cmd = "bash scripts/bench_server.sh" }
 
 [dependencies]
