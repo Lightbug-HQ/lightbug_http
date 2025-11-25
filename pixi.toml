@@ -1,13 +1,17 @@
 [workspace]
 authors = ["saviorand"]
-channels = ["conda-forge", "https://conda.modular.com/max", "https://repo.prefix.dev/modular-community"]
+channels = [
+    "conda-forge",
+    "https://conda.modular.com/max",
+    "https://repo.prefix.dev/modular-community",
+]
 description = "Simple and fast HTTP framework for Mojo!"
 name = "lightbug_http"
 platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
 version = "0.25.6"
 
 [tasks]
-build = { cmd = "rattler-build build --recipe recipes -c https://conda.modular.com/max -c conda-forge --skip-existing=all", env = {MODULAR_MOJO_IMPORT_PATH = "$CONDA_PREFIX/lib/mojo"} }
+build = { cmd = "rattler-build build --recipe recipes -c https://conda.modular.com/max -c conda-forge --skip-existing=all", env = { MODULAR_MOJO_IMPORT_PATH = "$CONDA_PREFIX/lib/mojo" } }
 publish = { cmd = "bash scripts/publish.sh", env = { PREFIX_API_KEY = "$PREFIX_API_KEY" } }
 format = { cmd = "pixi run mojo format -l 120 lightbug_http" }
 
@@ -33,5 +37,7 @@ fastapi = ">=0.116,<0.117"
 [environments]
 default = { solve-group = "default" }
 unit-tests = { features = ["unit-tests"], solve-group = "default" }
-integration-tests = { features = ["integration-tests"], solve-group = "default" }
+integration-tests = { features = [
+    "integration-tests",
+], solve-group = "default" }
 bench = { features = ["bench"], solve-group = "default" }
