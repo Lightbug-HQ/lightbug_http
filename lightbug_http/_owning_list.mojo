@@ -2,7 +2,7 @@ from os import abort
 from sys import size_of
 from sys.intrinsics import _type_is_eq
 
-from memory import Pointer, UnsafePointer, memcpy, Span
+from memory import Pointer, LegacyUnsafePointer, memcpy, Span
 
 from collections import Optional
 
@@ -70,7 +70,7 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
     """
 
     # Fields
-    var data: UnsafePointer[T]
+    var data: LegacyUnsafePointer[T]
     """The underlying storage for the list."""
     var size: Int
     """The number of elements in the list."""
@@ -83,7 +83,7 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
 
     fn __init__(out self):
         """Constructs an empty list."""
-        self.data = UnsafePointer[T]()
+        self.data = LegacyUnsafePointer[T]()
         self.size = 0
         self.capacity = 0
 
@@ -93,7 +93,7 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
         Args:
             capacity: The requested capacity of the list.
         """
-        self.data = UnsafePointer[T].alloc(capacity)
+        self.data = LegacyUnsafePointer[T].alloc(capacity)
         self.size = 0
         self.capacity = capacity
 
@@ -135,7 +135,7 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
                 return True
         return False
 
-    fn __iter__(ref self) -> _OwningListIter[T, __origin_of(self)]:
+    fn __iter__(ref self) -> _OwningListIter[T, origin_of(self)]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
@@ -240,7 +240,7 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
         return len(self) * size_of[T]()
 
     fn _realloc(mut self, new_capacity: Int):
-        var new_data = UnsafePointer[T].alloc(new_capacity)
+        var new_data = LegacyUnsafePointer[T].alloc(new_capacity)
 
         _move_pointee_into_many_elements(
             dest=new_data,
@@ -449,14 +449,14 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
             (self.data + i).destroy_pointee()
         self.size = 0
 
-    fn steal_data(mut self) -> UnsafePointer[T]:
+    fn steal_data(mut self) -> LegacyUnsafePointer[T]:
         """Take ownership of the underlying pointer from the list.
 
         Returns:
             The underlying data.
         """
         var ptr = self.data
-        self.data = UnsafePointer[T]()
+        self.data = LegacyUnsafePointer[T]()
         self.size = 0
         self.capacity = 0
         return ptr
@@ -486,11 +486,11 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
         return (self.data + normalized_idx)[]
 
     @always_inline
-    fn unsafe_ptr(self) -> UnsafePointer[T]:
+    fn unsafe_ptr(self) -> LegacyUnsafePointer[T]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
-            The UnsafePointer to the underlying memory.
+            The LegacyUnsafePointer to the underlying memory.
         """
         return self.data
 
@@ -499,7 +499,7 @@ fn _clip(value: Int, start: Int, end: Int) -> Int:
     return max(start, min(value, end))
 
 
-fn _move_pointee_into_many_elements[T: Movable](dest: UnsafePointer[T], src: UnsafePointer[T], size: Int):
+fn _move_pointee_into_many_elements[T: Movable](dest: LegacyUnsafePointer[T], src: LegacyUnsafePointer[T], size: Int):
     for i in range(size):
         (dest + i).init_pointee_move_from(src + i)
         # (src + i).move_pointee_into(dest + i)

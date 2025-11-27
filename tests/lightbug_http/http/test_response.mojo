@@ -53,3 +53,7 @@ def test_read_chunks():
 
 def test_encode():
     ...
+
+
+def main():
+    testing.TestSuite.discover_tests[__functions_in_module()]().run()

@@ -1,4 +1,4 @@
-from testing import assert_equal, assert_true
+from testing import assert_equal, assert_true, TestSuite
 from memory import Span
 from lightbug_http.header import Headers, Header
 from lightbug_http.io.bytes import Bytes, bytes, ByteReader
@@ -50,3 +50,6 @@ def test_parse_response_header():
     assert_equal(header["Content-Length"], "1234")
     assert_equal(header["Connection"], "close")
     assert_equal(header["Trailer"], "end-of-message")
+
+def main():
+    TestSuite.discover_tests[__functions_in_module()]().run()

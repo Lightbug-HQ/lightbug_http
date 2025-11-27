@@ -1,7 +1,7 @@
 from utils import StaticTuple
 from sys.ffi import external_call, c_char, c_int, c_size_t, c_ssize_t, c_uchar, c_ushort, c_uint
 from sys.info import size_of, CompilationTarget
-from memory import memcpy, UnsafePointer, stack_allocation
+from memory import memcpy, LegacyUnsafePointer, stack_allocation
 from lightbug_http.io.bytes import Bytes
 
 alias IPPROTO_IPV6 = 41
@@ -391,9 +391,9 @@ struct addrinfo:
     var ai_socktype: c_int
     var ai_protocol: c_int
     var ai_addrlen: socklen_t
-    var ai_addr: UnsafePointer[sockaddr]
-    var ai_canonname: UnsafePointer[c_char]
-    var ai_next: UnsafePointer[c_void]
+    var ai_addr: LegacyUnsafePointer[sockaddr]
+    var ai_canonname: LegacyUnsafePointer[c_char]
+    var ai_next: LegacyUnsafePointer[c_void]
 
     fn __init__(out self):
         self.ai_flags = 0
@@ -401,9 +401,9 @@ struct addrinfo:
         self.ai_socktype = 0
         self.ai_protocol = 0
         self.ai_addrlen = 0
-        self.ai_addr = UnsafePointer[sockaddr]()
-        self.ai_canonname = UnsafePointer[c_char]()
-        self.ai_next = UnsafePointer[c_void]()
+        self.ai_addr = LegacyUnsafePointer[sockaddr]()
+        self.ai_canonname = LegacyUnsafePointer[c_char]()
+        self.ai_next = LegacyUnsafePointer[c_void]()
 
 
 # --- ( Network Related Syscalls & Structs )------------------------------------
@@ -491,20 +491,20 @@ fn ntohs(netshort: c_ushort) -> c_ushort:
 
 fn _inet_ntop(
     af: c_int,
-    src: UnsafePointer[c_void, mut=False],
-    dst: UnsafePointer[c_char],
+    src: LegacyUnsafePointer[c_void, mut=False],
+    dst: LegacyUnsafePointer[c_char],
     size: socklen_t,
-) raises -> UnsafePointer[c_char, mut=False]:
+) raises -> LegacyUnsafePointer[c_char, mut=False]:
     """Libc POSIX `inet_ntop` function.
 
     Args:
         af: Address Family see AF_ aliases.
-        src: A UnsafePointer to a binary address.
-        dst: A UnsafePointer to a buffer to store the result.
+        src: A LegacyUnsafePointer to a binary address.
+        dst: A LegacyUnsafePointer to a buffer to store the result.
         size: The size of the buffer.
 
     Returns:
-        A UnsafePointer to the buffer containing the result.
+        A LegacyUnsafePointer to the buffer containing the result.
 
     #### C Function
     ```c
@@ -516,10 +516,10 @@ fn _inet_ntop(
     """
     return external_call[
         "inet_ntop",
-        UnsafePointer[c_char, mut=False],  # FnName, RetType
+        LegacyUnsafePointer[c_char, mut=False],  # FnName, RetType
         c_int,
-        UnsafePointer[c_void, mut=False],
-        UnsafePointer[c_char],
+        LegacyUnsafePointer[c_void, mut=False],
+        LegacyUnsafePointer[c_char],
         socklen_t,  # Args
     ](af, src, dst, size)
 
@@ -557,10 +557,10 @@ fn inet_ntop[address_family: AddressFamily, address_length: AddressLength](ip_ad
 
     # TODO: For some reason, using a pointer instead of a String here leads to a "tried to free invalid ptr crash".
     # Ideally we should try not to modify private members of the String.
-    var dst = UnsafePointer[c_char].alloc(address_length.value + 1)
+    var dst = LegacyUnsafePointer[c_char].alloc(address_length.value + 1)
     var result = _inet_ntop(
         address_family.value,
-        UnsafePointer(to=ip_address).bitcast[c_void](),
+        LegacyUnsafePointer(to=ip_address).bitcast[c_void](),
         dst,
         address_length.value,
     )
@@ -588,7 +588,7 @@ fn inet_ntop[address_family: AddressFamily, address_length: AddressLength](ip_ad
     return String(StringSlice(ptr=dst.bitcast[c_uchar](), length=i))
 
 
-fn _inet_pton(af: c_int, src: UnsafePointer[c_char, mut=False], dst: UnsafePointer[c_void]) -> c_int:
+fn _inet_pton(af: c_int, src: LegacyUnsafePointer[c_char, mut=False], dst: LegacyUnsafePointer[c_void]) -> c_int:
     """Libc POSIX `inet_pton` function. Converts a presentation format address (that is, printable form as held in a character string)
     to network format (usually a struct in_addr or some other internal binary representation, in network byte order).
     It returns 1 if the address was valid for the specified address family, or 0 if the address was not parseable in the specified address family,
@@ -596,8 +596,8 @@ fn _inet_pton(af: c_int, src: UnsafePointer[c_char, mut=False], dst: UnsafePoint
 
     Args:
         af: Address Family: `AF_INET` or `AF_INET6`.
-        src: A UnsafePointer to a string containing the address.
-        dst: A UnsafePointer to a buffer to store the result.
+        src: A LegacyUnsafePointer to a string containing the address.
+        dst: A LegacyUnsafePointer to a buffer to store the result.
 
     Returns:
         1 on success, 0 if the input is not a valid address, -1 on error.
@@ -614,8 +614,8 @@ fn _inet_pton(af: c_int, src: UnsafePointer[c_char, mut=False], dst: UnsafePoint
         "inet_pton",
         c_int,
         c_int,
-        UnsafePointer[c_char, mut=False],
-        UnsafePointer[c_void],
+        LegacyUnsafePointer[c_char, mut=False],
+        LegacyUnsafePointer[c_void],
     ](af, src, dst)
 
 
@@ -627,7 +627,7 @@ fn inet_pton[address_family: AddressFamily](var src: String) raises -> c_uint:
         address_family: Address Family: `AF_INET` or `AF_INET6`.
 
     Args:
-        src: A UnsafePointer to a string containing the address.
+        src: A LegacyUnsafePointer to a string containing the address.
 
     Returns:
         The binary representation of the ip address.
@@ -648,7 +648,7 @@ fn inet_pton[address_family: AddressFamily](var src: String) raises -> c_uint:
         address_family in [AddressFamily.AF_INET, AddressFamily.AF_INET6],
         "Address family must be either AF_INET or AF_INET6.",
     ]()
-    var ip_buffer: UnsafePointer[c_void]
+    var ip_buffer: LegacyUnsafePointer[c_void]
 
     @parameter
     if address_family == AddressFamily.AF_INET6:
@@ -656,7 +656,7 @@ fn inet_pton[address_family: AddressFamily](var src: String) raises -> c_uint:
     else:
         ip_buffer = stack_allocation[4, c_void]()
 
-    var result = _inet_pton(address_family.value, src.unsafe_cstr_ptr().origin_cast[False](), ip_buffer)
+    var result = _inet_pton(address_family.value, src.unsafe_cstr_ptr(), ip_buffer)
     if result == 0:
         raise Error("inet_pton Error: The input is not a valid address.")
     elif result == -1:
@@ -755,7 +755,7 @@ fn socket(domain: c_int, type: c_int, protocol: c_int) raises -> c_int:
 
 
 fn _setsockopt[
-    origin: ImmutableOrigin
+    origin: ImmutOrigin
 ](
     socket: c_int,
     level: c_int,
@@ -806,7 +806,7 @@ fn setsockopt(
         socket: A File Descriptor.
         level: The protocol level.
         option_name: The option to set.
-        option_value: A UnsafePointer to the value to set.
+        option_value: A LegacyUnsafePointer to the value to set.
 
     Raises:
         Error: If an error occurs while setting the socket option.
@@ -849,7 +849,7 @@ fn _getsockopt[
     socket: c_int,
     level: c_int,
     option_name: c_int,
-    option_value: UnsafePointer[c_void, mut=False],
+    option_value: LegacyUnsafePointer[c_void, mut=False],
     option_len: Pointer[socklen_t, len_origin],
 ) -> c_int:
     """Libc POSIX `setsockopt` function.
@@ -878,7 +878,7 @@ fn _getsockopt[
         c_int,
         c_int,
         c_int,
-        UnsafePointer[c_void, mut=False],
+        LegacyUnsafePointer[c_void, mut=False],
         Pointer[socklen_t, len_origin],  # Args
     ](socket, level, option_name, option_value, option_len)
 
@@ -939,13 +939,13 @@ fn getsockopt(
 
 fn _getsockname[
     origin: Origin
-](socket: c_int, address: UnsafePointer[sockaddr], address_len: Pointer[socklen_t, origin],) -> c_int:
+](socket: c_int, address: LegacyUnsafePointer[sockaddr], address_len: Pointer[socklen_t, origin],) -> c_int:
     """Libc POSIX `getsockname` function.
 
     Args:
         socket: A File Descriptor.
-        address: A UnsafePointer to a buffer to store the address of the peer.
-        address_len: A UnsafePointer to the size of the buffer.
+        address: A LegacyUnsafePointer to a buffer to store the address of the peer.
+        address_len: A LegacyUnsafePointer to the size of the buffer.
 
     Returns:
         0 on success, -1 on error.
@@ -962,20 +962,20 @@ fn _getsockname[
         "getsockname",
         c_int,  # FnName, RetType
         c_int,
-        UnsafePointer[sockaddr],
+        LegacyUnsafePointer[sockaddr],
         Pointer[socklen_t, origin],  # Args
     ](socket, address, address_len)
 
 
 fn getsockname[
     origin: Origin
-](socket: c_int, address: UnsafePointer[sockaddr], address_len: Pointer[socklen_t, origin],) raises:
+](socket: c_int, address: LegacyUnsafePointer[sockaddr], address_len: Pointer[socklen_t, origin],) raises:
     """Libc POSIX `getsockname` function.
 
     Args:
         socket: A File Descriptor.
-        address: A UnsafePointer to a buffer to store the address of the peer.
-        address_len: A UnsafePointer to the size of the buffer.
+        address: A LegacyUnsafePointer to a buffer to store the address of the peer.
+        address_len: A LegacyUnsafePointer to the size of the buffer.
 
     Raises:
         Error: If an error occurs while getting the socket name.
@@ -1014,13 +1014,13 @@ fn getsockname[
 
 fn _getpeername[
     origin: Origin
-](sockfd: c_int, addr: UnsafePointer[sockaddr], address_len: Pointer[socklen_t, origin],) -> c_int:
+](sockfd: c_int, addr: LegacyUnsafePointer[sockaddr], address_len: Pointer[socklen_t, origin],) -> c_int:
     """Libc POSIX `getpeername` function.
 
     Args:
         sockfd: A File Descriptor.
-        addr: A UnsafePointer to a buffer to store the address of the peer.
-        address_len: A UnsafePointer to the size of the buffer.
+        addr: A LegacyUnsafePointer to a buffer to store the address of the peer.
+        address_len: A LegacyUnsafePointer to the size of the buffer.
 
     Returns:
         0 on success, -1 on error.
@@ -1037,7 +1037,7 @@ fn _getpeername[
         "getpeername",
         c_int,  # FnName, RetType
         c_int,
-        UnsafePointer[sockaddr],
+        LegacyUnsafePointer[sockaddr],
         Pointer[socklen_t, origin],  # Args
     ](sockfd, addr, address_len)
 
@@ -1091,14 +1091,14 @@ fn getpeername(file_descriptor: c_int) raises -> sockaddr_in:
 
 
 fn _bind[
-    origin: ImmutableOrigin
+    origin: ImmutOrigin
 ](socket: c_int, address: Pointer[sockaddr_in, origin], address_len: socklen_t) -> c_int:
     """Libc POSIX `bind` function. Assigns the address specified by `address` to the socket referred to by
        the file descriptor `socket`.
 
     Args:
         socket: A File Descriptor.
-        address: A UnsafePointer to the address to bind to.
+        address: A LegacyUnsafePointer to the address to bind to.
         address_len: The size of the address.
 
     Returns:
@@ -1120,7 +1120,7 @@ fn bind(socket: c_int, address: sockaddr_in) raises:
 
     Args:
         socket: A File Descriptor.
-        address: A UnsafePointer to the address to bind to.
+        address: A LegacyUnsafePointer to the address to bind to.
 
     Raises:
         Error: If an error occurs while binding the socket.
@@ -1249,14 +1249,14 @@ fn listen(socket: c_int, backlog: c_int) raises:
 
 
 fn _accept[
-    address_origin: MutableOrigin, len_origin: Origin
+    address_origin: MutOrigin, len_origin: Origin
 ](socket: c_int, address: Pointer[sockaddr, address_origin], address_len: Pointer[socklen_t, len_origin],) -> c_int:
     """Libc POSIX `accept` function.
 
     Args:
         socket: A File Descriptor.
-        address: A UnsafePointer to a buffer to store the address of the peer.
-        address_len: A UnsafePointer to the size of the buffer.
+        address: A LegacyUnsafePointer to a buffer to store the address of the peer.
+        address_len: A LegacyUnsafePointer to the size of the buffer.
 
     Returns:
         A File Descriptor or -1 in case of failure.
@@ -1357,12 +1357,12 @@ fn accept(socket: c_int) raises -> c_int:
 
 
 fn _connect[
-    origin: ImmutableOrigin
+    origin: ImmutOrigin
 ](socket: c_int, address: Pointer[sockaddr_in, origin], address_len: socklen_t) -> c_int:
     """Libc POSIX `connect` function.
 
     Args: socket: A File Descriptor.
-        address: A UnsafePointer to the address to connect to.
+        address: A LegacyUnsafePointer to the address to connect to.
         address_len: The size of the address.
     Returns: 0 on success, -1 on error.
 
@@ -1460,7 +1460,7 @@ fn connect(socket: c_int, address: sockaddr_in) raises:
 
 fn _recv(
     socket: c_int,
-    buffer: UnsafePointer[UInt8],
+    buffer: LegacyUnsafePointer[UInt8],
     length: c_size_t,
     flags: c_int,
 ) -> c_ssize_t:
@@ -1468,7 +1468,7 @@ fn _recv(
 
     Args:
         socket: A File Descriptor.
-        buffer: A UnsafePointer to the buffer to store the received data.
+        buffer: A LegacyUnsafePointer to the buffer to store the received data.
         length: The size of the buffer.
         flags: Flags to control the behaviour of the function.
 
@@ -1487,7 +1487,7 @@ fn _recv(
         "recv",
         c_ssize_t,  # FnName, RetType
         c_int,
-        UnsafePointer[UInt8],
+        LegacyUnsafePointer[UInt8],
         c_size_t,
         c_int,  # Args
     ](socket, buffer, length, flags)
@@ -1495,15 +1495,15 @@ fn _recv(
 
 fn recv(
     socket: c_int,
-    buffer: UnsafePointer[UInt8],
+    buffer: LegacyUnsafePointer[UInt8],
     length: c_size_t,
     flags: c_int,
-) raises -> c_ssize_t:
+) raises -> c_size_t:
     """Libc POSIX `recv` function.
 
     Args:
         socket: A File Descriptor.
-        buffer: A UnsafePointer to the buffer to store the received data.
+        buffer: A LegacyUnsafePointer to the buffer to store the received data.
         length: The size of the buffer.
         flags: Flags to control the behaviour of the function.
 
@@ -1549,17 +1549,17 @@ fn recv(
                 + String(errno)
             )
 
-    return result
+    return UInt(result)
 
 
 fn _recvfrom[
     origin: Origin
 ](
     socket: c_int,
-    buffer: UnsafePointer[c_void],
+    buffer: LegacyUnsafePointer[c_void],
     length: c_size_t,
     flags: c_int,
-    address: UnsafePointer[sockaddr],
+    address: LegacyUnsafePointer[sockaddr],
     address_len: Pointer[socklen_t, origin],
 ) -> c_ssize_t:
     """Libc POSIX `recvfrom` function.
@@ -1594,20 +1594,20 @@ fn _recvfrom[
         "recvfrom",
         c_ssize_t,
         c_int,
-        UnsafePointer[c_void],
+        LegacyUnsafePointer[c_void],
         c_size_t,
         c_int,
-        UnsafePointer[sockaddr],
+        LegacyUnsafePointer[sockaddr],
         Pointer[socklen_t, origin],
     ](socket, buffer, length, flags, address, address_len)
 
 
 fn recvfrom(
     socket: c_int,
-    buffer: UnsafePointer[c_void],
+    buffer: LegacyUnsafePointer[c_void],
     length: c_size_t,
     flags: c_int,
-    address: UnsafePointer[sockaddr],
+    address: LegacyUnsafePointer[sockaddr],
 ) raises -> c_size_t:
     """Libc POSIX `recvfrom` function.
 
@@ -1664,19 +1664,19 @@ fn recvfrom(
         elif errno == ENOMEM:
             raise "ReceiveError: Insufficient memory was available to fulfill the request."
         else:
-            raise "ReceiveError: An error occurred while attempting to receive data from the socket. Error code: " + String(
+            raise Error("ReceiveError: An error occurred while attempting to receive data from the socket. Error code: " + String(
                 errno
-            )
+            ))
 
-    return result
+    return UInt(result)
 
 
-fn _send(socket: c_int, buffer: UnsafePointer[c_void, mut=False], length: c_size_t, flags: c_int) -> c_ssize_t:
+fn _send(socket: c_int, buffer: LegacyUnsafePointer[c_void, mut=False], length: c_size_t, flags: c_int) -> c_ssize_t:
     """Libc POSIX `send` function.
 
     Args:
         socket: A File Descriptor.
-        buffer: A UnsafePointer to the buffer to send.
+        buffer: A LegacyUnsafePointer to the buffer to send.
         length: The size of the buffer.
         flags: Flags to control the behaviour of the function.
 
@@ -1694,12 +1694,12 @@ fn _send(socket: c_int, buffer: UnsafePointer[c_void, mut=False], length: c_size
     return external_call["send", c_ssize_t](socket, buffer, length, flags)
 
 
-fn send(socket: c_int, buffer: UnsafePointer[c_void, mut=False], length: c_size_t, flags: c_int) raises -> c_size_t:
+fn send(socket: c_int, buffer: LegacyUnsafePointer[c_void, mut=False], length: c_size_t, flags: c_int) raises -> c_size_t:
     """Libc POSIX `send` function.
 
     Args:
         socket: A File Descriptor.
-        buffer: A UnsafePointer to the buffer to send.
+        buffer: A LegacyUnsafePointer to the buffer to send.
         length: The size of the buffer.
         flags: Flags to control the behaviour of the function.
 
@@ -1793,15 +1793,15 @@ fn send(socket: c_int, buffer: UnsafePointer[c_void, mut=False], length: c_size_
                 + String(errno)
             )
 
-    return result
+    return UInt(result)
 
 
 fn _sendto(
     socket: c_int,
-    message: UnsafePointer[c_void, mut=False],
+    message: LegacyUnsafePointer[c_void, mut=False],
     length: c_size_t,
     flags: c_int,
-    dest_addr: UnsafePointer[sockaddr, mut=False],
+    dest_addr: LegacyUnsafePointer[sockaddr, mut=False],
     dest_len: socklen_t,
 ) -> c_ssize_t:
     """Libc POSIX `sendto` function
@@ -1835,20 +1835,20 @@ fn _sendto(
         "sendto",
         c_ssize_t,
         c_int,
-        UnsafePointer[c_void, mut=False],
+        LegacyUnsafePointer[c_void, mut=False],
         c_size_t,
         c_int,
-        UnsafePointer[sockaddr, mut=False],
+        LegacyUnsafePointer[sockaddr, mut=False],
         socklen_t,
     ](socket, message, length, flags, dest_addr, dest_len)
 
 
 fn sendto(
     socket: c_int,
-    message: UnsafePointer[c_void],
+    message: LegacyUnsafePointer[c_void],
     length: c_size_t,
     flags: c_int,
-    dest_addr: UnsafePointer[sockaddr],
+    dest_addr: LegacyUnsafePointer[sockaddr],
 ) raises -> c_size_t:
     """Libc POSIX `sendto` function.
 
@@ -1943,11 +1943,11 @@ fn sendto(
         elif errno == ENAMETOOLONG:
             raise "SendToError (ENAMETOOLONG): The length of a pathname exceeds `PATH_MAX`, or pathname resolution of a symbolic link produced an intermediate result with a length that exceeds `PATH_MAX`."
         else:
-            raise "SendToError: An error occurred while attempting to send data to the socket. Error code: " + String(
+            raise Error("SendToError: An error occurred while attempting to send data to the socket. Error code: " + String(
                 errno
-            )
+            ))
 
-    return result
+    return UInt(result)
 
 
 fn _shutdown(socket: c_int, how: c_int) -> c_int:
@@ -2017,14 +2017,14 @@ fn shutdown(socket: c_int, how: c_int) raises:
             )
 
 
-fn gai_strerror(ecode: c_int) -> UnsafePointer[c_char, mut=False]:
+fn gai_strerror(ecode: c_int) -> UnsafePointer[mut=True, c_char, MutAnyOrigin]:
     """Libc POSIX `gai_strerror` function.
 
     Args:
         ecode: The error code.
 
     Returns:
-        A UnsafePointer to a string describing the error.
+        An UnsafePointer to a string describing the error.
 
     #### C Function
     ```c
@@ -2034,7 +2034,7 @@ fn gai_strerror(ecode: c_int) -> UnsafePointer[c_char, mut=False]:
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/gai_strerror.3p.html .
     """
-    return external_call["gai_strerror", UnsafePointer[c_char, mut=False], c_int](ecode)
+    return external_call["gai_strerror", UnsafePointer[mut=True, c_char, MutAnyOrigin], c_int](ecode)
 
 
 # --- ( File Related Syscalls & Structs )---------------------------------------
@@ -2117,10 +2117,11 @@ fn get_errno() -> c_int:
     """
 
     @parameter
-    if CompilationTarget.is_windows():
+    if CompilationTarget.is_linux():
+        return external_call["__errno_location", LegacyUnsafePointer[c_int]]()[]
+    elif CompilationTarget.is_macos():
+        return external_call["__error", LegacyUnsafePointer[c_int]]()[]
+    else:
         var errno = stack_allocation[1, c_int]()
         _ = external_call["_get_errno", c_void](errno)
         return errno[]
-    else:
-        alias loc = "__error" if CompilationTarget.is_macos() else "__errno_location"
-        return external_call[loc, UnsafePointer[c_int]]()[]

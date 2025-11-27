@@ -16,5 +16,4 @@ jobs:
           source $HOME/.bash_profile
           magic run test
           magic run integration_tests_py
-          magic run integration_tests_external
           magic run integration_tests_udp

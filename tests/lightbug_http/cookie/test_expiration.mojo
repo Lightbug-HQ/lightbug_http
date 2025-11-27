@@ -10,3 +10,7 @@ def test_ctors():
     # Failure returns None
     # testing.assert_false(Expiration.from_string("abc").__bool__())
     pass
+
+
+def main():
+    testing.TestSuite.discover_tests[__functions_in_module()]().run()

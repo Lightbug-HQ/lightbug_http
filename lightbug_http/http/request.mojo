@@ -111,7 +111,7 @@ struct HTTPRequest(Writable, Stringable, Encodable, Movable, Copyable):
             else:
                 self.headers[HeaderKey.HOST] = uri.host
 
-    fn get_body(self) -> StringSlice[__origin_of(self.body_raw)]:
+    fn get_body(self) -> StringSlice[origin_of(self.body_raw)]:
         return StringSlice(unsafe_from_utf8=Span(self.body_raw))
 
     fn set_connection_close(mut self):

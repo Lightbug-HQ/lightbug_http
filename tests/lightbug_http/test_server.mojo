@@ -12,3 +12,4 @@ from lightbug_http.server import Server
 
 #     server = Server(max_concurrent_connections=10)
 #     assert_equal(server.get_concurrency(), 10)
+
