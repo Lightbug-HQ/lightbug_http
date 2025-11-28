@@ -12,7 +12,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Run the test suite
         run: |
-          curl -ssL https://magic.modular.com | bash
+          curl -fsSL https://pixi.sh/install.sh | sh
           source $HOME/.bash_profile
-          magic run bench
-          # magic run bench_server # Commented out until we get `wrk` installed
+          pixi run bench
+          # pixi run bench_server # Commented out until we get `wrk` installed

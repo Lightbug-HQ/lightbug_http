@@ -1,4 +1,4 @@
-FROM ghcr.io/modular/magic:latest
+FROM ghcr.io/prefix-dev/pixi:latest
 
 RUN apt-get update && apt-get install -y git
 
@@ -15,4 +15,4 @@ ENV DEFAULT_SERVER_PORT=${DEFAULT_SERVER_PORT}
 ENV DEFAULT_SERVER_HOST=${DEFAULT_SERVER_HOST}
 ENV APP_ENTRYPOINT=lightbug.🔥
 
-CMD magic run mojo ${APP_ENTRYPOINT}
+CMD pixi run mojo ${APP_ENTRYPOINT}

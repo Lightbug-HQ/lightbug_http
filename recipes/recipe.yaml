@@ -14,7 +14,7 @@ source:
 build:
   script:
     - mkdir -p ${PREFIX}/lib/mojo
-    - magic run mojo package . -o ${PREFIX}/lib/mojo/lightbug_http.mojopkg
+    - pixi run mojo package . -o ${PREFIX}/lib/mojo/lightbug_http.mojopkg
 
 requirements:
   run:

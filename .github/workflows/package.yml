@@ -12,9 +12,9 @@ jobs:
           uses: actions/checkout@v4
         - name: Run the package command
           run: |
-            curl -ssL https://magic.modular.com | bash
+            curl -fsSL https://pixi.sh/install.sh | sh
             source $HOME/.bash_profile
-            magic run mojo package lightbug_http -o lightbug_http.mojopkg
+            pixi run mojo package lightbug_http -o lightbug_http.mojopkg
         
         - name: Upload package as artifact
           uses: actions/upload-artifact@v4

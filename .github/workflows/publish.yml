@@ -30,7 +30,7 @@ jobs:
           PREFIX_API_KEY: ${{ secrets.PREFIX_API_KEY }}
           CONDA_BLD_PATH: ${{ runner.workspace }}/.rattler
         run: |
-          curl -ssL https://magic.modular.com | bash
+          curl -fsSL https://pixi.sh/install.sh | sh
           source $HOME/.bash_profile
           
           # Temporary method to fetch the rattler binary.
@@ -40,5 +40,5 @@ jobs:
           chmod +x rattler-build
 
           # Build and push
-          magic run build --target-platform=$TARGET_PLATFORM
-          magic run publish
+          pixi run build --target-platform=$TARGET_PLATFORM
+          pixi run publish
