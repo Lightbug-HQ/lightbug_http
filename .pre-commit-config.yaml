@@ -9,7 +9,7 @@ repos:
     hooks:
       - id: mojo-format
         name: mojo-format
-        entry: magic run mojo format -l 120
+        entry: pixi run mojo format -l 120
         language: system
         files: '\.(mojo|🔥)$'
         stages: [pre-commit]

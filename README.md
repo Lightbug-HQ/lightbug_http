@@ -17,16 +17,16 @@
    <br/>
    [![Join our Discord][discord-shield]][discord-url]
    [![Contributors Welcome][contributors-shield]][contributors-url]
-
+   
 
   </p>
 </div>
 
 ## Overview
 
-Lightbug is a simple and sweet HTTP framework for [Mojo](https://www.modular.com/max/mojo) that builds on best practices from systems programming, such as the Golang [FastHTTP](https://github.com/valyala/fasthttp/) and Rust [may_minihttp](https://github.com/Xudong-Huang/may_minihttp/).
+Lightbug is a simple and sweet HTTP framework for Mojo that builds on best practice from systems programming, such as the Golang [FastHTTP](https://github.com/valyala/fasthttp/) and Rust [may_minihttp](https://github.com/Xudong-Huang/may_minihttp/). 
 
-This is not production-ready yet. We're aiming to keep up with new developments in Mojo, but it might take some time to get to a point when this is safe to use in real-world applications.
+This is not production ready yet. We're aiming to keep up with new developments in Mojo, but it might take some time to get to a point when this is safe to use in real-world applications.
 
 Lightbug currently has the following features:
  - [x] Pure Mojo! No Python dependencies. Everything is fully typed, with no `def` functions used
@@ -45,44 +45,39 @@ Lightbug currently has the following features:
 <!-- GETTING STARTED -->
 ## Getting Started
 
-The only hard dependency for `lightbug_http` is Mojo. To install Lightbug, we recommend using [pixi](https://pixi.sh/latest/). For other options and to see which systems support Mojo, see the [Mojo installation guide](https://docs.modular.com/mojo/manual/install).
+The only hard dependency for `lightbug_http` is Mojo. 
+Learn how to get up and running with Mojo on the [Modular website](https://www.modular.com/max/mojo).
+Once you have a Mojo project set up locally,
 
-1. If you don't have pixi, you can install it with this command:
+1. Add the `modular-community` channel to your `mojoproject.toml`, e.g:
 
-   ```bash
-   curl -fsSL https://pixi.sh/install.sh | sh
+   ```toml
+   [project]
+   channels = ["conda-forge", "https://conda.modular.com/max", "https://repo.prefix.dev/modular-community"]
    ```
 
-2. Navigate to the _parent_ directory where you want to create the project and execute:
+2. Add `lightbug_http` as a dependency:
 
-   ```bash
-    # Initialize project named lightbug: mkdir lightbug and add pixi.toml
-    pixi init lightbug \
-      -c conda-forge \
-      -c https://conda.modular.com/max \
-      -c https://repo.prefix.dev/mojo-community
-
-    cd lightbug
-
-    # Add dependency to pixi.toml
-    pixi add lightbug_http>=0.25.6
+   ```toml
+   [dependencies]
+   lightbug_http = ">=25.4.0"
    ```
 
-3. Run `pixi install` at the root of your project, where `pixi.toml` is located.
+3. Run `pixi install` at the root of your project, where `pixi.toml` is located
 4. Lightbug should now be installed as a dependency. You can import all the default imports at once, e.g:
 
     ```mojo
     from lightbug_http import *
     ```
 
-    or import individual structs and functions, e.g.
+    or import individual structs and functions, e.g. 
 
     ```mojo
     from lightbug_http.service import HTTPService
     from lightbug_http.http import HTTPRequest, HTTPResponse, OK, NotFound
     ```
 
-    There are also some default handlers you can play with:
+    there are some default handlers you can play with:
 
     ```mojo
     from lightbug_http.service import Printer # prints request details to console
@@ -98,7 +93,7 @@ The only hard dependency for `lightbug_http` is Mojo. To install Lightbug, we re
         ...
    ```
 
-   For example, to make a `Printer` service that prints some details about the request to the console:
+   For example, to make a `Printer` service that prints some details about the request to console:
 
    ```mojo
     from lightbug_http.http import HTTPRequest, HTTPResponse, OK
@@ -119,7 +114,7 @@ The only hard dependency for `lightbug_http` is Mojo. To install Lightbug, we re
             return OK(req.body_raw)
    ```
 
-6. Start a server listening on a port with your service like this:
+6. Start a server listening on a port with your service like so.
 
     ```mojo
     from lightbug_http import Welcome, Server
@@ -132,7 +127,7 @@ The only hard dependency for `lightbug_http` is Mojo. To install Lightbug, we re
 
 Feel free to change the settings in `listen_and_serve()` to serve on a particular host and port.
 
-Now send a request to `localhost:8080`. You should see some details about the request printed out to the console.
+Now send a request `localhost:8080`. You should see some details about the request printed out to the console.
 
 Congrats 🥳 You're using Lightbug!
 
@@ -160,14 +155,14 @@ struct ExampleRouter(HTTPService):
         return OK(body)
 ```
 
-We plan to add more advanced routing functionality in a future library called `lightbug_api`. See the [Roadmap](#roadmap) for more details.
+We plan to add more advanced routing functionality in a future library called `lightbug_api`, see [Roadmap](#roadmap) for more details.
 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ### Serving static files
 
-The default welcome screen shows an example of how to serve files like images or HTML using Lightbug. Mojo has built-in `open`, `read`, and `read_bytes` methods that you can use to read files and serve them on a route. Assuming you copy an HTML file and an image from the Lightbug repo into a `static` directory at the root of your repository:
+The default welcome screen shows an example of how to serve files like images or HTML using Lightbug. Mojo has built-in `open`, `read` and `read_bytes` methods that you can use to read files and serve them on a route. Assuming you copy an html file and image from the Lightbug repo into a `static` directory at the root of your repo:
 
 ```mojo
 from lightbug_http import *
@@ -195,7 +190,7 @@ struct Welcome(HTTPService):
 
 ### Using the client
 
-Create a file, e.g., `client.mojo`, with the following code. Run `pixi run mojo client.mojo` to execute the request to a given URL.
+Create a file, e.g `client.mojo` with the following code. Run `pixi run mojo client.mojo` to execute the request to a given URL.
 
 ```mojo
 from lightbug_http import *
@@ -228,10 +223,10 @@ fn main() -> None:
         print(e)
 ```
 
-A pure Mojo-based client is available by default. This client is also used internally for testing the server.
+Pure Mojo-based client is available by default. This client is also used internally for testing the server.
 
 ### UDP Support
-To get started with UDP, just use the `listen_udp` and `dial_udp` functions, along with `write_to` and `read_from` methods, as shown below.
+To get started with UDP, just use the `listen_udp` and `dial_udp` functions, along with `write_to` and `read_from` methods, like below.
 
 On the client:
 ```mojo
@@ -290,14 +285,14 @@ We're working on support for the following (contributors welcome!):
  - [ ] [Multiple simultaneous connections](https://github.com/saviorand/lightbug_http/issues/5), [parallelization and performance optimizations](https://github.com/saviorand/lightbug_http/issues/6)
  - [ ] [HTTP 2.0/3.0 support](https://github.com/saviorand/lightbug_http/issues/8)
 
-The plan is to reach a feature set similar to Python frameworks like [Starlette](https://github.com/encode/starlette), but with better performance.
+The plan is to get to a feature set similar to Python frameworks like [Starlette](https://github.com/encode/starlette), but with better performance.
 
-Our vision is to develop three libraries, with `lightbug_http` (this repo) as a starting point:
+Our vision is to develop three libraries, with `lightbug_http` (this repo) as a starting point: 
  - `lightbug_http` - Lightweight and simple HTTP framework, basic networking primitives
  - [`lightbug_api`](https://github.com/saviorand/lightbug_api) - Tools to make great APIs fast, with OpenAPI support and automated docs
  - `lightbug_web` - (release date TBD) Full-stack web framework for Mojo, similar to NextJS or SvelteKit
 
-The idea is to get to a point where the entire codebase of a simple modern web application can be written in Mojo.
+The idea is to get to a point where the entire codebase of a simple modern web application can be written in Mojo. 
 
 We don't make any promises, though -- this is just a vision, and whether we get there or not depends on many factors, including the support of the community.
 
@@ -329,7 +324,7 @@ Don't forget to give the project a star!
 <!-- LICENSE -->
 ## License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the MIT License. See `LICENSE.txt` for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
