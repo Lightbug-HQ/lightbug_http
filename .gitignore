@@ -8,9 +8,6 @@ install_id
 .pixi
 *.egg-info
 
-# magic environments
-.magic
-
 # Rattler
 output
 

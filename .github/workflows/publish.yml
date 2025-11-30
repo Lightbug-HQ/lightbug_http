@@ -1,44 +1,49 @@
 name: Build and publish
 
 on:
-  workflow_call:
-    secrets:
-      PREFIX_API_KEY:
-        required: true
+    workflow_call:
+        secrets:
+            PREFIX_API_KEY:
+                required: true
 
 jobs:
-  publish:
-    name: Publish package
-    strategy:
-      matrix:
-        include:
-          - { target: linux-64, os: ubuntu-latest }
-          - { target: osx-arm64, os: macos-14 } 
-      fail-fast: false
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 5
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+    publish:
+        name: Publish package
+        strategy:
+            matrix:
+                include:
+                    - { target: linux-64, os: ubuntu-latest }
+                    - { target: osx-arm64, os: macos-14 }
+            fail-fast: false
+        runs-on: ${{ matrix.os }}
+        timeout-minutes: 5
+        defaults:
+            run:
+                shell: bash
+        steps:
+            - name: Checkout repo
+              uses: actions/checkout@v4
 
-      - name: Build package for target platform
-        env:
-          TARGET_PLATFORM: ${{ matrix.target }}
-          PREFIX_API_KEY: ${{ secrets.PREFIX_API_KEY }}
-          CONDA_BLD_PATH: ${{ runner.workspace }}/.rattler
-        run: |
-          curl -fsSL https://pixi.sh/install.sh | sh
-          export PATH="$HOME/.pixi/bin:$PATH"
-          
-          # Temporary method to fetch the rattler binary.
-          RATTLER_BINARY="rattler-build-aarch64-apple-darwin"
-          if [[ $TARGET_PLATFORM == "linux-64" ]]; then RATTLER_BINARY="rattler-build-x86_64-unknown-linux-musl"; fi
-          curl -SL --progress-bar https://github.com/prefix-dev/rattler-build/releases/download/v0.33.2/${RATTLER_BINARY} -o rattler-build
-          chmod +x rattler-build
+            - name: Set up Pixi
+              uses: prefix-dev/setup-pixi@main
+              with:
+                  pixi-version: latest
+                  cache: true
 
-          # Build and push
-          pixi run build --target-platform=$TARGET_PLATFORM
-          pixi run publish
+            - name: Build package for target platform
+              env:
+                  TARGET_PLATFORM: ${{ matrix.target }}
+                  PREFIX_API_KEY: ${{ secrets.PREFIX_API_KEY }}
+                  CONDA_BLD_PATH: ${{ runner.workspace }}/.rattler
+              run: |
+                  # Temporary method to fetch the rattler binary.
+                  RATTLER_BINARY="rattler-build-aarch64-apple-darwin"
+                  if [[ "$TARGET_PLATFORM" == "linux-64" ]]; then
+                    RATTLER_BINARY="rattler-build-x86_64-unknown-linux-musl"
+                  fi
+                  curl -SL --progress-bar "https://github.com/prefix-dev/rattler-build/releases/download/v0.33.2/${RATTLER_BINARY}" -o rattler-build
+                  chmod +x rattler-build
+
+                  # Build and push
+                  pixi run build --target-platform="$TARGET_PLATFORM"
+                  pixi run publish
