@@ -59,7 +59,7 @@ struct _OwningListIter[
             return self.index
 
 
-struct OwningList[T: Movable](Movable, Sized, Boolable):
+struct OwningList[T: Movable](Boolable, Movable, Sized):
     """The `List` type is a dynamically-allocated list.
 
     It supports pushing and popping from the back resizing the underlying

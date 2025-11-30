@@ -502,7 +502,9 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
             ip = addrinfo_unix().get_ip_address(address)
 
         var addr = sockaddr_in(address_family=Int(address_family.value), port=port, binary_ip=ip.s_addr)
-        bytes_sent = sendto(self.fd, src.unsafe_ptr(), UInt(len(src)), 0, LegacyUnsafePointer(to=addr).bitcast[sockaddr]())
+        bytes_sent = sendto(
+            self.fd, src.unsafe_ptr(), UInt(len(src)), 0, LegacyUnsafePointer(to=addr).bitcast[sockaddr]()
+        )
 
         return bytes_sent
 

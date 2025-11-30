@@ -139,7 +139,7 @@ struct Server(Movable):
         var max_request_body_size = self.max_request_body_size()
         if max_request_body_size <= 0:
             max_request_body_size = default_max_request_body_size
-        
+
         var max_request_uri_length = self.max_request_uri_length()
         if max_request_uri_length <= 0:
             max_request_uri_length = default_max_request_uri_length
@@ -178,7 +178,9 @@ struct Server(Movable):
 
             var request: HTTPRequest
             try:
-                request = HTTPRequest.from_bytes(self.address(), max_request_body_size, max_request_uri_length, request_buffer)
+                request = HTTPRequest.from_bytes(
+                    self.address(), max_request_body_size, max_request_uri_length, request_buffer
+                )
                 var response: HTTPResponse
                 var close_connection = (not self.tcp_keep_alive) or request.connection_close()
                 try:

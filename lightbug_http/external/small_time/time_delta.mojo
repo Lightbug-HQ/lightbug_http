@@ -1,11 +1,12 @@
 # small_time library, courtesy @thatstoasty , 2025
-# https://github.com/thatstoasty/small-time/ 
+# https://github.com/thatstoasty/small-time/
 alias SECONDS_OF_DAY = 24 * 3600
 
 
 @register_passable("trivial")
 struct TimeDelta(Stringable):
     """Time delta."""
+
     var days: Int
     """Days."""
     var seconds: Int
@@ -69,7 +70,7 @@ struct TimeDelta(Stringable):
 
     fn __str__(self) -> String:
         """String representation of the duration.
-        
+
         Returns:
             String representation of the duration.
         """
@@ -89,7 +90,7 @@ struct TimeDelta(Stringable):
 
     fn total_seconds(self) -> Float64:
         """Total seconds in the duration.
-        
+
         Returns:
             Total seconds in the duration.
         """
@@ -100,7 +101,7 @@ struct TimeDelta(Stringable):
 
         Args:
             other: Time delta to add.
-        
+
         Returns:
             Sum of the two time deltas.
         """
@@ -115,7 +116,7 @@ struct TimeDelta(Stringable):
 
         Args:
             other: Time delta to add.
-        
+
         Returns:
             Sum of the two time deltas.
         """
@@ -126,7 +127,7 @@ struct TimeDelta(Stringable):
 
         Args:
             other: Time delta to subtract.
-        
+
         Returns:
             Difference of the two time deltas.
         """
@@ -141,7 +142,7 @@ struct TimeDelta(Stringable):
 
         Args:
             other: Time delta to subtract.
-        
+
         Returns:
             Difference of the two time deltas.
         """
@@ -198,7 +199,7 @@ struct TimeDelta(Stringable):
 
         Args:
             other: Scalar to multiply by.
-        
+
         Returns:
             Scaled time delta.
         """
@@ -217,7 +218,7 @@ struct TimeDelta(Stringable):
 
         Args:
             other: Time delta to divide by.
-        
+
         Returns:
             Remainder of the division of two time deltas.
         """
@@ -228,7 +229,7 @@ struct TimeDelta(Stringable):
 
         Args:
             other: Time delta to compare with.
-        
+
         Returns:
             True if the time deltas are equal, False otherwise.
         """
@@ -239,7 +240,7 @@ struct TimeDelta(Stringable):
 
         Args:
             other: Time delta to compare with.
-        
+
         Returns:
             True if the time delta is less than or equal to the other time delta, False otherwise.
         """
@@ -257,7 +258,7 @@ struct TimeDelta(Stringable):
 
         Args:
             other: Time delta to compare with.
-        
+
         Returns:
             True if the time delta is less than the other time delta, False otherwise.
         """
@@ -275,7 +276,7 @@ struct TimeDelta(Stringable):
 
         Args:
             other: Time delta to compare with.
-        
+
         Returns:
             True if the time delta is greater than or equal to the other time delta, False otherwise.
         """
@@ -286,7 +287,7 @@ struct TimeDelta(Stringable):
 
         Args:
             other: Time delta to compare with.
-        
+
         Returns:
             True if the time delta is greater than the other time delta, False otherwise.
         """

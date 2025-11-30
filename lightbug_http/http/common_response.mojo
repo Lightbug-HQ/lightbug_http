@@ -15,9 +15,7 @@ fn OK(body: Bytes, content_type: String = "text/plain") -> HTTPResponse:
     )
 
 
-fn OK(
-    body: Bytes, content_type: String, content_encoding: String
-) -> HTTPResponse:
+fn OK(body: Bytes, content_type: String, content_encoding: String) -> HTTPResponse:
     return HTTPResponse(
         headers=Headers(
             Header(HeaderKey.CONTENT_TYPE, content_type),
@@ -27,9 +25,7 @@ fn OK(
     )
 
 
-fn SeeOther(
-    location: String, content_type: String, var cookies: List[Cookie] = []
-) -> HTTPResponse:
+fn SeeOther(location: String, content_type: String, var cookies: List[Cookie] = []) -> HTTPResponse:
     return HTTPResponse(
         bytes("See Other"),
         cookies=ResponseCookieJar(cookies^),
@@ -59,12 +55,13 @@ fn NotFound(path: String) -> HTTPResponse:
         status_text="Not Found",
     )
 
+
 fn URITooLong() -> HTTPResponse:
     return HTTPResponse(
         bytes("URI Too Long"),
         headers=Headers(Header(HeaderKey.CONTENT_TYPE, "text/plain")),
         status_code=414,
-        status_text="URI Too Long"
+        status_text="URI Too Long",
     )
 
 

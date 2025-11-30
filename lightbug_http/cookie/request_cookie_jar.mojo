@@ -7,7 +7,7 @@ from lightbug_http.io.bytes import ByteReader, ByteWriter, is_newline, is_space
 
 
 @fieldwise_init
-struct RequestCookieJar(Writable, Stringable, Copyable, Movable):
+struct RequestCookieJar(Copyable, Movable, Stringable, Writable):
     var _inner: Dict[String, String]
 
     fn __init__(out self):
