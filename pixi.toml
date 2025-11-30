@@ -12,11 +12,11 @@ publish = { cmd = "bash scripts/publish.sh", env = { PREFIX_API_KEY = "$PREFIX_A
 format = { cmd = "mojo format -l 120 lightbug_http" }
 
 [feature.unit-tests.tasks]
-test = { cmd = "mojo test -I . tests/lightbug_http" }
+test = { cmd = "bash scripts/mojo_tests.sh tests/lightbug_http" }
 
 [feature.integration-tests.tasks]
 integration_tests_py = { cmd = "bash scripts/integration_test.sh" }
-integration_tests_external = { cmd = "mojo test -I . tests/integration" }
+integration_tests_external = { cmd = "bash scripts/mojo_tests.sh tests/integration" }
 integration_tests_udp = { cmd = "bash scripts/udp_test.sh" }
 
 [feature.bench.tasks]
