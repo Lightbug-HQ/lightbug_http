@@ -28,3 +28,6 @@ fn test_string_to_bytes() raises:
 
     for c in cases.items():
         testing.assert_equal(to_string(Bytes(c.key.as_bytes())), to_string(c.copy().value.copy()))
+
+def main():
+    testing.TestSuite.discover_tests[__functions_in_module()]().run()

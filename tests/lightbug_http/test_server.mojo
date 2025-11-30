@@ -1,4 +1,4 @@
-from testing import assert_equal
+from testing import assert_equal, TestSuite
 from lightbug_http.server import Server
 
 
@@ -12,3 +12,7 @@ from lightbug_http.server import Server
 
 #     server = Server(max_concurrent_connections=10)
 #     assert_equal(server.get_concurrency(), 10)
+
+
+def main():
+    TestSuite.discover_tests[__functions_in_module()]().run()

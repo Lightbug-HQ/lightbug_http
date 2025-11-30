@@ -29,10 +29,10 @@ alias default_tcp_keep_alive = Duration(15 * 1000 * 1000 * 1000)  # 15 seconds
 
 
 trait Connection(Movable):
-    fn read(self, mut buf: Bytes) raises -> Int:
+    fn read(self, mut buf: Bytes) raises -> UInt:
         ...
 
-    fn write(self, buf: Span[Byte]) raises -> Int:
+    fn write(self, buf: Span[Byte]) raises -> UInt:
         ...
 
     fn close(mut self) raises:
@@ -88,8 +88,8 @@ struct ListenConfig:
         self._keep_alive = keep_alive
 
     fn listen[network: NetworkType = NetworkType.tcp4](mut self, address: String) raises -> NoTLSListener:
-        var local = parse_address[__origin_of(address)](network, address)
-        var addr = TCPAddr(String(local[0]), local[1])
+        var local = parse_address[origin_of(address)](network, address)
+        var addr = TCPAddr(ip=String(local[0]), port=local[1])
         var socket: Socket[TCPAddr]
         try:
             socket = Socket[TCPAddr]()
@@ -148,7 +148,7 @@ struct TCPConnection(Connection):
     fn __moveinit__(out self, deinit existing: Self):
         self.socket = existing.socket^
 
-    fn read(self, mut buf: Bytes) raises -> Int:
+    fn read(self, mut buf: Bytes) raises -> UInt:
         try:
             return self.socket.receive(buf)
         except e:
@@ -158,7 +158,7 @@ struct TCPConnection(Connection):
                 logger.error(e)
                 raise Error("TCPConnection.read: Failed to read data from connection.")
 
-    fn write(self, buf: Span[Byte]) raises -> Int:
+    fn write(self, buf: Span[Byte]) raises -> UInt:
         try:
             return self.socket.send(buf)
         except e:
@@ -194,7 +194,7 @@ struct UDPConnection[network: NetworkType]:
     fn __moveinit__(out self, deinit existing: Self):
         self.socket = existing.socket^
 
-    fn read_from(mut self, size: Int = default_buffer_size) raises -> (Bytes, String, UInt16):
+    fn read_from(mut self, size: Int = default_buffer_size) raises -> Tuple[Bytes, String, UInt16]:
         """Reads data from the underlying file descriptor.
 
         Args:
@@ -208,7 +208,7 @@ struct UDPConnection[network: NetworkType]:
         """
         return self.socket.receive_from(size)
 
-    fn read_from(mut self, mut dest: Bytes) raises -> (UInt, String, UInt16):
+    fn read_from(mut self, mut dest: Bytes) raises -> Tuple[UInt, String, UInt16]:
         """Reads data from the underlying file descriptor.
 
         Args:
@@ -222,7 +222,7 @@ struct UDPConnection[network: NetworkType]:
         """
         return self.socket.receive_from(dest)
 
-    fn write_to(mut self, src: Span[Byte], address: UDPAddr) raises -> Int:
+    fn write_to(mut self, src: Span[Byte], address: UDPAddr) raises -> UInt:
         """Writes data to the underlying file descriptor.
 
         Args:
@@ -237,7 +237,7 @@ struct UDPConnection[network: NetworkType]:
         """
         return self.socket.send_to(src, address.ip, address.port)
 
-    fn write_to(mut self, src: Span[Byte], host: String, port: UInt16) raises -> Int:
+    fn write_to(mut self, src: Span[Byte], host: String, port: UInt16) raises -> UInt:
         """Writes data to the underlying file descriptor.
 
         Args:

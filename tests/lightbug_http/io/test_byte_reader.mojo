@@ -72,3 +72,6 @@ def test_skip_carriage_return():
 def test_consume():
     var r = ByteReader(example.as_bytes())
     testing.assert_equal(to_string(r^.consume()), to_string(Bytes(72, 101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 33)))
+
+def main():
+    testing.TestSuite.discover_tests[__functions_in_module()]().run()

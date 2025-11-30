@@ -2,7 +2,7 @@ from memory import stack_allocation
 from utils import StaticTuple
 from sys import size_of, external_call
 from sys.info import CompilationTarget
-from memory import Pointer, UnsafePointer
+from memory import Pointer, LegacyUnsafePointer
 from lightbug_http._libc import (
     socket,
     connect,
@@ -324,7 +324,7 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         var local = self.get_sock_name()
         self._local_address = AddrType(local[0], local[1])
 
-    fn get_sock_name(self) raises -> (String, UInt16):
+    fn get_sock_name(self) raises -> Tuple[String, UInt16]:
         """Return the address of the socket.
 
         Returns:
@@ -353,7 +353,7 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
             binary_port_to_int(addr_in.sin_port)
         )
 
-    fn get_peer_name(self) raises -> (String, UInt16):
+    fn get_peer_name(self) raises -> Tuple[String, UInt16]:
         """Return the address of the peer connected to the socket.
 
         Returns:
@@ -440,9 +440,9 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         var remote = self.get_peer_name()
         self._remote_address = AddrType(remote[0], remote[1])
 
-    fn send(self, buffer: Span[Byte]) raises -> Int:
+    fn send(self, buffer: Span[Byte]) raises -> UInt:
         try:
-            return send(self.fd, buffer.unsafe_ptr(), len(buffer), 0)
+            return send(self.fd, buffer.unsafe_ptr(), UInt(len(buffer)), 0)
         except e:
             logger.error("Socket.send: Failed to write data to connection.")
             raise e
@@ -465,7 +465,7 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
             if attempts > max_attempts:
                 raise Error("Failed to send message after " + String(max_attempts) + " attempts.")
 
-            var sent: Int
+            var sent: UInt
             try:
                 sent = self.send(src[total_bytes_sent:])
             except e:
@@ -476,7 +476,7 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
                     + "bytes before failing."
                 )
 
-            total_bytes_sent += sent
+            total_bytes_sent += Int(sent)
             attempts += 1
 
     fn send_to(mut self, src: Span[Byte], address: String, port: UInt16) raises -> UInt:
@@ -502,7 +502,7 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
             ip = addrinfo_unix().get_ip_address(address)
 
         var addr = sockaddr_in(address_family=Int(address_family.value), port=port, binary_ip=ip.s_addr)
-        bytes_sent = sendto(self.fd, src.unsafe_ptr(), len(src), 0, UnsafePointer(to=addr).bitcast[sockaddr]())
+        bytes_sent = sendto(self.fd, src.unsafe_ptr(), UInt(len(src)), 0, LegacyUnsafePointer(to=addr).bitcast[sockaddr]())
 
         return bytes_sent
 
@@ -519,16 +519,16 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
             Error: If reading data from the socket fails.
             EOF: If 0 bytes are received, return EOF.
         """
-        var bytes_received: Int
+        var bytes_received: UInt
         var size = len(buffer)
         try:
             bytes_received = recv(
                 self.fd,
                 buffer.unsafe_ptr().offset(size),
-                buffer.capacity - len(buffer),
+                UInt(buffer.capacity - len(buffer)),
                 0,
             )
-            buffer._len += bytes_received
+            buffer._len += Int(bytes_received)
         except e:
             logger.error(e)
             raise Error("Socket.receive: Failed to read data from connection.")
@@ -566,7 +566,7 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         """
         return self._receive(buffer)
 
-    fn _receive_from(self, mut buffer: Bytes) raises -> (UInt, String, UInt16):
+    fn _receive_from(self, mut buffer: Bytes) raises -> Tuple[UInt, String, UInt16]:
         """Receive data from the socket into the buffer.
 
         Args:
@@ -584,9 +584,9 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         try:
             var size = len(buffer)
             bytes_received = recvfrom(
-                self.fd, buffer.unsafe_ptr().offset(size), buffer.capacity - len(buffer), 0, remote_address
+                self.fd, buffer.unsafe_ptr().offset(size), UInt(buffer.capacity - len(buffer)), 0, remote_address
             )
-            buffer._len += bytes_received
+            buffer._len += Int(bytes_received)
         except e:
             logger.error(e)
             raise Error("Socket._receive_from: Failed to read data from connection.")
@@ -601,7 +601,7 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
             UInt16(binary_port_to_int(addr_in.sin_port)),
         )
 
-    fn receive_from(mut self, size: Int = default_buffer_size) raises -> (List[Byte], String, UInt16):
+    fn receive_from(mut self, size: Int = default_buffer_size) raises -> Tuple[List[Byte], String, UInt16]:
         """Receive data from the socket into the buffer dest.
 
         Args:
@@ -617,7 +617,7 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         _, host, port = self._receive_from(buffer)
         return buffer^, host, port
 
-    fn receive_from(mut self, mut dest: List[Byte]) raises -> (UInt, String, UInt16):
+    fn receive_from(mut self, mut dest: List[Byte]) raises -> Tuple[UInt, String, UInt16]:
         """Receive data from the socket into the buffer dest.
 
         Args:

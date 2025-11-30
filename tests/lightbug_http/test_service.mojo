@@ -20,3 +20,6 @@ def test_tech_empower_router():
 
 def test_counter():
     pass
+
+def main():
+    testing.TestSuite.discover_tests[__functions_in_module()]().run()

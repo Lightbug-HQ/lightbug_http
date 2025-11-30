@@ -24,11 +24,11 @@ struct Server(Movable):
 
     var name: String
     var _address: String
-    var max_concurrent_connections: UInt
-    var max_requests_per_connection: UInt
+    var max_concurrent_connections: Int
+    var max_requests_per_connection: Int
 
-    var _max_request_body_size: UInt
-    var _max_request_uri_length: UInt
+    var _max_request_body_size: Int
+    var _max_request_uri_length: Int
     var tcp_keep_alive: Bool
 
     fn __init__(
@@ -36,10 +36,10 @@ struct Server(Movable):
         error_handler: ErrorHandler = ErrorHandler(),
         name: String = "lightbug_http",
         address: String = "127.0.0.1",
-        max_concurrent_connections: UInt = 1000,
-        max_requests_per_connection: UInt = 0,
-        max_request_body_size: UInt = default_max_request_body_size,
-        max_request_uri_length: UInt = default_max_request_uri_length,
+        max_concurrent_connections: Int = 1000,
+        max_requests_per_connection: Int = 0,
+        max_request_body_size: Int = default_max_request_body_size,
+        max_request_uri_length: Int = default_max_request_uri_length,
         tcp_keep_alive: Bool = False,
     ) raises:
         self.error_handler = error_handler.copy()
@@ -70,19 +70,19 @@ struct Server(Movable):
     fn set_address(mut self, own_address: String) -> None:
         self._address = own_address
 
-    fn max_request_body_size(self) -> UInt:
+    fn max_request_body_size(self) -> Int:
         return self._max_request_body_size
 
-    fn set_max_request_body_size(mut self, size: UInt) -> None:
+    fn set_max_request_body_size(mut self, size: Int) -> None:
         self._max_request_body_size = size
 
-    fn max_request_uri_length(self) -> UInt:
+    fn max_request_uri_length(self) -> Int:
         return self._max_request_uri_length
 
-    fn set_max_request_uri_length(mut self, length: UInt) -> None:
+    fn set_max_request_uri_length(mut self, length: Int) -> None:
         self._max_request_uri_length = length
 
-    fn get_concurrency(self) -> UInt:
+    fn get_concurrency(self) -> Int:
         """Retrieve the concurrency level which is either
         the configured `max_concurrent_connections` or the `DefaultConcurrency`.
 

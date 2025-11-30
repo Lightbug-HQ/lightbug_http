@@ -78,3 +78,7 @@ def test_http_version_parse():
     testing.assert_equal(v1._v, 1)
     var v2 = HttpVersion("HTTP/2")
     testing.assert_equal(v2._v, 2)
+
+
+def main():
+    testing.TestSuite.discover_tests[__functions_in_module()]().run()

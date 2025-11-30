@@ -91,3 +91,6 @@ fn test_mojo_client_lightbug_external_req_200() raises:
     except e:
         print(e)
         raise
+
+fn main() raises:
+    testing.TestSuite.discover_tests[__functions_in_module()]().run()

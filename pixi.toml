@@ -1,10 +1,10 @@
-[project]
+[workspace]
 authors = ["saviorand"]
 channels = ["conda-forge", "https://conda.modular.com/max", "https://repo.prefix.dev/modular-community"]
 description = "Simple and fast HTTP framework for Mojo!"
 name = "lightbug_http"
 platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
-version = "0.25.6"
+version = "0.25.7"
 
 [tasks]
 build = { cmd = "rattler-build build --recipe recipes -c https://conda.modular.com/max -c conda-forge --skip-existing=all", env = {MODULAR_MOJO_IMPORT_PATH = "$CONDA_PREFIX/lib/mojo"} }
@@ -12,11 +12,11 @@ publish = { cmd = "bash scripts/publish.sh", env = { PREFIX_API_KEY = "$PREFIX_A
 format = { cmd = "mojo format -l 120 lightbug_http" }
 
 [feature.unit-tests.tasks]
-test = { cmd = "mojo test -I . tests/lightbug_http" }
+test = { cmd = "bash scripts/mojo_tests.sh tests/lightbug_http" }
 
 [feature.integration-tests.tasks]
 integration_tests_py = { cmd = "bash scripts/integration_test.sh" }
-integration_tests_external = { cmd = "mojo test -I . tests/integration" }
+integration_tests_external = { cmd = "bash scripts/mojo_tests.sh tests/integration" }
 integration_tests_udp = { cmd = "bash scripts/udp_test.sh" }
 
 [feature.bench.tasks]
@@ -24,7 +24,8 @@ bench = { cmd = "mojo -I . benchmark/bench.mojo" }
 bench_server = { cmd = "bash scripts/bench_server.sh" }
 
 [dependencies]
-mojo = ">=0.25.6,<0.26"
+mojo = ">=0.25.7,<0.26"
+rattler-build = ">=0.27.0,<1"
 
 [feature.integration-tests.dependencies]
 requests = ">=2.32.3,<3"

@@ -2,7 +2,7 @@
 # https://github.com/thatstoasty/small-time/
 from sys import external_call
 from sys.ffi import c_uchar
-from memory import UnsafePointer, Pointer, stack_allocation
+from memory import LegacyUnsafePointer, Pointer, stack_allocation
 
 
 @register_passable("trivial")
@@ -94,7 +94,7 @@ fn localtime(var tv_sec: Int) -> Tm:
     Returns:
         Broken down local time.
     """
-    return external_call["localtime", UnsafePointer[Tm]](UnsafePointer(to=tv_sec)).take_pointee()
+    return external_call["localtime", LegacyUnsafePointer[Tm]](LegacyUnsafePointer(to=tv_sec)).take_pointee()
 
 
 fn strptime(time_str: String, time_format: String) -> Tm:
@@ -108,7 +108,7 @@ fn strptime(time_str: String, time_format: String) -> Tm:
         Broken down time.
     """
     var tm = stack_allocation[1, Tm]()
-    _ = external_call["strptime", NoneType, UnsafePointer[c_uchar], UnsafePointer[c_uchar], UnsafePointer[Tm]](
+    _ = external_call["strptime", NoneType, LegacyUnsafePointer[c_uchar], LegacyUnsafePointer[c_uchar], LegacyUnsafePointer[Tm]](
         time_str.unsafe_ptr(), time_format.unsafe_ptr(), tm
     )
     return tm.take_pointee()
@@ -123,4 +123,4 @@ fn gmtime(var tv_sec: Int) -> Tm:
     Returns:
         Broken down UTC time.
     """
-    return external_call["gmtime", UnsafePointer[Tm]](Pointer(to=tv_sec)).take_pointee()
+    return external_call["gmtime", LegacyUnsafePointer[Tm]](Pointer(to=tv_sec)).take_pointee()
