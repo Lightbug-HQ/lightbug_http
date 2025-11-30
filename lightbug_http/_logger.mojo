@@ -47,7 +47,7 @@ mojo ... -D LB_LOG_LEVEL=DEBUG
 
 
 @fieldwise_init
-struct Logger[level: Int](Movable, ImplicitlyCopyable):
+struct Logger[level: Int](ImplicitlyCopyable, Movable):
     fn _log_message[event_level: Int](self, message: String):
         @parameter
         if level >= event_level:

@@ -108,9 +108,9 @@ fn strptime(time_str: String, time_format: String) -> Tm:
         Broken down time.
     """
     var tm = stack_allocation[1, Tm]()
-    _ = external_call["strptime", NoneType, LegacyUnsafePointer[c_uchar], LegacyUnsafePointer[c_uchar], LegacyUnsafePointer[Tm]](
-        time_str.unsafe_ptr(), time_format.unsafe_ptr(), tm
-    )
+    _ = external_call[
+        "strptime", NoneType, LegacyUnsafePointer[c_uchar], LegacyUnsafePointer[c_uchar], LegacyUnsafePointer[Tm]
+    ](time_str.unsafe_ptr(), time_format.unsafe_ptr(), tm)
     return tm.take_pointee()
 
 

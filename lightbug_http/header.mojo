@@ -21,7 +21,7 @@ struct HeaderKey:
 
 
 @fieldwise_init
-struct Header(Writable, Stringable, Copyable, Movable):
+struct Header(Copyable, Movable, Stringable, Writable):
     var key: String
     var value: String
 
@@ -38,7 +38,7 @@ fn write_header[T: Writer](mut writer: T, key: String, value: String):
 
 
 @fieldwise_init
-struct Headers(Writable, Stringable, Copyable, Movable):
+struct Headers(Copyable, Movable, Stringable, Writable):
     """Represents the header key/values in an http request/response.
 
     Header keys are normalized to lowercase

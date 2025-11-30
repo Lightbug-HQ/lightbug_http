@@ -31,7 +31,7 @@ struct RequestMethod:
 
 
 @fieldwise_init
-struct HTTPRequest(Writable, Stringable, Encodable, Movable, Copyable):
+struct HTTPRequest(Copyable, Encodable, Movable, Stringable, Writable):
     var headers: Headers
     var cookies: RequestCookieJar
     var uri: URI
@@ -192,7 +192,7 @@ struct HTTPRequest(Writable, Stringable, Encodable, Movable, Copyable):
 
     fn __str__(self) -> String:
         return String.write(self)
-    
+
     fn __eq__(self, other: HTTPRequest) -> Bool:
         return (
             self.method == other.method
@@ -202,10 +202,9 @@ struct HTTPRequest(Writable, Stringable, Encodable, Movable, Copyable):
             and self.cookies == other.cookies
             and self.body_raw.__str__() == other.body_raw.__str__()
         )
-    
+
     fn __isnot__(self, other: HTTPRequest) -> Bool:
         return not self.__eq__(other)
 
     fn __isnot__(self, other: None) -> Bool:
         return self.get_body() or self.uri.request_uri
-

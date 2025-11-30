@@ -26,7 +26,7 @@ struct StatusCode:
 
 
 @fieldwise_init
-struct HTTPResponse(Writable, Stringable, Encodable, Sized, Movable):
+struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
     var headers: Headers
     var cookies: ResponseCookieJar
     var body_raw: Bytes

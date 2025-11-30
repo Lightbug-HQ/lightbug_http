@@ -1090,9 +1090,7 @@ fn getpeername(file_descriptor: c_int) raises -> sockaddr_in:
     return remote_address.bitcast[sockaddr_in]().take_pointee()
 
 
-fn _bind[
-    origin: ImmutOrigin
-](socket: c_int, address: Pointer[sockaddr_in, origin], address_len: socklen_t) -> c_int:
+fn _bind[origin: ImmutOrigin](socket: c_int, address: Pointer[sockaddr_in, origin], address_len: socklen_t) -> c_int:
     """Libc POSIX `bind` function. Assigns the address specified by `address` to the socket referred to by
        the file descriptor `socket`.
 
@@ -1356,9 +1354,7 @@ fn accept(socket: c_int) raises -> c_int:
     return result
 
 
-fn _connect[
-    origin: ImmutOrigin
-](socket: c_int, address: Pointer[sockaddr_in, origin], address_len: socklen_t) -> c_int:
+fn _connect[origin: ImmutOrigin](socket: c_int, address: Pointer[sockaddr_in, origin], address_len: socklen_t) -> c_int:
     """Libc POSIX `connect` function.
 
     Args: socket: A File Descriptor.
@@ -1664,9 +1660,10 @@ fn recvfrom(
         elif errno == ENOMEM:
             raise "ReceiveError: Insufficient memory was available to fulfill the request."
         else:
-            raise Error("ReceiveError: An error occurred while attempting to receive data from the socket. Error code: " + String(
-                errno
-            ))
+            raise Error(
+                "ReceiveError: An error occurred while attempting to receive data from the socket. Error code: "
+                + String(errno)
+            )
 
     return UInt(result)
 
@@ -1694,7 +1691,9 @@ fn _send(socket: c_int, buffer: LegacyUnsafePointer[c_void, mut=False], length: 
     return external_call["send", c_ssize_t](socket, buffer, length, flags)
 
 
-fn send(socket: c_int, buffer: LegacyUnsafePointer[c_void, mut=False], length: c_size_t, flags: c_int) raises -> c_size_t:
+fn send(
+    socket: c_int, buffer: LegacyUnsafePointer[c_void, mut=False], length: c_size_t, flags: c_int
+) raises -> c_size_t:
     """Libc POSIX `send` function.
 
     Args:
@@ -1943,9 +1942,10 @@ fn sendto(
         elif errno == ENAMETOOLONG:
             raise "SendToError (ENAMETOOLONG): The length of a pathname exceeds `PATH_MAX`, or pathname resolution of a symbolic link produced an intermediate result with a length that exceeds `PATH_MAX`."
         else:
-            raise Error("SendToError: An error occurred while attempting to send data to the socket. Error code: " + String(
-                errno
-            ))
+            raise Error(
+                "SendToError: An error occurred while attempting to send data to the socket. Error code: "
+                + String(errno)
+            )
 
     return UInt(result)
 

@@ -35,7 +35,7 @@ struct AddressConstants:
     alias EMPTY = ""
 
 
-trait Addr(Stringable, Representable, Writable, EqualityComparable, Movable, Copyable):
+trait Addr(Copyable, EqualityComparable, Movable, Representable, Stringable, Writable):
     alias _type: StaticString
 
     fn __init__(out self):
@@ -70,7 +70,7 @@ trait AnAddrInfo:
 
 
 @fieldwise_init
-struct NetworkType(EqualityComparable, Movable, ImplicitlyCopyable):
+struct NetworkType(EqualityComparable, ImplicitlyCopyable, Movable):
     var value: String
 
     alias empty = NetworkType("")
@@ -438,7 +438,9 @@ fn parse_port[origin: ImmutOrigin](port_str: StringSlice[origin]) raises -> UInt
     return UInt16(port)
 
 
-fn parse_address[origin: ImmutOrigin](network: NetworkType, address: StringSlice[origin]) raises -> Tuple[String, UInt16]:
+fn parse_address[
+    origin: ImmutOrigin
+](network: NetworkType, address: StringSlice[origin]) raises -> Tuple[String, UInt16]:
     """Parse an address string into a host and port.
 
     Args:
@@ -495,6 +497,7 @@ fn parse_address[origin: ImmutOrigin](network: NetworkType, address: StringSlice
 
     return String(host), port
 
+
 # TODO: Support IPv6 long form.
 fn join_host_port(host: String, port: String) -> String:
     if host.find(":") != -1:  # must be IPv6 literal
@@ -546,7 +549,11 @@ fn binary_ip_to_string[address_family: AddressFamily](var ip_address: UInt32) ra
 
 
 fn _getaddrinfo[
-    T: AnAddrInfo, node_origin: ImmutOrigin, serv_origin: ImmutOrigin, hints_origin: ImmutOrigin, result_origin: MutOrigin, //
+    T: AnAddrInfo,
+    node_origin: ImmutOrigin,
+    serv_origin: ImmutOrigin,
+    hints_origin: ImmutOrigin,
+    result_origin: MutOrigin, //,
 ](
     nodename: UnsafePointer[mut=False, c_char, node_origin],
     servname: UnsafePointer[mut=False, c_char, serv_origin],

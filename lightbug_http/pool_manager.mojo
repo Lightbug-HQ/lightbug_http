@@ -5,8 +5,9 @@ from lightbug_http._logger import logger
 from lightbug_http._owning_list import OwningList
 from lightbug_http.uri import Scheme
 
+
 @fieldwise_init
-struct PoolKey(Hashable, KeyElement, Writable, Stringable, ImplicitlyCopyable):
+struct PoolKey(Hashable, ImplicitlyCopyable, KeyElement, Stringable, Writable):
     var host: String
     var port: UInt16
     var scheme: Scheme
