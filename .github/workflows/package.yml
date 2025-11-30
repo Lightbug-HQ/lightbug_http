@@ -11,14 +11,13 @@ jobs:
             - name: Checkout code
               uses: actions/checkout@v4
             - name: Set up Pixi
-              uses: prefix-dev/setup-pixi@v0.8.1
+              uses: prefix-dev/setup-pixi@main
               with:
-                  pixi-version: 0.59.0
+                  pixi-version: latest
                   cache: true
             - name: Run the package command
               run: |
                   pixi run mojo package lightbug_http -o lightbug_http.mojopkg
-
             - name: Upload package as artifact
               uses: actions/upload-artifact@v4
               with:
