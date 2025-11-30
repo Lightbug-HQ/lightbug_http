@@ -1,23 +1,25 @@
 name: Create package
 
 on:
-  workflow_call:
+    workflow_call:
 
 jobs:
-  package:
-    name: Package
-    runs-on: ubuntu-latest
-    steps:
-        - name: Checkout code
-          uses: actions/checkout@v4
-        - name: Run the package command
-          run: |
-            curl -ssL https://magic.modular.com | bash
-            source $HOME/.bash_profile
-            magic run mojo package lightbug_http -o lightbug_http.mojopkg
-        
-        - name: Upload package as artifact
-          uses: actions/upload-artifact@v4
-          with:
-            name: lightbug_http-package
-            path: lightbug_http.mojopkg
+    package:
+        name: Package
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+            - name: Set up Pixi
+              uses: prefix-dev/setup-pixi@main
+              with:
+                  pixi-version: latest
+                  cache: true
+            - name: Run the package command
+              run: |
+                  pixi run mojo package lightbug_http -o lightbug_http.mojopkg
+            - name: Upload package as artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: lightbug_http-package
+                  path: lightbug_http.mojopkg

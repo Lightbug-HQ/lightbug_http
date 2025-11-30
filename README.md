@@ -63,7 +63,7 @@ Once you have a Mojo project set up locally,
    lightbug_http = ">=25.4.0"
    ```
 
-3. Run `magic install` at the root of your project, where `mojoproject.toml` is located
+3. Run `pixi install` at the root of your project, where `pixi.toml` is located
 4. Lightbug should now be installed as a dependency. You can import all the default imports at once, e.g:
 
     ```mojo
@@ -190,7 +190,7 @@ struct Welcome(HTTPService):
 
 ### Using the client
 
-Create a file, e.g `client.mojo` with the following code. Run `magic run mojo client.mojo` to execute the request to a given URL.
+Create a file, e.g `client.mojo` with the following code. Run `pixi run mojo client.mojo` to execute the request to a given URL.
 
 ```mojo
 from lightbug_http import *

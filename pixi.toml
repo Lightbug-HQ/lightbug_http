@@ -9,17 +9,18 @@ version = "0.25.7"
 [tasks]
 build = { cmd = "rattler-build build --recipe recipes -c https://conda.modular.com/max -c conda-forge --skip-existing=all", env = {MODULAR_MOJO_IMPORT_PATH = "$CONDA_PREFIX/lib/mojo"} }
 publish = { cmd = "bash scripts/publish.sh", env = { PREFIX_API_KEY = "$PREFIX_API_KEY" } }
-format = { cmd = "magic run mojo format -l 120 lightbug_http" }
+format = { cmd = "mojo format -l 120 lightbug_http" }
 
 [feature.unit-tests.tasks]
-test = { cmd = "bash scripts/mojo_tests.sh tests" }
+test = { cmd = "mojo test -I . tests/lightbug_http" }
 
 [feature.integration-tests.tasks]
 integration_tests_py = { cmd = "bash scripts/integration_test.sh" }
+integration_tests_external = { cmd = "mojo test -I . tests/integration" }
 integration_tests_udp = { cmd = "bash scripts/udp_test.sh" }
 
 [feature.bench.tasks]
-bench = { cmd = "magic run mojo -I . benchmark/bench.mojo" }
+bench = { cmd = "mojo -I . benchmark/bench.mojo" }
 bench_server = { cmd = "bash scripts/bench_server.sh" }
 
 [dependencies]
