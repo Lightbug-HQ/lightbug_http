@@ -25,6 +25,7 @@ bench_server = { cmd = "bash scripts/bench_server.sh" }
 
 [dependencies]
 mojo = ">=0.25.7,<0.26"
+rattler-build = ">=0.27.0,<1"
 
 [feature.integration-tests.dependencies]
 requests = ">=2.32.3,<3"
