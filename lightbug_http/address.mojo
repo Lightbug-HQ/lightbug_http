@@ -209,11 +209,6 @@ struct UDPAddr[Network: NetworkType = NetworkType.udp4](Addr, ImplicitlyCopyable
         self.port = port
         self.zone = ""
 
-    # fn __init__(out self, ip: String, port: UInt16):
-    #     self.ip = ip
-    #     self.port = port
-    #     self.zone = ""
-
     @always_inline
     fn address_family(self) -> Int:
         if Network == NetworkType.udp4:
