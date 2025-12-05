@@ -63,9 +63,9 @@ struct Socket[
     """The socket type."""
     var protocol: ProtocolFamily
     """The protocol."""
-    var local_address: AddrType
+    var local_address: Self.AddrType
     """The local address of the socket (local address if bound)."""
-    var remote_address: AddrType
+    var remote_address: Self.AddrType
     """The remote address of the socket (peer's address if connected)."""
     var _closed: Bool
     """Whether the socket is closed."""
@@ -74,8 +74,8 @@ struct Socket[
 
     fn __init__(
         out self,
-        local_address: AddrType = AddrType(),
-        remote_address: AddrType = AddrType(),
+        local_address: Self.AddrType = Self.AddrType(),
+        remote_address: Self.AddrType = Self.AddrType(),
         socket_type: SocketType = SocketType.SOCK_STREAM,
         protocol: ProtocolFamily = ProtocolFamily.PF_UNSPEC,
     ) raises:
@@ -92,7 +92,7 @@ struct Socket[
         """
         self.socket_type = socket_type
         self.protocol = protocol
-        self.fd = FileDescriptor(Int(socket(address_family.value, socket_type.value, protocol.value)))
+        self.fd = FileDescriptor(Int(socket(Self.address_family.value, socket_type.value, protocol.value)))
         self.local_address = local_address
         self.remote_address = remote_address
         self._closed = False
@@ -103,8 +103,8 @@ struct Socket[
         fd: FileDescriptor,
         socket_type: SocketType,
         protocol: ProtocolFamily,
-        local_address: AddrType,
-        remote_address: AddrType = AddrType(),
+        local_address: Self.AddrType,
+        remote_address: Self.AddrType = Self.AddrType(),
     ):
         """
         Create a new socket object when you already have a socket file descriptor. Typically through socket.accept().
@@ -154,9 +154,9 @@ struct Socket[
     fn write_to[W: Writer, //](self, mut writer: W):
         writer.write(
             "Socket[",
-            AddrType._type,
+            Self.AddrType._type,
             ", ",
-            address_family,
+            Self.address_family,
             "]",
             "(",
             "fd=",
@@ -172,7 +172,7 @@ struct Socket[
             ")",
         )
 
-    fn accept(self) raises -> Self where address_family.is_inet():
+    fn accept(self) raises -> Self where Self.address_family.is_inet():
         """Accept a connection. The socket must be bound to an address and listening for connections.
         The return value is a connection where conn is a new socket object usable to send and receive data on the connection,
         and address is the address bound to the socket on the other end of the connection.
@@ -197,7 +197,7 @@ struct Socket[
             local_address=self.local_address,
         )
         var peer = new_socket.get_peer_name()
-        new_socket.remote_address = AddrType(peer[0], peer[1])
+        new_socket.remote_address = Self.AddrType(peer[0], peer[1])
         return new_socket^
 
     fn listen(self, backlog: UInt = 0) raises:
@@ -215,7 +215,7 @@ struct Socket[
             logger.error(e)
             raise Error("Socket.listen: Failed to listen for connections.")
 
-    fn bind(mut self, address: String, port: UInt16) raises where address_family.is_inet():
+    fn bind(mut self, address: String, port: UInt16) raises where Self.address_family.is_inet():
         """Bind the socket to address. The socket must not already be bound. (The format of address depends on the address family).
 
         When a socket is created with Socket(), it exists in a name
@@ -235,13 +235,13 @@ struct Socket[
         """
         var binary_ip: c_uint
         try:
-            binary_ip = inet_pton[address_family](address)
+            binary_ip = inet_pton[Self.address_family](address)
         except e:
             logger.error(e)
             raise Error("ListenConfig.listen: Failed to convert IP address to binary form.")
 
         var local_address = sockaddr_in(
-            address_family=Int(address_family.value),
+            address_family=Int(Self.address_family.value),
             port=port,
             binary_ip=binary_ip,
         )
@@ -252,9 +252,9 @@ struct Socket[
             raise Error("Socket.bind: Binding socket failed.")
 
         var local = self.get_sock_name()
-        self.local_address = AddrType(local[0], local[1])
+        self.local_address = Self.AddrType(local[0], local[1])
 
-    fn get_sock_name(self) raises -> Tuple[String, UInt16] where address_family.is_inet():
+    fn get_sock_name(self) raises -> Tuple[String, UInt16] where Self.address_family.is_inet():
         """Return the address of the socket.
 
         Returns:
@@ -280,11 +280,11 @@ struct Socket[
             raise Error("get_sock_name: Failed to get address of local socket.")
 
         var addr_in = local_address.bitcast[sockaddr_in]().take_pointee()
-        return binary_ip_to_string[address_family](addr_in.sin_addr.s_addr), UInt16(
+        return binary_ip_to_string[Self.address_family](addr_in.sin_addr.s_addr), UInt16(
             binary_port_to_int(addr_in.sin_port)
         )
 
-    fn get_peer_name(self) raises -> Tuple[String, UInt16] where address_family.is_inet():
+    fn get_peer_name(self) raises -> Tuple[String, UInt16] where Self.address_family.is_inet():
         """Return the address of the peer connected to the socket.
 
         Returns:
@@ -304,7 +304,7 @@ struct Socket[
             logger.error(e)
             raise Error("get_peer_name: Failed to get address of remote socket.")
 
-        return binary_ip_to_string[address_family](addr_in.sin_addr.s_addr), UInt16(
+        return binary_ip_to_string[Self.address_family](addr_in.sin_addr.s_addr), UInt16(
             binary_port_to_int(addr_in.sin_port)
         )
 
@@ -344,7 +344,7 @@ struct Socket[
             logger.warn("Socket.set_socket_option: Failed to set socket option.")
             raise e
 
-    fn connect(mut self, mut address: String, port: UInt16) raises -> None where address_family.is_inet():
+    fn connect(mut self, mut address: String, port: UInt16) raises -> None where Self.address_family.is_inet():
         """Connect to a remote socket at address.
 
         Args:
@@ -355,7 +355,7 @@ struct Socket[
             Error: If connecting to the remote socket fails.
         """
         var ip = get_ip_address(address)
-        var addr = sockaddr_in(address_family=Int(address_family.value), port=port, binary_ip=ip.s_addr)
+        var addr = sockaddr_in(address_family=Int(Self.address_family.value), port=port, binary_ip=ip.s_addr)
         try:
             connect(self.fd, addr)
         except e:
@@ -363,7 +363,7 @@ struct Socket[
             raise e
 
         var remote = self.get_peer_name()
-        self.remote_address = AddrType(remote[0], remote[1])
+        self.remote_address = Self.AddrType(remote[0], remote[1])
 
     fn send(self, buffer: Span[Byte]) raises -> UInt:
         try:
@@ -388,7 +388,7 @@ struct Socket[
             Error: If sending the data fails.
         """
         var ip = get_ip_address(address)
-        var addr = sockaddr_in(address_family=Int(address_family.value), port=port, binary_ip=ip.s_addr)
+        var addr = sockaddr_in(address_family=Int(Self.address_family.value), port=port, binary_ip=ip.s_addr)
         return sendto(self.fd, src, UInt(len(src)), 0, UnsafePointer(to=addr).bitcast[sockaddr]().as_immutable())
 
     fn _receive(self, mut buffer: Bytes) raises -> UInt:
@@ -451,7 +451,7 @@ struct Socket[
         """
         return self._receive(buffer)
 
-    fn _receive_from(self, mut buffer: Bytes) raises -> Tuple[UInt, String, UInt16] where address_family.is_inet():
+    fn _receive_from(self, mut buffer: Bytes) raises -> Tuple[UInt, String, UInt16] where Self.address_family.is_inet():
         """Receive data from the socket into the buffer.
 
         Args:
@@ -482,13 +482,13 @@ struct Socket[
         var addr_in = remote_address.bitcast[sockaddr_in]().take_pointee()
         return (
             bytes_received,
-            binary_ip_to_string[address_family](addr_in.sin_addr.s_addr),
+            binary_ip_to_string[Self.address_family](addr_in.sin_addr.s_addr),
             UInt16(binary_port_to_int(addr_in.sin_port)),
         )
 
     fn receive_from(
         mut self, size: Int = default_buffer_size
-    ) raises -> Tuple[List[Byte], String, UInt16] where address_family.is_inet():
+    ) raises -> Tuple[List[Byte], String, UInt16] where Self.address_family.is_inet():
         """Receive data from the socket into the buffer dest.
 
         Args:
@@ -506,7 +506,7 @@ struct Socket[
 
     fn receive_from(
         mut self, mut dest: List[Byte]
-    ) raises -> Tuple[UInt, String, UInt16] where address_family.is_inet():
+    ) raises -> Tuple[UInt, String, UInt16] where Self.address_family.is_inet():
         """Receive data from the socket into the buffer dest.
 
         Args:

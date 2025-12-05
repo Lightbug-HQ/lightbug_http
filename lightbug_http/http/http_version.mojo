@@ -1,7 +1,7 @@
 # TODO: Apply this to request/response structs
 @fieldwise_init
 @register_passable("trivial")
-struct HttpVersion(EqualityComparable, Stringable):
+struct HttpVersion(Equatable, Stringable):
     var _v: Int
 
     fn __init__(out self, version: String) raises:

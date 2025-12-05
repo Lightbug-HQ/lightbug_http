@@ -325,7 +325,7 @@ fn inet_pton[address_family: AddressFamily where address_family.is_inet()](var s
     else:
         ip_buffer = stack_allocation[4, c_void]()
 
-    var result = _inet_pton(address_family.value, src.unsafe_cstr_ptr(), ip_buffer)
+    var result = _inet_pton(address_family.value, src.as_c_string_slice().unsafe_ptr(), ip_buffer)
     if result == 0:
         raise Error("inet_pton Error: The input is not a valid address.")
     elif result == -1:

@@ -50,7 +50,7 @@ mojo ... -D LB_LOG_LEVEL=DEBUG
 struct Logger[level: Int](ImplicitlyCopyable, Movable):
     fn _log_message[event_level: Int](self, message: String):
         @parameter
-        if level >= event_level:
+        if Self.level >= event_level:
 
             @parameter
             if event_level < LogLevel.WARN:

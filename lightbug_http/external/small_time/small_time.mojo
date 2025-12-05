@@ -515,10 +515,11 @@ struct SmallTime(Copyable, Movable, Representable, Stringable, Writable):
         elif timespec == "hours":
             time_str = String(self.hour).rjust(2, "0")
 
+        var elements = [date_str, time_str]  # TODO: How do we use variadic join now?
         if not self.tz:
-            return sep.join(date_str, time_str)
+            return sep.join(elements)
         else:
-            return sep.join(date_str, time_str) + self.tz.format()
+            return sep.join(elements) + self.tz.format()
 
     fn to_ordinal(self) -> Int:
         """Return proleptic Gregorian ordinal for the year, month and day.

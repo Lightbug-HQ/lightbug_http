@@ -22,24 +22,24 @@ struct _OwningListIter[
 
     Parameters:
         list_mutability: Whether the reference to the list is mutable.
-        T: The type of the elements in the list.
-        list_origin: The origin of the List
-        forward: The iteration direction. `False` is backwards.
+        Self.T: The type of the elements in the list.
+        Self.list_origin: The origin of the List
+        Self.forward: The iteration direction. `False` is backwards.
     """
 
-    comptime list_type = OwningList[T]
+    comptime list_type = OwningList[Self.T]
 
     var index: Int
-    var src: Pointer[Self.list_type, list_origin]
+    var src: Pointer[Self.list_type, Self.list_origin]
 
     fn __iter__(self) -> Self:
         return self.copy()
 
     fn __next__(
         mut self,
-    ) -> Pointer[T, list_origin]:
+    ) -> Pointer[Self.T, Self.list_origin]:
         @parameter
-        if forward:
+        if Self.forward:
             self.index += 1
             return Pointer(to=self.src[][self.index - 1])
         else:
@@ -52,7 +52,7 @@ struct _OwningListIter[
 
     fn __len__(self) -> Int:
         @parameter
-        if forward:
+        if Self.forward:
             return len(self.src[]) - self.index
         else:
             return self.index
@@ -69,7 +69,7 @@ struct OwningList[T: Movable](Boolable, Movable, Sized):
     """
 
     # Fields
-    var data: LegacyUnsafePointer[T]
+    var data: LegacyUnsafePointer[Self.T]
     """The underlying storage for the list."""
     var size: Int
     """The number of elements in the list."""
@@ -82,7 +82,7 @@ struct OwningList[T: Movable](Boolable, Movable, Sized):
 
     fn __init__(out self):
         """Constructs an empty list."""
-        self.data = LegacyUnsafePointer[T]()
+        self.data = LegacyUnsafePointer[Self.T]()
         self.size = 0
         self.capacity = 0
 
@@ -92,7 +92,7 @@ struct OwningList[T: Movable](Boolable, Movable, Sized):
         Args:
             capacity: The requested capacity of the list.
         """
-        self.data = LegacyUnsafePointer[T].alloc(capacity)
+        self.data = LegacyUnsafePointer[Self.T].alloc(capacity)
         self.size = 0
         self.capacity = capacity
 
@@ -116,12 +116,12 @@ struct OwningList[T: Movable](Boolable, Movable, Sized):
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    fn __contains__[U: EqualityComparable & Movable, //](self: OwningList[U, *_], value: U) -> Bool:
+    fn __contains__[U: Equatable & Movable, //](self: OwningList[U, *_], value: U) -> Bool:
         """Verify if a given value is present in the list.
 
         Parameters:
             U: The type of the elements in the list. Must implement the
-              traits `EqualityComparable`, `Copyable`, and `Movable`.
+              traits `Equatable `, `Copyable`, and `Movable`.
 
         Args:
             value: The value to find.
@@ -134,7 +134,7 @@ struct OwningList[T: Movable](Boolable, Movable, Sized):
                 return True
         return False
 
-    fn __iter__(ref self) -> _OwningListIter[T, origin_of(self)]:
+    fn __iter__(ref self) -> _OwningListIter[Self.T, origin_of(self)]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
@@ -207,11 +207,6 @@ struct OwningList[T: Movable](Boolable, Movable, Sized):
         Note that since we can't condition methods on a trait yet,
         the way to call this method is a bit special. Here is an example below:
 
-        ```mojo
-        var my_list = List[Int](1, 2, 3)
-        print(my_list.__repr__())
-        ```
-
         When the compiler supports conditional methods, then a simple `repr(my_list)` will
         be enough.
 
@@ -236,10 +231,10 @@ struct OwningList[T: Movable](Boolable, Movable, Sized):
         Returns:
             The bytecount of the List.
         """
-        return len(self) * size_of[T]()
+        return len(self) * size_of[Self.T]()
 
     fn _realloc(mut self, new_capacity: Int):
-        var new_data = LegacyUnsafePointer[T].alloc(new_capacity)
+        var new_data = LegacyUnsafePointer[Self.T].alloc(new_capacity)
 
         _move_pointee_into_many_elements(
             dest=new_data,
@@ -252,7 +247,7 @@ struct OwningList[T: Movable](Boolable, Movable, Sized):
         self.data = new_data
         self.capacity = new_capacity
 
-    fn append(mut self, var value: T):
+    fn append(mut self, var value: Self.T):
         """Appends a value to this list.
 
         Args:
@@ -263,7 +258,7 @@ struct OwningList[T: Movable](Boolable, Movable, Sized):
         (self.data + self.size).init_pointee_move(value^)
         self.size += 1
 
-    fn insert(mut self, i: Int, var value: T):
+    fn insert(mut self, i: Int, var value: Self.T):
         """Inserts a value to the list at the given index.
         `a.insert(len(a), value)` is equivalent to `a.append(value)`.
 
@@ -292,7 +287,7 @@ struct OwningList[T: Movable](Boolable, Movable, Sized):
             earlier_idx -= 1
             later_idx -= 1
 
-    fn extend(mut self, var other: OwningList[T, *_]):
+    fn extend(mut self, var other: OwningList[Self.T, *_]):
         """Extends this list by consuming the elements of `other`.
 
         Args:
@@ -321,7 +316,7 @@ struct OwningList[T: Movable](Boolable, Movable, Sized):
             var src_ptr = other.data + i
 
             # This (TODO: optimistically) moves an element directly from the
-            # `other` list into this list using a single `T.__moveinit()__`
+            # `other` list into this list using a single `Self.T.__moveinit()__`
             # call, without moving into an intermediate temporary value
             # (avoiding an extra redundant move constructor call).
             dest_ptr.init_pointee_move_from(src_ptr)
@@ -332,7 +327,7 @@ struct OwningList[T: Movable](Boolable, Movable, Sized):
         # list.
         self.size = final_size
 
-    fn pop(mut self, i: Int = -1) -> T:
+    fn pop(mut self, i: Int = -1) -> Self.T:
         """Pops a value from the list at the given index.
 
         Args:
@@ -392,16 +387,11 @@ struct OwningList[T: Movable](Boolable, Movable, Sized):
 
     # TODO: Remove explicit self type when issue 1876 is resolved.
     fn index[
-        C: EqualityComparable & Movable, //
+        C: Equatable & Movable, //
     ](ref self: OwningList[C, *_], value: C, start: Int = 0, stop: Optional[Int] = None,) raises -> Int:
         """
         Returns the index of the first occurrence of a value in a list
         restricted by the range given the start and stop bounds.
-
-        ```mojo
-        var my_list = List[Int](1, 2, 3)
-        print(my_list.index(2)) # prints `1`
-        ```
 
         Args:
             value: The value to search for.
@@ -412,7 +402,7 @@ struct OwningList[T: Movable](Boolable, Movable, Sized):
 
         Parameters:
             C: The type of the elements in the list. Must implement the
-                `EqualityComparable & Movable` trait.
+                `Equatable  & Movable` trait.
 
         Returns:
             The index of the first occurrence of the value in the list.
@@ -448,19 +438,19 @@ struct OwningList[T: Movable](Boolable, Movable, Sized):
             (self.data + i).destroy_pointee()
         self.size = 0
 
-    fn steal_data(mut self) -> LegacyUnsafePointer[T]:
+    fn steal_data(mut self) -> LegacyUnsafePointer[Self.T]:
         """Take ownership of the underlying pointer from the list.
 
         Returns:
             The underlying data.
         """
         var ptr = self.data
-        self.data = LegacyUnsafePointer[T]()
+        self.data = LegacyUnsafePointer[Self.T]()
         self.size = 0
         self.capacity = 0
         return ptr
 
-    fn __getitem__(ref self, idx: Int) -> ref [self] T:
+    fn __getitem__(ref self, idx: Int) -> ref [self] Self.T:
         """Gets the list element at the given index.
 
         Args:
@@ -485,7 +475,7 @@ struct OwningList[T: Movable](Boolable, Movable, Sized):
         return (self.data + normalized_idx)[]
 
     @always_inline
-    fn unsafe_ptr(self) -> LegacyUnsafePointer[T]:
+    fn unsafe_ptr(self) -> LegacyUnsafePointer[Self.T]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:

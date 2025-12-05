@@ -45,13 +45,13 @@ struct PoolKey(Hashable, ImplicitlyCopyable, KeyElement, Stringable, Writable):
         )
 
 
-struct PoolManager[ConnectionType: Connection]():
-    var _connections: OwningList[ConnectionType]
+struct PoolManager[connection_type: Connection]():
+    var _connections: OwningList[Self.connection_type]
     var _capacity: Int
     var mapping: Dict[PoolKey, Int]
 
     fn __init__(out self, capacity: Int = 10):
-        self._connections = OwningList[ConnectionType](capacity=capacity)
+        self._connections = OwningList[Self.connection_type](capacity=capacity)
         self._capacity = capacity
         self.mapping = Dict[PoolKey, Int]()
 
@@ -61,7 +61,7 @@ struct PoolManager[ConnectionType: Connection]():
         )
         self.clear()
 
-    fn give(mut self, key: PoolKey, var value: ConnectionType) raises:
+    fn give(mut self, key: PoolKey, var value: Self.connection_type) raises:
         if key in self.mapping:
             self._connections[self.mapping[key]] = value^
             return
@@ -73,7 +73,7 @@ struct PoolManager[ConnectionType: Connection]():
         self.mapping[key] = self._connections.size - 1
         logger.debug("Checked in connection for peer:", String(key) + ", at index:", self._connections.size)
 
-    fn take(mut self, key: PoolKey) raises -> ConnectionType:
+    fn take(mut self, key: PoolKey) raises -> Self.connection_type:
         var index: Int
         try:
             index = self.mapping[key]
@@ -103,11 +103,11 @@ struct PoolManager[ConnectionType: Connection]():
     fn __contains__(self, key: PoolKey) -> Bool:
         return key in self.mapping
 
-    fn __setitem__(mut self, key: PoolKey, var value: ConnectionType) raises -> None:
+    fn __setitem__(mut self, key: PoolKey, var value: Self.connection_type) raises -> None:
         if key in self.mapping:
             self._connections[self.mapping[key]] = value^
         else:
             self.give(key, value^)
 
-    fn __getitem__(self, key: PoolKey) raises -> ref [self._connections] ConnectionType:
+    fn __getitem__(self, key: PoolKey) raises -> ref [self._connections] Self.connection_type:
         return self._connections[self.mapping[key]]

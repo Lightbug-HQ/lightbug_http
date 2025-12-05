@@ -19,7 +19,7 @@ fn unquote[expand_plus: Bool = False](input_str: String, disallowed_escapes: Lis
     var str_bytes = List[UInt8]()
     while current_idx < len(percent_idxs):
         var slice_end = percent_idxs[current_idx]
-        sub_strings.append(encoded_str[slice_start:slice_end])
+        sub_strings.append(String(encoded_str[slice_start:slice_end]))
 
         var current_offset = slice_end
         while current_idx < len(percent_idxs):
@@ -86,7 +86,7 @@ struct PortBounds:
 
 
 @fieldwise_init
-struct Scheme(EqualityComparable, Hashable, ImplicitlyCopyable, Movable, Representable, Stringable, Writable):
+struct Scheme(Equatable, Hashable, ImplicitlyCopyable, Movable, Representable, Stringable, Writable):
     var value: String
     comptime HTTP = Self("http")
     comptime HTTPS = Self("https")
@@ -177,7 +177,7 @@ struct URI(Copyable, Movable, Representable, Stringable, Writable):
         if not original_path_bytes:
             original_path = "/"
         else:
-            original_path = unquote(String(original_path_bytes), disallowed_escapes=List(String("/")))
+            original_path = unquote(String(original_path_bytes), disallowed_escapes=["/"])
 
         # Parse the path
         var path: String = "/"
@@ -187,7 +187,7 @@ struct URI(Copyable, Movable, Representable, Stringable, Writable):
             var request_uri_reader = reader.copy()
             request_uri = String(request_uri_reader.read_bytes())
             # Read until the query string, or the end if there is none.
-            path = unquote(String(reader.read_until(ord(URIDelimiters.QUERY))), disallowed_escapes=List(String("/")))
+            path = unquote(String(reader.read_until(ord(URIDelimiters.QUERY))), disallowed_escapes=["/"])
 
         # Parse query
         var query: String = ""

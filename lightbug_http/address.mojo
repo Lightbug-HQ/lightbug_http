@@ -23,7 +23,7 @@ struct AddressConstants:
     comptime EMPTY = ""
 
 
-trait Addr(Copyable, Defaultable, EqualityComparable, Movable, Representable, Stringable, Writable):
+trait Addr(Copyable, Defaultable, Equatable, Movable, Representable, Stringable, Writable):
     comptime _type: StaticString
 
     fn __init__(out self, ip: String, port: UInt16):
@@ -51,7 +51,7 @@ trait AnAddrInfo:
 
 
 @fieldwise_init
-struct NetworkType(EqualityComparable, ImplicitlyCopyable, Movable):
+struct NetworkType(Equatable, ImplicitlyCopyable, Movable):
     var value: String
 
     comptime empty = NetworkType("")
@@ -110,7 +110,7 @@ struct NetworkType(EqualityComparable, ImplicitlyCopyable, Movable):
 
 
 # @fieldwise_init
-struct TCPAddr[Network: NetworkType = NetworkType.tcp4](Addr, ImplicitlyCopyable):
+struct TCPAddr[network: NetworkType = NetworkType.tcp4](Addr, ImplicitlyCopyable):
     comptime _type = "TCPAddr"
     var ip: String
     var port: UInt16
@@ -133,20 +133,20 @@ struct TCPAddr[Network: NetworkType = NetworkType.tcp4](Addr, ImplicitlyCopyable
 
     @always_inline
     fn address_family(self) -> Int:
-        if Network == NetworkType.tcp4:
+        if Self.network == NetworkType.tcp4:
             return Int(AddressFamily.AF_INET.value)
-        elif Network == NetworkType.tcp6:
+        elif Self.network == NetworkType.tcp6:
             return Int(AddressFamily.AF_INET6.value)
         else:
             return Int(AddressFamily.AF_UNSPEC.value)
 
     @always_inline
     fn is_v4(self) -> Bool:
-        return Network == NetworkType.tcp4
+        return Self.network == NetworkType.tcp4
 
     @always_inline
     fn is_v6(self) -> Bool:
-        return Network == NetworkType.tcp6
+        return Self.network == NetworkType.tcp6
 
     @always_inline
     fn is_unix(self) -> Bool:
@@ -171,7 +171,7 @@ struct TCPAddr[Network: NetworkType = NetworkType.tcp4](Addr, ImplicitlyCopyable
 
 
 @fieldwise_init
-struct UDPAddr[Network: NetworkType = NetworkType.udp4](Addr, ImplicitlyCopyable):
+struct UDPAddr[network: NetworkType = NetworkType.udp4](Addr, ImplicitlyCopyable):
     comptime _type = "UDPAddr"
     var ip: String
     var port: UInt16
@@ -189,20 +189,20 @@ struct UDPAddr[Network: NetworkType = NetworkType.udp4](Addr, ImplicitlyCopyable
 
     @always_inline
     fn address_family(self) -> Int:
-        if Network == NetworkType.udp4:
+        if Self.network == NetworkType.udp4:
             return Int(AddressFamily.AF_INET.value)
-        elif Network == NetworkType.udp6:
+        elif Self.network == NetworkType.udp6:
             return Int(AddressFamily.AF_INET6.value)
         else:
             return Int(AddressFamily.AF_UNSPEC.value)
 
     @always_inline
     fn is_v4(self) -> Bool:
-        return Network == NetworkType.udp4
+        return Self.network == NetworkType.udp4
 
     @always_inline
     fn is_v6(self) -> Bool:
-        return Network == NetworkType.udp6
+        return Self.network == NetworkType.udp6
 
     @always_inline
     fn is_unix(self) -> Bool:
@@ -530,9 +530,9 @@ struct CAddrInfo[T: AnAddrInfo]:
     the struct and free the pointer while you're still using it.
     """
 
-    var ptr: ExternalMutUnsafePointer[T]
+    var ptr: ExternalMutUnsafePointer[Self.T]
 
-    fn data(mut self) -> MutUnsafePointer[T, origin = origin_of(self)]:
+    fn data(mut self) -> MutUnsafePointer[Self.T, origin = origin_of(self)]:
         return self.ptr.unsafe_origin_cast[origin_of(self)]()
 
     fn __del__(deinit self):
@@ -631,8 +631,8 @@ fn getaddrinfo[T: AnAddrInfo, //](mut node: String, mut service: String, hints: 
     """
     var ptr = ExternalMutUnsafePointer[T]()
     var result = _getaddrinfo(
-        node.unsafe_cstr_ptr(),
-        service.unsafe_cstr_ptr(),
+        node.as_c_string_slice().unsafe_ptr(),
+        service.as_c_string_slice().unsafe_ptr(),
         Pointer(to=hints),
         Pointer(to=ptr),
     )

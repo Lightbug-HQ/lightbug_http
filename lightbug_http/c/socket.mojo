@@ -8,7 +8,7 @@ from memory import stack_allocation
 
 @fieldwise_init
 @register_passable("trivial")
-struct ShutdownOption(Copyable, EqualityComparable, Movable, Stringable, Writable):
+struct ShutdownOption(Copyable, Equatable, Movable, Stringable, Writable):
     var value: c_int
     comptime SHUT_RD = Self(0)
     comptime SHUT_WR = Self(1)
@@ -37,7 +37,7 @@ comptime SOL_SOCKET = 0xFFFF
 # Taken from: https://github.com/openbsd/src/blob/master/sys/sys/socket.h
 @fieldwise_init
 @register_passable("trivial")
-struct SocketOption(Copyable, EqualityComparable, Movable, Stringable, Writable):
+struct SocketOption(Copyable, Equatable, Movable, Stringable, Writable):
     var value: c_int
     comptime SO_DEBUG = Self(0x0001)
     comptime SO_ACCEPTCONN = Self(0x0002)
@@ -141,7 +141,7 @@ comptime O_CLOEXEC = 524288
 # Socket Type constants
 @fieldwise_init
 @register_passable("trivial")
-struct SocketType(Copyable, EqualityComparable, Movable, Stringable, Writable):
+struct SocketType(Copyable, Equatable, Movable, Stringable, Writable):
     var value: c_int
     comptime SOCK_STREAM = Self(1)
     comptime SOCK_DGRAM = Self(2)

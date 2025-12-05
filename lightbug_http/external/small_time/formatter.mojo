@@ -175,7 +175,7 @@ struct _Formatter(ImplicitlyCopyable):
             if token_count == 1:
                 return "Y"
             if token_count == 2:
-                return String(m.year).rjust(4, "0")[2:4]
+                return String(String(m.year).rjust(4, "0")[2:4])
             if token_count == 4:
                 return String(m.year).rjust(4, "0")
         elif token == _M:
