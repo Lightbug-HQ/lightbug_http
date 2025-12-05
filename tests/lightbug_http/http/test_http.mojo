@@ -1,14 +1,17 @@
-import testing
-from testing import assert_true, assert_equal
 from collections import Dict, List
-from lightbug_http.io.bytes import Bytes, bytes
-from lightbug_http.http import HTTPRequest, HTTPResponse, encode, HttpVersion
-from lightbug_http.header import Header, Headers, HeaderKey
-from lightbug_http.cookie import Cookie, ResponseCookieJar, RequestCookieJar, Duration, ResponseCookieKey
-from lightbug_http.uri import URI
-from lightbug_http.strings import to_string
 
-alias default_server_conn_string = "http://localhost:8080"
+import testing
+from lightbug_http.header import Header, HeaderKey, Headers
+from lightbug_http.io.bytes import Bytes, bytes
+from lightbug_http.strings import to_string
+from lightbug_http.uri import URI
+from testing import assert_equal, assert_true
+
+from lightbug_http.cookie import Cookie, Duration, RequestCookieJar, ResponseCookieJar, ResponseCookieKey
+from lightbug_http.http import HTTPRequest, HTTPResponse, HttpVersion, encode
+
+
+comptime default_server_conn_string = "http://localhost:8080"
 
 
 def test_encode_http_request():

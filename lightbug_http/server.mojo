@@ -1,20 +1,21 @@
-from lightbug_http.io.sync import Duration
-from lightbug_http.io.bytes import Bytes, BytesConstant, ByteView, ByteReader, bytes
-from lightbug_http.address import NetworkType
 from lightbug_http._logger import logger
-from lightbug_http.connection import NoTLSListener, default_buffer_size, TCPConnection, ListenConfig
-from lightbug_http.socket import Socket
-from lightbug_http.http import HTTPRequest, encode
-from lightbug_http.http.common_response import InternalError, BadRequest, URITooLong
-from lightbug_http.uri import URI
-from lightbug_http.header import Headers
-from lightbug_http.service import HTTPService
+from lightbug_http.address import NetworkType
+from lightbug_http.connection import ListenConfig, NoTLSListener, TCPConnection, default_buffer_size
 from lightbug_http.error import ErrorHandler
+from lightbug_http.header import Headers
+from lightbug_http.http.common_response import BadRequest, InternalError, URITooLong
+from lightbug_http.io.bytes import ByteReader, Bytes, BytesConstant, ByteView, bytes
+from lightbug_http.io.sync import Duration
+from lightbug_http.service import HTTPService
+from lightbug_http.socket import Socket
+from lightbug_http.uri import URI
+
+from lightbug_http.http import HTTPRequest, encode
 
 
-alias DefaultConcurrency: Int = 256 * 1024
-alias default_max_request_body_size = 4 * 1024 * 1024  # 4MB
-alias default_max_request_uri_length = 8192
+comptime DefaultConcurrency: Int = 256 * 1024
+comptime default_max_request_body_size = 4 * 1024 * 1024  # 4MB
+comptime default_max_request_uri_length = 8192
 
 
 struct Server(Movable):
@@ -121,25 +122,31 @@ struct Server(Movable):
         """
         while True:
             var conn = ln.accept()
-            self.serve_connection(conn, handler)
+            try:
+                self.serve_connection(conn, handler)
+            finally:
+                conn^.teardown()
 
     fn serve_connection[T: HTTPService](mut self, mut conn: TCPConnection, mut handler: T) raises -> None:
         """Serve a single connection.
+
         Parameters:
             T: The type of HTTPService that handles incoming requests.
+
         Args:
             conn: A connection object that represents a client connection.
             handler: An object that handles incoming HTTP requests.
+
         Raises:
             If there is an error while serving the connection.
         """
         logger.debug(
-            "Connection accepted! IP:", conn.socket._remote_address.ip, "Port:", conn.socket._remote_address.port
+            "Connection accepted! IP:", conn.socket.remote_address.ip, "Port:", conn.socket.remote_address.port
         )
         var max_request_body_size = self.max_request_body_size()
         if max_request_body_size <= 0:
             max_request_body_size = default_max_request_body_size
-        
+
         var max_request_uri_length = self.max_request_uri_length()
         if max_request_uri_length <= 0:
             max_request_uri_length = default_max_request_uri_length
@@ -157,7 +164,6 @@ struct Server(Movable):
                     logger.debug("Bytes read:", bytes_read)
 
                     if bytes_read == 0:
-                        conn.teardown()
                         return
 
                     request_buffer.extend(temp_buffer^)
@@ -168,17 +174,18 @@ struct Server(Movable):
                         break
 
                 except e:
-                    conn.teardown()
                     # 0 bytes were read from the peer, which indicates their side of the connection was closed.
                     if String(e) == "EOF":
                         return
                     else:
-                        logger.error("Server.serve_connection: Failed to read request. Expected EOF, got:", String(e))
+                        logger.error("Server.serve_connection: Failed to read request. Expected EOF, got:", e)
                         return
 
             var request: HTTPRequest
             try:
-                request = HTTPRequest.from_bytes(self.address(), max_request_body_size, max_request_uri_length, request_buffer)
+                request = HTTPRequest.from_bytes(
+                    self.address(), max_request_body_size, max_request_uri_length, request_buffer
+                )
                 var response: HTTPResponse
                 var close_connection = (not self.tcp_keep_alive) or request.connection_close()
                 try:
@@ -186,21 +193,20 @@ struct Server(Movable):
                     if close_connection:
                         response.set_connection_close()
                     logger.debug(
-                        conn.socket._remote_address.ip,
-                        String(conn.socket._remote_address.port),
+                        conn.socket.remote_address.ip,
+                        String(conn.socket.remote_address.port),
                         request.method,
                         request.uri.path,
                         response.status_code,
                     )
+
                     try:
                         _ = conn.write(encode(response^))
                     except e:
                         logger.error("Failed to write encoded response to the connection:", String(e))
-                        conn.teardown()
                         break
 
                     if close_connection:
-                        conn.teardown()
                         break
                 except e:
                     logger.error("Handler error:", String(e))
@@ -209,8 +215,6 @@ struct Server(Movable):
                             _ = conn.write(encode(InternalError()))
                         except e:
                             raise Error("Failed to send InternalError response")
-                        finally:
-                            conn.teardown()
                         return
             except e:
                 logger.error("Failed to parse HTTPRequest:", String(e))
@@ -221,5 +225,4 @@ struct Server(Movable):
                         _ = conn.write(encode(BadRequest()))
                 except e:
                     logger.error("Failed to write BadRequest response to the connection:", String(e))
-                    conn.teardown()
                     break

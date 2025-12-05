@@ -1,8 +1,8 @@
-from lightbug_http._owning_list import OwningList
 from sys.info import size_of
 
+from lightbug_http._owning_list import OwningList
 from memory import LegacyUnsafePointer, Span
-from testing import assert_equal, assert_false, assert_raises, assert_true, TestSuite
+from testing import TestSuite, assert_equal, assert_false, assert_raises, assert_true
 
 
 def test_mojo_issue_698():

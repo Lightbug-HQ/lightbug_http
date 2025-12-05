@@ -1,8 +1,10 @@
 from collections import Dict
-from lightbug_http import *
-from lightbug_http.client import Client
+
 from lightbug_http._logger import logger
+from lightbug_http.client import Client
 from testing import *
+
+from lightbug_http import *
 
 
 fn u(s: String) raises -> URI:
@@ -24,7 +26,7 @@ struct IntegrationTest:
         self.results[name] = "❌"
 
     fn test_redirect(mut self):
-        alias name = "test_redirect"
+        comptime name = "test_redirect"
         print("\n~~~ Testing redirect ~~~")
         var h = Headers(Header(HeaderKey.CONNECTION, "keep-alive"))
         try:
@@ -42,7 +44,7 @@ struct IntegrationTest:
             return
 
     fn test_close_connection(mut self):
-        alias name = "test_close_connection"
+        comptime name = "test_close_connection"
         print("\n~~~ Testing close connection ~~~")
         var h = Headers(Header(HeaderKey.CONNECTION, "close"))
         try:
@@ -58,7 +60,7 @@ struct IntegrationTest:
             return
 
     fn test_server_error(mut self):
-        alias name = "test_server_error"
+        comptime name = "test_server_error"
         print("\n~~~ Testing internal server error ~~~")
         try:
             var res = self.client.do(HTTPRequest(u("error")))

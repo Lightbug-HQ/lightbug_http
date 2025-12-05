@@ -1,36 +1,36 @@
-from memory import Span
-from lightbug_http.io.bytes import Bytes, bytes, byte
+from lightbug_http.io.bytes import Bytes, byte, bytes
 
-alias strSlash = "/"
-alias strHttp = "http"
-alias http = "http"
-alias strHttps = "https"
-alias https = "https"
-alias strHttp11 = "HTTP/1.1"
-alias strHttp10 = "HTTP/1.0"
 
-alias strMethodGet = "GET"
+comptime strSlash = "/"
+comptime strHttp = "http"
+comptime http = "http"
+comptime strHttps = "https"
+comptime https = "https"
+comptime strHttp11 = "HTTP/1.1"
+comptime strHttp10 = "HTTP/1.0"
 
-alias rChar = "\r"
-alias nChar = "\n"
-alias lineBreak = rChar + nChar
-alias colonChar = ":"
+comptime strMethodGet = "GET"
 
-alias empty_string = ""
-alias whitespace = " "
-alias whitespace_byte = ord(whitespace)
-alias tab = "\t"
-alias tab_byte = ord(tab)
+comptime rChar = "\r"
+comptime nChar = "\n"
+comptime lineBreak = rChar + nChar
+comptime colonChar = ":"
+
+comptime empty_string = ""
+comptime whitespace = " "
+comptime whitespace_byte = ord(whitespace)
+comptime tab = "\t"
+comptime tab_byte = ord(tab)
 
 
 struct BytesConstant:
-    alias whitespace = byte(whitespace)
-    alias colon = byte(colonChar)
-    alias rChar = byte(rChar)
-    alias nChar = byte(nChar)
+    comptime whitespace = byte(whitespace)
+    comptime colon = byte(colonChar)
+    comptime rChar = byte(rChar)
+    comptime nChar = byte(nChar)
 
-    alias CRLF = bytes(lineBreak)
-    alias DOUBLE_CRLF = bytes(lineBreak + lineBreak)
+    comptime CRLF = bytes(lineBreak)
+    comptime DOUBLE_CRLF = bytes(lineBreak + lineBreak)
 
 
 fn to_string[T: Writable](value: T) -> String:

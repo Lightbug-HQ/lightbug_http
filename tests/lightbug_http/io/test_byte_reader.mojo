@@ -1,8 +1,9 @@
 import testing
-from lightbug_http.io.bytes import Bytes, ByteReader, EndOfReaderError
+from lightbug_http.io.bytes import ByteReader, Bytes, EndOfReaderError
 from lightbug_http.strings import to_string
 
-alias example = "Hello, World!"
+
+comptime example = "Hello, World!"
 
 
 def test_peek():

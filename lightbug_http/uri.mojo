@@ -1,16 +1,7 @@
-from collections import Optional, Dict
 from hashlib.hash import Hasher
-from lightbug_http.io.bytes import Bytes, bytes, ByteReader
-from lightbug_http.strings import (
-    find_all,
-    strSlash,
-    strHttp11,
-    strHttp10,
-    strHttp,
-    http,
-    strHttps,
-    https,
-)
+
+from lightbug_http.io.bytes import ByteReader, Bytes, bytes
+from lightbug_http.strings import find_all, http, https, strHttp, strHttp10, strHttp11, strHttps, strSlash
 
 
 fn unquote[expand_plus: Bool = False](input_str: String, disallowed_escapes: List[String] = List[String]()) -> String:
@@ -63,42 +54,42 @@ fn unquote[expand_plus: Bool = False](input_str: String, disallowed_escapes: Lis
         slice_start = current_offset
         current_idx += 1
 
-    sub_strings.append(encoded_str[slice_start:])
+    sub_strings.append(String(encoded_str[slice_start:]))
 
     return StaticString("").join(sub_strings)
 
 
-alias QueryMap = Dict[String, String]
+comptime QueryMap = Dict[String, String]
 
 
 struct QueryDelimiters:
-    alias STRING_START = "?"
-    alias ITEM = "&"
-    alias ITEM_ASSIGN = "="
-    alias PLUS_ESCAPED_SPACE = "+"
+    comptime STRING_START = "?"
+    comptime ITEM = "&"
+    comptime ITEM_ASSIGN = "="
+    comptime PLUS_ESCAPED_SPACE = "+"
 
 
 struct URIDelimiters:
-    alias SCHEMA = "://"
-    alias PATH = strSlash
-    alias ROOT_PATH = strSlash
-    alias CHAR_ESCAPE = "%"
-    alias AUTHORITY = "@"
-    alias QUERY = "?"
-    alias SCHEME = ":"
+    comptime SCHEMA = "://"
+    comptime PATH = strSlash
+    comptime ROOT_PATH = strSlash
+    comptime CHAR_ESCAPE = "%"
+    comptime AUTHORITY = "@"
+    comptime QUERY = "?"
+    comptime SCHEME = ":"
 
 
 struct PortBounds:
     # For port parsing
-    alias NINE: UInt8 = ord("9")
-    alias ZERO: UInt8 = ord("0")
+    comptime NINE: UInt8 = ord("9")
+    comptime ZERO: UInt8 = ord("0")
 
 
 @fieldwise_init
-struct Scheme(Hashable, EqualityComparable, Representable, Stringable, Writable, ImplicitlyCopyable, Movable):
+struct Scheme(EqualityComparable, Hashable, ImplicitlyCopyable, Movable, Representable, Stringable, Writable):
     var value: String
-    alias HTTP = Self("http")
-    alias HTTPS = Self("https")
+    comptime HTTP = Self("http")
+    comptime HTTPS = Self("https")
 
     fn __hash__[H: Hasher](self, mut hasher: H):
         hasher.update(self.value)
@@ -120,7 +111,7 @@ struct Scheme(Hashable, EqualityComparable, Representable, Stringable, Writable,
 
 
 @fieldwise_init
-struct URI(Writable, Stringable, Representable, Copyable, Movable):
+struct URI(Copyable, Movable, Representable, Stringable, Writable):
     var _original_path: String
     var scheme: String
     var path: String

@@ -1,13 +1,14 @@
-from lightbug_http.connection import dial_udp
 from lightbug_http.address import UDPAddr
+from lightbug_http.connection import dial_udp
 
-alias test_string = "Hello, lightbug!"
+
+comptime test_string = "Hello, lightbug!"
 
 
 fn main() raises:
     print("Dialing UDP server...")
-    alias host = "127.0.0.1"
-    alias port = 12000
+    comptime host = "127.0.0.1"
+    comptime port = 12000
     var udp = dial_udp(host, port)
 
     print("Sending " + String(len(test_string)) + " messages to the server...")

@@ -1,19 +1,20 @@
-from python import Python, PythonObject
-from lightbug_http.io.bytes import Bytes
-from lightbug_http.error import ErrorHandler
-from lightbug_http.uri import URI
-from lightbug_http.http import HTTPRequest, HTTPResponse
-from lightbug_http.connection import Listener, Connection
 from lightbug_http.address import Addr, TCPAddr
-from lightbug_http.service import HTTPService, OK
-from lightbug_http.server import ServerTrait
 from lightbug_http.client import Client
-from lightbug_http.io.bytes import bytes
-from lightbug_http.header import Headers, Header
+from lightbug_http.connection import Connection, Listener
+from lightbug_http.error import ErrorHandler
+from lightbug_http.header import Header, Headers
+from lightbug_http.io.bytes import Bytes, bytes
+from lightbug_http.server import ServerTrait
+from lightbug_http.service import OK, HTTPService
+from lightbug_http.uri import URI
+from python import Python, PythonObject
 
-alias default_server_conn_string = "http://localhost:8080"
+from lightbug_http.http import HTTPRequest, HTTPResponse
 
-alias defaultExpectedGetResponse = bytes(
+
+comptime default_server_conn_string = "http://localhost:8080"
+
+comptime defaultExpectedGetResponse = bytes(
     "HTTP/1.1 200 OK\r\nServer: lightbug_http\r\nContent-Type:"
     " text/plain\r\nContent-Length: 12\r\nConnection: close\r\nDate:"
     " \r\n\r\nHello world!"

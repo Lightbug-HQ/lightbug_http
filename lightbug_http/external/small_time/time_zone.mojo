@@ -1,19 +1,22 @@
 # small_time library, courtesy @thatstoasty , 2025
-# https://github.com/thatstoasty/small-time/ 
+# https://github.com/thatstoasty/small-time/
 from collections import Optional
+
 import lightbug_http.external.small_time.c
 
-alias UTC = "UTC"
-alias UTC_TZ = TimeZone(0, UTC)
+
+comptime UTC = "UTC"
+comptime UTC_TZ = TimeZone(0, UTC)
 """UTC Timezone."""
 
-alias DASH = "-"
-alias PLUS = "+"
-alias COLON = ":"
+comptime DASH = "-"
+comptime PLUS = "+"
+comptime COLON = ":"
+
 
 fn local() -> TimeZone:
     """Returns the local timezone.
-    
+
     Returns:
         Local timezone.
     """
@@ -23,10 +26,10 @@ fn local() -> TimeZone:
 
 fn _is_numeric(c: Byte) -> Bool:
     """Checks if a character is numeric.
-    
+
     Args:
         c: Character.
-    
+
     Returns:
         True if the character is numeric, False otherwise.
     """
@@ -38,17 +41,17 @@ fn from_utc(utc_str: String) raises -> TimeZone:
 
     Args:
         utc_str: UTC string.
-    
+
     Returns:
         Timezone.
-    
+
     Raises:
         Error: If the UTC string is invalid.
     """
     var timezone = utc_str.as_string_slice()
     if len(timezone) == 0:
         raise Error("utc_str is empty")
-    
+
     if timezone == "utc" or timezone == "UTC" or timezone == "Z":
         return TimeZone(0, String("utc"))
 
@@ -56,7 +59,7 @@ fn from_utc(utc_str: String) raises -> TimeZone:
     # Skip the UTC prefix.
     if len(timezone) > 3 and timezone[0:3] == UTC:
         i = 3
-    
+
     var sign = -1 if timezone[i] == DASH else 1
     if timezone[i] == PLUS or timezone[i] == DASH:
         i += 1
@@ -75,14 +78,15 @@ fn from_utc(utc_str: String) raises -> TimeZone:
         minutes = atol(timezone[i : i + 2])
     else:
         raise Error("utc_str format is invalid")
-    
+
     var offset = sign * (hours * 3600 + minutes * 60)
     return TimeZone(offset)
 
 
 @fieldwise_init
-struct TimeZone(Stringable, ImplicitlyCopyable):
+struct TimeZone(ImplicitlyCopyable, Stringable):
     """Timezone."""
+
     var offset: Int
     """Offset in seconds."""
     var name: Optional[String]
@@ -121,7 +125,7 @@ struct TimeZone(Stringable, ImplicitlyCopyable):
 
         Args:
             sep: Separator between hours and minutes.
-        
+
         Returns:
             Formatted timezone.
         """

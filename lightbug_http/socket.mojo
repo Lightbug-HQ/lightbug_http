@@ -1,67 +1,52 @@
-from memory import stack_allocation
-from utils import StaticTuple
-from sys import size_of, external_call
+from sys import external_call, size_of
+from sys.ffi import c_char, c_int, c_uint
 from sys.info import CompilationTarget
-from memory import Pointer, LegacyUnsafePointer
-from lightbug_http._libc import (
-    socket,
+
+from lightbug_http._logger import logger
+from lightbug_http.address import Addr, NetworkType, binary_ip_to_string, binary_port_to_int, get_ip_address
+from lightbug_http.c.address import AddressFamily, AddressLength, ProtocolFamily
+from lightbug_http.c.aliases import c_void
+from lightbug_http.c.network import htons, in_addr, inet_ntop, inet_pton, ntohs
+from lightbug_http.c.socket import (
+    SOL_SOCKET,
+    CloseInvalidDescriptorError,
+    ShutdownInvalidArgumentError,
+    ShutdownOption,
+    SocketOption,
+    SocketType,
+    accept,
+    bind,
+    close,
     connect,
+    getpeername,
+    getsockname,
+    getsockopt,
+    listen,
     recv,
     recvfrom,
     send,
     sendto,
-    shutdown,
-    inet_pton,
-    inet_ntop,
-    htons,
-    ntohs,
-    gai_strerror,
-    bind,
-    listen,
-    accept,
     setsockopt,
-    getsockopt,
-    getsockname,
-    getpeername,
-    close,
+    shutdown,
     sockaddr,
     sockaddr_in,
-    addrinfo,
+    socket,
     socklen_t,
-    c_void,
-    c_uint,
-    c_char,
-    c_int,
-    in_addr,
-    SHUT_RDWR,
-    SOL_SOCKET,
-    AddressFamily,
-    AddressLength,
-    SOCK_STREAM,
-    SO_REUSEADDR,
-    SO_RCVTIMEO,
-    CloseInvalidDescriptorError,
-    ShutdownInvalidArgumentError,
-)
-from lightbug_http.io.bytes import Bytes
-from lightbug_http.address import (
-    NetworkType,
-    Addr,
-    binary_port_to_int,
-    binary_ip_to_string,
-    addrinfo_macos,
-    addrinfo_unix,
 )
 from lightbug_http.connection import default_buffer_size
-from lightbug_http._logger import logger
+from lightbug_http.io.bytes import Bytes
+from memory import stack_allocation
+from utils import StaticTuple
 
 
-alias SocketClosedError = "Socket: Socket is already closed"
+comptime SocketClosedError = "Socket: Socket is already closed"
 
 
-struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily = AddressFamily.AF_INET](
-    Representable, Stringable, Writable
-):
+@fieldwise_init
+struct Socket[
+    AddrType: Addr & ImplicitlyCopyable,
+    address_family: AddressFamily = AddressFamily.AF_INET,
+](Movable, Representable, Stringable, Writable):
     """Represents a network file descriptor. Wraps around a file descriptor and provides network functions.
 
     Args:
@@ -72,15 +57,15 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         protocol: The protocol.
     """
 
-    var fd: Int32
+    var fd: FileDescriptor
     """The file descriptor of the socket."""
-    var socket_type: Int32
+    var socket_type: SocketType
     """The socket type."""
-    var protocol: Byte
+    var protocol: ProtocolFamily
     """The protocol."""
-    var _local_address: AddrType
+    var local_address: AddrType
     """The local address of the socket (local address if bound)."""
-    var _remote_address: AddrType
+    var remote_address: AddrType
     """The remote address of the socket (peer's address if connected)."""
     var _closed: Bool
     """Whether the socket is closed."""
@@ -91,8 +76,8 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         out self,
         local_address: AddrType = AddrType(),
         remote_address: AddrType = AddrType(),
-        socket_type: Int32 = SOCK_STREAM,
-        protocol: Byte = 0,
+        socket_type: SocketType = SocketType.SOCK_STREAM,
+        protocol: ProtocolFamily = ProtocolFamily.PF_UNSPEC,
     ) raises:
         """Create a new socket object.
 
@@ -107,17 +92,17 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         """
         self.socket_type = socket_type
         self.protocol = protocol
-        self.fd = socket(address_family.value, socket_type, 0)
-        self._local_address = local_address
-        self._remote_address = remote_address
+        self.fd = FileDescriptor(Int(socket(address_family.value, socket_type.value, protocol.value)))
+        self.local_address = local_address
+        self.remote_address = remote_address
         self._closed = False
         self._connected = False
 
     fn __init__(
         out self,
-        fd: Int32,
-        socket_type: Int32,
-        protocol: Byte,
+        fd: FileDescriptor,
+        socket_type: SocketType,
+        protocol: ProtocolFamily,
         local_address: AddrType,
         remote_address: AddrType = AddrType(),
     ):
@@ -134,28 +119,12 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         self.fd = fd
         self.socket_type = socket_type
         self.protocol = protocol
-        self._local_address = local_address
-        self._remote_address = remote_address
+        self.local_address = local_address
+        self.remote_address = remote_address
         self._closed = False
         self._connected = True
 
-    fn __moveinit__(out self, deinit existing: Self):
-        """Initialize a new socket object by moving the data from an existing socket object.
-
-        Args:
-            existing: The existing socket object to move the data from.
-        """
-        self.fd = existing.fd
-        self.socket_type = existing.socket_type
-        self.protocol = existing.protocol
-
-        self._local_address = existing._local_address^
-        self._remote_address = existing._remote_address^
-
-        self._closed = existing._closed
-        self._connected = existing._connected
-
-    fn teardown(mut self) raises:
+    fn teardown(deinit self) raises:
         """Close the socket and free the file descriptor."""
         if self._connected:
             try:
@@ -172,7 +141,7 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
     fn __del__(deinit self):
         """Close the socket when the object is deleted."""
         try:
-            self.teardown()
+            self^.teardown()
         except e:
             logger.debug("Socket.__del__: Failed to close socket during deletion:", e)
 
@@ -183,26 +152,19 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         return String.write(self)
 
     fn write_to[W: Writer, //](self, mut writer: W):
-        @parameter
-        fn af() -> String:
-            if address_family == AddressFamily.AF_INET:
-                return "AF_INET"
-            else:
-                return "AF_INET6"
-
         writer.write(
             "Socket[",
             AddrType._type,
             ", ",
-            af(),
+            address_family,
             "]",
             "(",
             "fd=",
-            String(self.fd),
-            ", _local_address=",
-            repr(self._local_address),
-            ", _remote_address=",
-            repr(self._remote_address),
+            String(self.fd.value),
+            ", local_address=",
+            repr(self.local_address),
+            ", remote_address=",
+            repr(self.remote_address),
             ", _closed=",
             String(self._closed),
             ", _connected=",
@@ -210,39 +172,7 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
             ")",
         )
 
-    fn local_address(ref self) -> ref [self._local_address] AddrType:
-        """Return the local address of the socket as a UDP address.
-
-        Returns:
-            The local address of the socket as a UDP address.
-        """
-        return self._local_address
-
-    fn set_local_address(mut self, address: AddrType) -> None:
-        """Set the local address of the socket.
-
-        Args:
-            address: The local address to set.
-        """
-        self._local_address = address
-
-    fn remote_address(ref self) -> ref [self._remote_address] AddrType:
-        """Return the remote address of the socket as a UDP address.
-
-        Returns:
-            The remote address of the socket as a UDP address.
-        """
-        return self._remote_address
-
-    fn set_remote_address(mut self, address: AddrType) -> None:
-        """Set the remote address of the socket.
-
-        Args:
-            address: The remote address to set.
-        """
-        self._remote_address = address
-
-    fn accept(self) raises -> Socket[AddrType]:
+    fn accept(self) raises -> Self where address_family.is_inet():
         """Accept a connection. The socket must be bound to an address and listening for connections.
         The return value is a connection where conn is a new socket object usable to send and receive data on the connection,
         and address is the address bound to the socket on the other end of the connection.
@@ -253,21 +183,21 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         Raises:
             Error: If the connection fails.
         """
-        var new_socket_fd: c_int
+        var new_socket_fd: FileDescriptor
         try:
             new_socket_fd = accept(self.fd)
         except e:
             logger.error(e)
             raise Error("Socket.accept: Failed to accept connection, system `accept()` returned an error.")
 
-        var new_socket = Socket(
+        var new_socket = Self(
             fd=new_socket_fd,
             socket_type=self.socket_type,
             protocol=self.protocol,
-            local_address=self.local_address(),
+            local_address=self.local_address,
         )
         var peer = new_socket.get_peer_name()
-        new_socket.set_remote_address(AddrType(peer[0], peer[1]))
+        new_socket.remote_address = AddrType(peer[0], peer[1])
         return new_socket^
 
     fn listen(self, backlog: UInt = 0) raises:
@@ -285,7 +215,7 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
             logger.error(e)
             raise Error("Socket.listen: Failed to listen for connections.")
 
-    fn bind(mut self, address: String, port: UInt16) raises:
+    fn bind(mut self, address: String, port: UInt16) raises where address_family.is_inet():
         """Bind the socket to address. The socket must not already be bound. (The format of address depends on the address family).
 
         When a socket is created with Socket(), it exists in a name
@@ -322,9 +252,9 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
             raise Error("Socket.bind: Binding socket failed.")
 
         var local = self.get_sock_name()
-        self._local_address = AddrType(local[0], local[1])
+        self.local_address = AddrType(local[0], local[1])
 
-    fn get_sock_name(self) raises -> Tuple[String, UInt16]:
+    fn get_sock_name(self) raises -> Tuple[String, UInt16] where address_family.is_inet():
         """Return the address of the socket.
 
         Returns:
@@ -338,11 +268,12 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
 
         # TODO: Add check to see if the socket is bound and error if not.
         var local_address = stack_allocation[1, sockaddr]()
+        var addr_len = socklen_t(size_of[sockaddr]())
         try:
             getsockname(
                 self.fd,
                 local_address,
-                Pointer(to=socklen_t(size_of[sockaddr]())),
+                addr_len,
             )
         except e:
             logger.error(e)
@@ -353,7 +284,7 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
             binary_port_to_int(addr_in.sin_port)
         )
 
-    fn get_peer_name(self) raises -> Tuple[String, UInt16]:
+    fn get_peer_name(self) raises -> Tuple[String, UInt16] where address_family.is_inet():
         """Return the address of the peer connected to the socket.
 
         Returns:
@@ -377,7 +308,7 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
             binary_port_to_int(addr_in.sin_port)
         )
 
-    fn get_socket_option(self, option_name: Int) raises -> Int:
+    fn get_socket_option(self, option_name: SocketOption) raises -> Int:
         """Return the value of the given socket option.
 
         Args:
@@ -390,13 +321,13 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
             Error: If getting the socket option fails.
         """
         try:
-            return getsockopt(self.fd, SOL_SOCKET, option_name)
+            return getsockopt(self.fd, SOL_SOCKET, option_name.value)
         except e:
             # TODO: Should this be a warning or an error?
             logger.warn("Socket.get_socket_option: Failed to get socket option.")
             raise e
 
-    fn set_socket_option(self, option_name: Int, var option_value: Byte = 1) raises:
+    fn set_socket_option(self, option_name: SocketOption, var option_value: Int = 1) raises:
         """Return the value of the given socket option.
 
         Args:
@@ -407,13 +338,13 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
             Error: If setting the socket option fails.
         """
         try:
-            setsockopt(self.fd, SOL_SOCKET, option_name, option_value)
+            setsockopt(self.fd, SOL_SOCKET, option_name.value, option_value)
         except e:
             # TODO: Should this be a warning or an error?
             logger.warn("Socket.set_socket_option: Failed to set socket option.")
             raise e
 
-    fn connect(mut self, address: String, port: UInt16) raises -> None:
+    fn connect(mut self, mut address: String, port: UInt16) raises -> None where address_family.is_inet():
         """Connect to a remote socket at address.
 
         Args:
@@ -423,13 +354,7 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         Raises:
             Error: If connecting to the remote socket fails.
         """
-
-        @parameter
-        if CompilationTarget.is_macos():
-            ip = addrinfo_macos().get_ip_address(address)
-        else:
-            ip = addrinfo_unix().get_ip_address(address)
-
+        var ip = get_ip_address(address)
         var addr = sockaddr_in(address_family=Int(address_family.value), port=port, binary_ip=ip.s_addr)
         try:
             connect(self.fd, addr)
@@ -438,48 +363,16 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
             raise e
 
         var remote = self.get_peer_name()
-        self._remote_address = AddrType(remote[0], remote[1])
+        self.remote_address = AddrType(remote[0], remote[1])
 
     fn send(self, buffer: Span[Byte]) raises -> UInt:
         try:
-            return send(self.fd, buffer.unsafe_ptr(), UInt(len(buffer)), 0)
+            return send(self.fd, buffer, UInt(len(buffer)), 0)
         except e:
             logger.error("Socket.send: Failed to write data to connection.")
             raise e
 
-    fn send_all(self, src: Span[Byte], max_attempts: Int = 3) raises -> None:
-        """Send data to the socket. The socket must be connected to a remote socket.
-
-        Args:
-            src: The data to send.
-            max_attempts: The maximum number of attempts to send the data.
-
-        Raises:
-            Error: If sending the data fails, or if the data is not sent after the maximum number of attempts.
-        """
-        var total_bytes_sent = 0
-        var attempts = 0
-
-        # Try to send all the data in the buffer. If it did not send all the data, keep trying but start from the offset of the last successful send.
-        while total_bytes_sent < len(src):
-            if attempts > max_attempts:
-                raise Error("Failed to send message after " + String(max_attempts) + " attempts.")
-
-            var sent: UInt
-            try:
-                sent = self.send(src[total_bytes_sent:])
-            except e:
-                logger.error(e)
-                raise Error(
-                    "Socket.send_all: Failed to send message, wrote"
-                    + String(total_bytes_sent)
-                    + "bytes before failing."
-                )
-
-            total_bytes_sent += Int(sent)
-            attempts += 1
-
-    fn send_to(mut self, src: Span[Byte], address: String, port: UInt16) raises -> UInt:
+    fn send_to(mut self, src: Span[Byte], mut address: String, port: UInt16) raises -> UInt:
         """Send data to the a remote address by connecting to the remote socket before sending.
         The socket must be not already be connected to a remote socket.
 
@@ -494,17 +387,9 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         Raises:
             Error: If sending the data fails.
         """
-
-        @parameter
-        if CompilationTarget.is_macos():
-            ip = addrinfo_macos().get_ip_address(address)
-        else:
-            ip = addrinfo_unix().get_ip_address(address)
-
+        var ip = get_ip_address(address)
         var addr = sockaddr_in(address_family=Int(address_family.value), port=port, binary_ip=ip.s_addr)
-        bytes_sent = sendto(self.fd, src.unsafe_ptr(), UInt(len(src)), 0, LegacyUnsafePointer(to=addr).bitcast[sockaddr]())
-
-        return bytes_sent
+        return sendto(self.fd, src, UInt(len(src)), 0, UnsafePointer(to=addr).bitcast[sockaddr]().as_immutable())
 
     fn _receive(self, mut buffer: Bytes) raises -> UInt:
         """Receive data from the socket into the buffer.
@@ -524,7 +409,7 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         try:
             bytes_received = recv(
                 self.fd,
-                buffer.unsafe_ptr().offset(size),
+                Span(buffer)[size:],
                 UInt(buffer.capacity - len(buffer)),
                 0,
             )
@@ -566,7 +451,7 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         """
         return self._receive(buffer)
 
-    fn _receive_from(self, mut buffer: Bytes) raises -> Tuple[UInt, String, UInt16]:
+    fn _receive_from(self, mut buffer: Bytes) raises -> Tuple[UInt, String, UInt16] where address_family.is_inet():
         """Receive data from the socket into the buffer.
 
         Args:
@@ -584,7 +469,7 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         try:
             var size = len(buffer)
             bytes_received = recvfrom(
-                self.fd, buffer.unsafe_ptr().offset(size), UInt(buffer.capacity - len(buffer)), 0, remote_address
+                self.fd, Span(buffer)[size:], UInt(buffer.capacity - len(buffer)), 0, remote_address
             )
             buffer._len += Int(bytes_received)
         except e:
@@ -601,7 +486,9 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
             UInt16(binary_port_to_int(addr_in.sin_port)),
         )
 
-    fn receive_from(mut self, size: Int = default_buffer_size) raises -> Tuple[List[Byte], String, UInt16]:
+    fn receive_from(
+        mut self, size: Int = default_buffer_size
+    ) raises -> Tuple[List[Byte], String, UInt16] where address_family.is_inet():
         """Receive data from the socket into the buffer dest.
 
         Args:
@@ -617,7 +504,9 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         _, host, port = self._receive_from(buffer)
         return buffer^, host, port
 
-    fn receive_from(mut self, mut dest: List[Byte]) raises -> Tuple[UInt, String, UInt16]:
+    fn receive_from(
+        mut self, mut dest: List[Byte]
+    ) raises -> Tuple[UInt, String, UInt16] where address_family.is_inet():
         """Receive data from the socket into the buffer dest.
 
         Args:
@@ -634,7 +523,7 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
     fn shutdown(mut self) raises -> None:
         """Shut down the socket. The remote end will receive no more data (after queued data is flushed)."""
         try:
-            shutdown(self.fd, SHUT_RDWR)
+            shutdown(self.fd, ShutdownOption.SHUT_RDWR)
         except e:
             # For the other errors, either the socket is already closed or the descriptor is invalid.
             # At that point we can feasibly say that the socket is already shut down.
@@ -667,7 +556,7 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
 
     fn get_timeout(self) raises -> Int:
         """Return the timeout value for the socket."""
-        return self.get_socket_option(SO_RCVTIMEO)
+        return self.get_socket_option(SocketOption.SO_RCVTIMEO)
 
     fn set_timeout(self, var duration: Int) raises:
         """Set the timeout value for the socket.
@@ -675,4 +564,4 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         Args:
             duration: Seconds - The timeout duration in seconds.
         """
-        self.set_socket_option(SO_RCVTIMEO, duration)
+        self.set_socket_option(SocketOption.SO_RCVTIMEO, duration)

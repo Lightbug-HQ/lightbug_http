@@ -1,27 +1,25 @@
-from collections import Dict, Optional
-from lightbug_http.io.bytes import Bytes, ByteReader, ByteWriter, is_newline, is_space
-from lightbug_http.strings import BytesConstant
 from lightbug_http._logger import logger
-from lightbug_http.strings import rChar, nChar, lineBreak, to_string
+from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter, is_newline, is_space
+from lightbug_http.strings import BytesConstant, lineBreak, nChar, rChar, to_string
 
 
 struct HeaderKey:
     # TODO: Fill in more of these
-    alias CONNECTION = "connection"
-    alias CONTENT_TYPE = "content-type"
-    alias CONTENT_LENGTH = "content-length"
-    alias CONTENT_ENCODING = "content-encoding"
-    alias TRANSFER_ENCODING = "transfer-encoding"
-    alias DATE = "date"
-    alias LOCATION = "location"
-    alias HOST = "host"
-    alias SERVER = "server"
-    alias SET_COOKIE = "set-cookie"
-    alias COOKIE = "cookie"
+    comptime CONNECTION = "connection"
+    comptime CONTENT_TYPE = "content-type"
+    comptime CONTENT_LENGTH = "content-length"
+    comptime CONTENT_ENCODING = "content-encoding"
+    comptime TRANSFER_ENCODING = "transfer-encoding"
+    comptime DATE = "date"
+    comptime LOCATION = "location"
+    comptime HOST = "host"
+    comptime SERVER = "server"
+    comptime SET_COOKIE = "set-cookie"
+    comptime COOKIE = "cookie"
 
 
 @fieldwise_init
-struct Header(Writable, Stringable, Copyable, Movable):
+struct Header(Copyable, Movable, Stringable, Writable):
     var key: String
     var value: String
 
@@ -38,7 +36,7 @@ fn write_header[T: Writer](mut writer: T, key: String, value: String):
 
 
 @fieldwise_init
-struct Headers(Writable, Stringable, Copyable, Movable):
+struct Headers(Copyable, Movable, Stringable, Writable):
     """Represents the header key/values in an http request/response.
 
     Header keys are normalized to lowercase

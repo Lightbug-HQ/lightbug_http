@@ -1,2 +1,2 @@
 # Time in nanoseconds
-alias Duration = Int
+comptime Duration = Int

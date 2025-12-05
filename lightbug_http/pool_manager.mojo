@@ -1,12 +1,13 @@
-from collections import Dict
 from hashlib.hash import Hasher
-from lightbug_http.connection import create_connection, TCPConnection, Connection
+
 from lightbug_http._logger import logger
 from lightbug_http._owning_list import OwningList
+from lightbug_http.connection import Connection, TCPConnection, create_connection
 from lightbug_http.uri import Scheme
 
+
 @fieldwise_init
-struct PoolKey(Hashable, KeyElement, Writable, Stringable, ImplicitlyCopyable):
+struct PoolKey(Hashable, ImplicitlyCopyable, KeyElement, Stringable, Writable):
     var host: String
     var port: UInt16
     var scheme: Scheme
@@ -93,7 +94,7 @@ struct PoolManager[ConnectionType: Connection]():
         while self._connections:
             var connection = self._connections.pop(0)
             try:
-                connection.teardown()
+                connection^.teardown()
             except e:
                 # TODO: This is used in __del__, would be nice if we didn't have to absorb the error.
                 logger.error("Failed to tear down connection. Error:", e)

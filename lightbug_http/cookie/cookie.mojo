@@ -1,19 +1,20 @@
 from collections import Optional
+
 from lightbug_http.header import HeaderKey
 
 
 struct Cookie(Copyable, Movable):
-    alias EXPIRES = "Expires"
-    alias MAX_AGE = "Max-Age"
-    alias DOMAIN = "Domain"
-    alias PATH = "Path"
-    alias SECURE = "Secure"
-    alias HTTP_ONLY = "HttpOnly"
-    alias SAME_SITE = "SameSite"
-    alias PARTITIONED = "Partitioned"
+    comptime EXPIRES = "Expires"
+    comptime MAX_AGE = "Max-Age"
+    comptime DOMAIN = "Domain"
+    comptime PATH = "Path"
+    comptime SECURE = "Secure"
+    comptime HTTP_ONLY = "HttpOnly"
+    comptime SAME_SITE = "SameSite"
+    comptime PARTITIONED = "Partitioned"
 
-    alias SEPERATOR = "; "
-    alias EQUAL = "="
+    comptime SEPERATOR = "; "
+    comptime EQUAL = "="
 
     var name: String
     var value: String

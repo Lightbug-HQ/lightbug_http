@@ -1,45 +1,30 @@
-from memory import LegacyUnsafePointer, Span
-from collections import Optional
-from sys.ffi import external_call
-from lightbug_http.strings import to_string
-from lightbug_http._logger import logger
-from lightbug_http.socket import Socket
-from lightbug_http._libc import (
-    c_int,
-    c_char,
-    c_uchar,
-    in_addr,
-    sockaddr,
-    sockaddr_in,
-    socklen_t,
-    AddressFamily,
-    AddressLength,
-    SOCK_STREAM,
-    ntohs,
-    inet_ntop,
-    socket,
-    gai_strerror,
-)
+from sys.ffi import CompilationTarget, c_char, c_int, c_uchar, external_call
 
-alias MAX_PORT = 65535
-alias MIN_PORT = 0
-alias DEFAULT_IP_PORT = UInt16(0)
+from lightbug_http._logger import logger
+from lightbug_http.c.address import AddressFamily, AddressLength
+from lightbug_http.c.aliases import ExternalImmutUnsafePointer, ExternalMutUnsafePointer, c_void
+from lightbug_http.c.network import in_addr, inet_ntop, ntohs, sockaddr, sockaddr_in, socklen_t
+from lightbug_http.c.socket import SocketType, socket
+from lightbug_http.socket import Socket
+from lightbug_http.strings import to_string
+
+
+comptime MAX_PORT = 65535
+comptime MIN_PORT = 0
+comptime DEFAULT_IP_PORT = UInt16(0)
 
 
 struct AddressConstants:
     """Constants used in address parsing."""
 
-    alias LOCALHOST = "localhost"
-    alias IPV4_LOCALHOST = "127.0.0.1"
-    alias IPV6_LOCALHOST = "::1"
-    alias EMPTY = ""
+    comptime LOCALHOST = "localhost"
+    comptime IPV4_LOCALHOST = "127.0.0.1"
+    comptime IPV6_LOCALHOST = "::1"
+    comptime EMPTY = ""
 
 
-trait Addr(Stringable, Representable, Writable, EqualityComparable, Movable, Copyable):
-    alias _type: StaticString
-
-    fn __init__(out self):
-        ...
+trait Addr(Copyable, Defaultable, EqualityComparable, Movable, Representable, Stringable, Writable):
+    comptime _type: StaticString
 
     fn __init__(out self, ip: String, port: UInt16):
         ...
@@ -62,30 +47,26 @@ trait Addr(Stringable, Representable, Writable, EqualityComparable, Movable, Cop
 
 
 trait AnAddrInfo:
-    fn get_ip_address(self, host: String) raises -> in_addr:
-        """TODO: Once default functions can be implemented in traits, this should use the functions currently
-        implemented in the `addrinfo_macos` and `addrinfo_unix` structs.
-        """
-        ...
+    ...
 
 
 @fieldwise_init
-struct NetworkType(EqualityComparable, Movable, ImplicitlyCopyable):
+struct NetworkType(EqualityComparable, ImplicitlyCopyable, Movable):
     var value: String
 
-    alias empty = NetworkType("")
-    alias tcp = NetworkType("tcp")
-    alias tcp4 = NetworkType("tcp4")
-    alias tcp6 = NetworkType("tcp6")
-    alias udp = NetworkType("udp")
-    alias udp4 = NetworkType("udp4")
-    alias udp6 = NetworkType("udp6")
-    alias ip = NetworkType("ip")
-    alias ip4 = NetworkType("ip4")
-    alias ip6 = NetworkType("ip6")
-    alias unix = NetworkType("unix")
+    comptime empty = NetworkType("")
+    comptime tcp = NetworkType("tcp")
+    comptime tcp4 = NetworkType("tcp4")
+    comptime tcp6 = NetworkType("tcp6")
+    comptime udp = NetworkType("udp")
+    comptime udp4 = NetworkType("udp4")
+    comptime udp6 = NetworkType("udp6")
+    comptime ip = NetworkType("ip")
+    comptime ip4 = NetworkType("ip4")
+    comptime ip6 = NetworkType("ip6")
+    comptime unix = NetworkType("unix")
 
-    alias SUPPORTED_TYPES = [
+    comptime SUPPORTED_TYPES = [
         Self.tcp,
         Self.tcp4,
         Self.tcp6,
@@ -96,17 +77,17 @@ struct NetworkType(EqualityComparable, Movable, ImplicitlyCopyable):
         Self.ip4,
         Self.ip6,
     ]
-    alias TCP_TYPES = [
+    comptime TCP_TYPES = [
         Self.tcp,
         Self.tcp4,
         Self.tcp6,
     ]
-    alias UDP_TYPES = [
+    comptime UDP_TYPES = [
         Self.udp,
         Self.udp4,
         Self.udp6,
     ]
-    alias IP_TYPES = [
+    comptime IP_TYPES = [
         Self.ip,
         Self.ip4,
         Self.ip6,
@@ -114,9 +95,6 @@ struct NetworkType(EqualityComparable, Movable, ImplicitlyCopyable):
 
     fn __eq__(self, other: NetworkType) -> Bool:
         return self.value == other.value
-
-    fn __ne__(self, other: NetworkType) -> Bool:
-        return self.value != other.value
 
     fn is_ip_protocol(self) -> Bool:
         """Check if the network type is an IP protocol."""
@@ -133,7 +111,7 @@ struct NetworkType(EqualityComparable, Movable, ImplicitlyCopyable):
 
 # @fieldwise_init
 struct TCPAddr[Network: NetworkType = NetworkType.tcp4](Addr, ImplicitlyCopyable):
-    alias _type = "TCPAddr"
+    comptime _type = "TCPAddr"
     var ip: String
     var port: UInt16
     var zone: String  # IPv6 addressing zone
@@ -194,7 +172,7 @@ struct TCPAddr[Network: NetworkType = NetworkType.tcp4](Addr, ImplicitlyCopyable
 
 @fieldwise_init
 struct UDPAddr[Network: NetworkType = NetworkType.udp4](Addr, ImplicitlyCopyable):
-    alias _type = "UDPAddr"
+    comptime _type = "UDPAddr"
     var ip: String
     var port: UInt16
     var zone: String  # IPv6 addressing zone
@@ -261,52 +239,26 @@ struct addrinfo_macos(AnAddrInfo):
     var ai_socktype: c_int
     var ai_protocol: c_int
     var ai_addrlen: socklen_t
-    var ai_canonname: UnsafePointer[c_char, MutOrigin.external]
-    var ai_addr: UnsafePointer[sockaddr, MutOrigin.external]
-    var ai_next: LegacyOpaquePointer
+    var ai_canonname: ExternalMutUnsafePointer[c_char]
+    var ai_addr: ExternalMutUnsafePointer[sockaddr]
+    var ai_next: ExternalMutUnsafePointer[c_void]
 
     fn __init__(
         out self,
         ai_flags: c_int = 0,
-        ai_family: c_int = 0,
-        ai_socktype: c_int = 0,
+        ai_family: AddressFamily = AddressFamily.AF_UNSPEC,
+        ai_socktype: SocketType = SocketType.SOCK_STREAM,
         ai_protocol: c_int = 0,
         ai_addrlen: socklen_t = 0,
     ):
         self.ai_flags = ai_flags
-        self.ai_family = ai_family
-        self.ai_socktype = ai_socktype
+        self.ai_family = ai_family.value
+        self.ai_socktype = ai_socktype.value
         self.ai_protocol = ai_protocol
         self.ai_addrlen = ai_addrlen
         self.ai_canonname = {}
         self.ai_addr = {}
         self.ai_next = {}
-
-    fn get_ip_address(self, host: String) raises -> in_addr:
-        """Returns an IP address based on the host.
-        This is a MacOS-specific implementation.
-
-        Args:
-            host: String - The host to get the IP from.
-
-        Returns:
-            The IP address.
-        """
-        var result = UnsafePointer[Self, MutOrigin.external]()
-        var hints = Self(ai_flags=0, ai_family=AddressFamily.AF_INET.value, ai_socktype=SOCK_STREAM, ai_protocol=0)
-        try:
-            getaddrinfo(host, String(), hints, result)
-        except e:
-            logger.error("Failed to get IP address.")
-            raise e
-
-        if not result[].ai_addr:
-            freeaddrinfo(result)
-            raise Error("Failed to get IP address because the response's `ai_addr` was null.")
-
-        var ip = result[].ai_addr.bitcast[sockaddr_in]()[].sin_addr
-        freeaddrinfo(result)
-        return ip
 
 
 @fieldwise_init
@@ -321,52 +273,72 @@ struct addrinfo_unix(AnAddrInfo):
     var ai_socktype: c_int
     var ai_protocol: c_int
     var ai_addrlen: socklen_t
-    var ai_addr: UnsafePointer[sockaddr, MutOrigin.external]
-    var ai_canonname: UnsafePointer[c_char, MutOrigin.external]
-    var ai_next: LegacyOpaquePointer
+    var ai_addr: ExternalMutUnsafePointer[sockaddr]
+    var ai_canonname: ExternalMutUnsafePointer[c_char]
+    var ai_next: ExternalMutUnsafePointer[c_void]
 
     fn __init__(
         out self,
         ai_flags: c_int = 0,
-        ai_family: c_int = 0,
-        ai_socktype: c_int = 0,
+        ai_family: AddressFamily = AddressFamily.AF_UNSPEC,
+        ai_socktype: SocketType = SocketType.SOCK_STREAM,
         ai_protocol: c_int = 0,
         ai_addrlen: socklen_t = 0,
     ):
         self.ai_flags = ai_flags
-        self.ai_family = ai_family
-        self.ai_socktype = ai_socktype
+        self.ai_family = ai_family.value
+        self.ai_socktype = ai_socktype.value
         self.ai_protocol = ai_protocol
         self.ai_addrlen = ai_addrlen
         self.ai_addr = {}
         self.ai_canonname = {}
         self.ai_next = {}
 
-    fn get_ip_address(self, host: String) raises -> in_addr:
-        """Returns an IP address based on the host.
-        This is a Unix-specific implementation.
 
-        Args:
-            host: String - The host to get IP from.
+fn get_ip_address(mut host: String) raises -> in_addr:
+    """Returns an IP address based on the host.
+    This is a Unix-specific implementation.
 
-        Returns:
-            The IP address.
-        """
-        var result = UnsafePointer[Self, MutOrigin.external]()
-        var hints = Self(ai_flags=0, ai_family=AddressFamily.AF_INET.value, ai_socktype=SOCK_STREAM, ai_protocol=0)
+    Args:
+        host: String - The host to get IP from.
+
+    Returns:
+        The IP address.
+    """
+
+    @parameter
+    if CompilationTarget.is_macos():
+        var result: CAddrInfo[addrinfo_macos]
+        var hints = addrinfo_macos(
+            ai_flags=0, ai_family=AddressFamily.AF_INET, ai_socktype=SocketType.SOCK_STREAM, ai_protocol=0
+        )
+        var service = String()
         try:
-            getaddrinfo(host, String(), hints, result)
+            result = getaddrinfo(host, service, hints)
         except e:
             logger.error("Failed to get IP address.")
             raise e
 
-        if not result[].ai_addr:
-            freeaddrinfo(result)
+        if not result.ptr[].ai_addr:
             raise Error("Failed to get IP address because the response's `ai_addr` was null.")
 
-        var ip = result[].ai_addr.bitcast[sockaddr_in]()[].sin_addr
-        freeaddrinfo(result)
-        return ip
+        return result.ptr[].ai_addr.bitcast[sockaddr_in]()[].sin_addr
+    else:
+        var result: CAddrInfo[addrinfo_unix]
+        var hints = addrinfo_unix(
+            ai_flags=0, ai_family=AddressFamily.AF_INET, ai_socktype=SocketType.SOCK_STREAM, ai_protocol=0
+        )
+        var service = String()
+        try:
+            result = getaddrinfo(host, service, hints)
+        except e:
+            logger.error("Failed to get IP address.")
+            raise e
+
+        if not result.ptr[].ai_addr:
+            raise Error("Failed to get IP address because the response's `ai_addr` was null.")
+
+        return result.ptr[].ai_addr.bitcast[sockaddr_in]()[].sin_addr
 
 
 fn is_ip_protocol(network: NetworkType) -> Bool:
@@ -438,7 +410,9 @@ fn parse_port[origin: ImmutOrigin](port_str: StringSlice[origin]) raises -> UInt
     return UInt16(port)
 
 
-fn parse_address[origin: ImmutOrigin](network: NetworkType, address: StringSlice[origin]) raises -> Tuple[String, UInt16]:
+fn parse_address[
+    origin: ImmutOrigin
+](network: NetworkType, address: StringSlice[origin]) raises -> Tuple[String, UInt16]:
     """Parse an address string into a host and port.
 
     Args:
@@ -495,6 +469,7 @@ fn parse_address[origin: ImmutOrigin](network: NetworkType, address: StringSlice
 
     return String(host), port
 
+
 # TODO: Support IPv6 long form.
 fn join_host_port(host: String, port: String) -> String:
     if host.find(":") != -1:  # must be IPv6 literal
@@ -502,8 +477,8 @@ fn join_host_port(host: String, port: String) -> String:
     return host + ":" + port
 
 
-alias MissingPortError = Error("missing port in address")
-alias TooManyColonsError = Error("too many colons in address")
+comptime MissingPortError = Error("missing port in address")
+comptime TooManyColonsError = Error("too many colons in address")
 
 
 fn binary_port_to_int(port: UInt16) -> Int:
@@ -518,7 +493,9 @@ fn binary_port_to_int(port: UInt16) -> Int:
     return Int(ntohs(port))
 
 
-fn binary_ip_to_string[address_family: AddressFamily](var ip_address: UInt32) raises -> String:
+fn binary_ip_to_string[
+    address_family: AddressFamily
+](var ip_address: UInt32) raises -> String where address_family.is_inet():
     """Convert a binary IP address to a string by calling `inet_ntop`.
 
     Parameters:
@@ -530,28 +507,70 @@ fn binary_ip_to_string[address_family: AddressFamily](var ip_address: UInt32) ra
     Returns:
         The IP address as a string.
     """
-    constrained[
-        address_family in [AddressFamily.AF_INET, AddressFamily.AF_INET6],
-        "Address family must be either AF_INET or AF_INET6.",
-    ]()
-    var ip: String
 
     @parameter
     if address_family == AddressFamily.AF_INET:
-        ip = inet_ntop[address_family, AddressLength.INET_ADDRSTRLEN](ip_address)
+        return inet_ntop[address_family, AddressLength.INET_ADDRSTRLEN](ip_address)
     else:
-        ip = inet_ntop[address_family, AddressLength.INET6_ADDRSTRLEN](ip_address)
+        return inet_ntop[address_family, AddressLength.INET6_ADDRSTRLEN](ip_address)
 
-    return ip
+
+fn freeaddrinfo[T: AnAddrInfo, //](ptr: ExternalMutUnsafePointer[T]):
+    """Free the memory allocated by `getaddrinfo`."""
+    external_call["freeaddrinfo", NoneType, type_of(ptr)](ptr)
+
+
+@fieldwise_init
+struct CAddrInfo[T: AnAddrInfo]:
+    """A wrapper around an ExternalMutUnsafePointer to an addrinfo struct.
+
+    This struct will call `freeaddrinfo` when it is deinitialized to free the memory allocated
+    by `getaddrinfo`. Make sure to use the data method to access the underlying pointer, so Mojo
+    knows that there's a reference to the pointer. If you access ptr directly, Mojo might destroy
+    the struct and free the pointer while you're still using it.
+    """
+
+    var ptr: ExternalMutUnsafePointer[T]
+
+    fn data(mut self) -> MutUnsafePointer[T, origin = origin_of(self)]:
+        return self.ptr.unsafe_origin_cast[origin_of(self)]()
+
+    fn __del__(deinit self):
+        if self.ptr:
+            freeaddrinfo(self.ptr)
+
+
+fn gai_strerror(ecode: c_int) -> ExternalImmutUnsafePointer[c_char]:
+    """Libc POSIX `gai_strerror` function.
+
+    Args:
+        ecode: The error code.
+
+    Returns:
+        An UnsafePointer to a string describing the error.
+
+    #### C Function
+    ```c
+    const char *gai_strerror(int ecode)
+    ```
+
+    #### Notes:
+    * Reference: https://man7.org/linux/man-pages/man3/gai_strerror.3p.html .
+    """
+    return external_call["gai_strerror", ExternalImmutUnsafePointer[c_char], type_of(ecode)](ecode)
 
 
 fn _getaddrinfo[
-    T: AnAddrInfo, node_origin: ImmutOrigin, serv_origin: ImmutOrigin, hints_origin: ImmutOrigin, result_origin: MutOrigin, //
+    T: AnAddrInfo,
+    node_origin: ImmutOrigin,
+    serv_origin: ImmutOrigin,
+    hints_origin: ImmutOrigin,
+    result_origin: MutOrigin, //,
 ](
-    nodename: UnsafePointer[mut=False, c_char, node_origin],
-    servname: UnsafePointer[mut=False, c_char, serv_origin],
+    nodename: ImmutUnsafePointer[c_char, node_origin],
+    servname: ImmutUnsafePointer[c_char, serv_origin],
     hints: Pointer[T, hints_origin],
-    res: Pointer[UnsafePointer[T, MutOrigin.external], result_origin],
+    res: Pointer[ExternalMutUnsafePointer[T], result_origin],
 ) -> c_int:
     """Libc POSIX `getaddrinfo` function.
 
@@ -559,7 +578,7 @@ fn _getaddrinfo[
         nodename: The node name.
         servname: The service name.
         hints: A Pointer to the hints.
-        res: A LegacyUnsafePointer to the result.
+        res: A Pointer to an UnsafePointer the result.
 
     Returns:
         0 on success, an error code on failure.
@@ -575,31 +594,32 @@ fn _getaddrinfo[
     return external_call[
         "getaddrinfo",
         c_int,
+        type_of(nodename),
+        type_of(servname),
+        type_of(hints),
+        type_of(res),
     ](nodename, servname, hints, res)
 
 
-fn getaddrinfo[
-    T: AnAddrInfo, //
-](var node: String, var service: String, hints: T, mut res: UnsafePointer[T, MutOrigin.external]) raises:
+fn getaddrinfo[T: AnAddrInfo, //](mut node: String, mut service: String, hints: T) raises -> CAddrInfo[T]:
     """Libc POSIX `getaddrinfo` function.
 
     Args:
         node: The node name.
         service: The service name.
-        hints: A Pointer to the hints.
-        res: A LegacyUnsafePointer to the result.
+        hints: An addrinfo struct containing hints for the lookup.
 
     Raises:
         Error: If an error occurs while attempting to receive data from the socket.
-        EAI_AGAIN: The name could not be resolved at this time. Future attempts may succeed.
-        EAI_BADFLAGS: The `ai_flags` value was invalid.
-        EAI_FAIL: A non-recoverable error occurred when attempting to resolve the name.
-        EAI_FAMILY: The `ai_family` member of the `hints` argument is not supported.
-        EAI_MEMORY: Out of memory.
-        EAI_NONAME: The name does not resolve for the supplied parameters.
-        EAI_SERVICE: The `servname` is not supported for `ai_socktype`.
-        EAI_SOCKTYPE: The `ai_socktype` is not supported.
-        EAI_SYSTEM: A system error occurred. `errno` is set in this case.
+        * EAI_AGAIN: The name could not be resolved at this time. Future attempts may succeed.
+        * EAI_BADFLAGS: The `ai_flags` value was invalid.
+        * EAI_FAIL: A non-recoverable error occurred when attempting to resolve the name.
+        * EAI_FAMILY: The `ai_family` member of the `hints` argument is not supported.
+        * EAI_MEMORY: Out of memory.
+        * EAI_NONAME: The name does not resolve for the supplied parameters.
+        * EAI_SERVICE: The `servname` is not supported for `ai_socktype`.
+        * EAI_SOCKTYPE: The `ai_socktype` is not supported.
+        * EAI_SYSTEM: A system error occurred. `errno` is set in this case.
 
     #### C Function
     ```c
@@ -609,17 +629,16 @@ fn getaddrinfo[
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/getaddrinfo.3p.html.
     """
+    var ptr = ExternalMutUnsafePointer[T]()
     var result = _getaddrinfo(
         node.unsafe_cstr_ptr(),
         service.unsafe_cstr_ptr(),
         Pointer(to=hints),
-        Pointer(to=res),
+        Pointer(to=ptr),
     )
 
     if result != 0:
-        raise Error("getaddrinfo: ", String(gai_strerror(result)))
+        raise Error("getaddrinfo: ", gai_strerror(result))
 
-
-fn freeaddrinfo[T: AnAddrInfo, //](ptr: UnsafePointer[T]):
-    """Free the memory allocated by `getaddrinfo`."""
-    external_call["freeaddrinfo", NoneType](ptr)
+    # CAddrInfo will be responsible for freeing the memory allocated by getaddrinfo.
+    return CAddrInfo[T](ptr=ptr)

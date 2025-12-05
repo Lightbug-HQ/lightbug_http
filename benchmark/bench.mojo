@@ -1,18 +1,19 @@
-from memory import Span
-from benchmark import *
-from lightbug_http.io.bytes import bytes, Bytes
-from lightbug_http.header import Headers, Header
-from lightbug_http.io.bytes import ByteReader, ByteWriter
-from lightbug_http.http import HTTPRequest, HTTPResponse, encode
-from lightbug_http.uri import URI
+from lightbug_http.header import Header, Headers
+from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter, bytes
 from lightbug_http.server import default_max_request_body_size, default_max_request_uri_length
+from lightbug_http.uri import URI
+from memory import Span
 
-alias headers = "GET /index.html HTTP/1.1\r\nHost: example.com\r\nUser-Agent: Mozilla/5.0\r\nContent-Type: text/html\r\nContent-Length: 1234\r\nConnection: close\r\nTrailer: end-of-message\r\n\r\n"
+from benchmark import *
+from lightbug_http.http import HTTPRequest, HTTPResponse, encode
 
-alias body = "I am the body of an HTTP request" * 5
-alias body_bytes = bytes(body)
-alias Request = "GET /index.html HTTP/1.1\r\nHost: example.com\r\nUser-Agent: Mozilla/5.0\r\nContent-Type: text/html\r\nContent-Length: 1234\r\nConnection: close\r\nTrailer: end-of-message\r\n\r\n" + body
-alias Response = "HTTP/1.1 200 OK\r\nserver: lightbug_http\r\ncontent-type: application/octet-stream\r\nconnection: keep-alive\r\ncontent-length: 13\r\ndate: 2024-06-02T13:41:50.766880+00:00\r\n\r\n" + body
+
+comptime headers = "GET /index.html HTTP/1.1\r\nHost: example.com\r\nUser-Agent: Mozilla/5.0\r\nContent-Type: text/html\r\nContent-Length: 1234\r\nConnection: close\r\nTrailer: end-of-message\r\n\r\n"
+
+comptime body = "I am the body of an HTTP request" * 5
+comptime body_bytes = bytes(body)
+comptime Request = "GET /index.html HTTP/1.1\r\nHost: example.com\r\nUser-Agent: Mozilla/5.0\r\nContent-Type: text/html\r\nContent-Length: 1234\r\nConnection: close\r\nTrailer: end-of-message\r\n\r\n" + body
+comptime Response = "HTTP/1.1 200 OK\r\nserver: lightbug_http\r\ncontent-type: application/octet-stream\r\nconnection: keep-alive\r\ncontent-length: 13\r\ndate: 2024-06-02T13:41:50.766880+00:00\r\n\r\n" + body
 
 
 fn main():
@@ -35,7 +36,7 @@ fn run_benchmark():
         print("failed to start benchmark")
 
 
-alias headers_struct = Headers(
+comptime headers_struct = Headers(
     Header("Content-Type", "application/json"),
     Header("Content-Length", "1234"),
     Header("Connection", "close"),

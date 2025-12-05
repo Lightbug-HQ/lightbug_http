@@ -1,7 +1,9 @@
-from lightbug_http.cookie import SameSite, Cookie, Duration, Expiration
-from lightbug_http.external.small_time.small_time import SmallTime, now
-from testing import assert_true, assert_equal, TestSuite
 from collections import Optional
+
+from testing import TestSuite, assert_equal, assert_true
+
+from lightbug_http.cookie import Cookie, Duration, Expiration, SameSite
+from lightbug_http.external.small_time.small_time import SmallTime, now
 
 
 fn test_set_cookie() raises:

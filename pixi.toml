@@ -1,15 +1,14 @@
 [workspace]
 authors = ["saviorand"]
-channels = ["conda-forge", "https://conda.modular.com/max", "https://repo.prefix.dev/modular-community"]
+channels = ["conda-forge", "https://conda.modular.com/max-nightly", "https://repo.prefix.dev/modular-community"]
 description = "Simple and fast HTTP framework for Mojo!"
-name = "lightbug_http"
 platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
-version = "0.25.7"
-
-[tasks]
-build = { cmd = "rattler-build build --recipe recipes -c https://conda.modular.com/max -c conda-forge --skip-existing=all", env = {MODULAR_MOJO_IMPORT_PATH = "$CONDA_PREFIX/lib/mojo"} }
-publish = { cmd = "bash scripts/publish.sh", env = { PREFIX_API_KEY = "$PREFIX_API_KEY" } }
-format = { cmd = "mojo format -l 120 lightbug_http" }
+license = "MIT"
+license-file = "LICENSE"
+readme = "README.md"
+homepage = "https://github.com/Lightbug-HQ/lightbug_http"
+repository = "https://github.com/Lightbug-HQ/lightbug_http"
+preview = ["pixi-build"]
 
 [feature.unit-tests.tasks]
 test = { cmd = "bash scripts/mojo_tests.sh tests/lightbug_http" }
@@ -23,9 +22,38 @@ integration_tests_udp = { cmd = "bash scripts/udp_test.sh" }
 bench = { cmd = "mojo -I . benchmark/bench.mojo" }
 bench_server = { cmd = "bash scripts/bench_server.sh" }
 
+[feature.util.tasks]
+# Linting and Formatting
+lint_docs = "python3 scripts/check-docstrings.py"
+mojo_format = "mojo format lightbug_http --line-length 120"
+sort_imports = "isort **/*.mojo -m 3 --line-length 120 --lines-after-imports 2 --trailing-comma"
+format = [{ task = "mojo_format" }, { task = "sort_imports" }]
+
+build = { cmd = "pixi build -o ." }
+publish = { cmd = "find . -name 'lightbug_http-*.conda' | xargs pixi upload https://prefix.dev/api/v1/upload/mojo-community" }
+build_and_publish = [{ task = "build" }, { task = "publish" }]
+
+[package]
+name = "lightbug_http"
+version = "0.25.7.1"
+
+[package.build]
+backend = { name = "pixi-build-mojo", version = "*" }
+
 [dependencies]
-mojo = ">=0.25.7,<0.26"
-rattler-build = ">=0.27.0,<1"
+mojo = "*"
+
+[package.host-dependencies]
+mojo-compiler = ">=0.25.7.0,<0.26.1.0"
+
+[package.build-dependencies]
+mojo-compiler = ">=0.25.7.0,<0.26.1.0"
+
+[package.run-dependencies]
+mojo-compiler = ">=0.25.7.0,<0.26.1.0"
+
+[feature.util.dependencies]
+isort = ">=6.0.1,<7"
 
 [feature.integration-tests.dependencies]
 requests = ">=2.32.3,<3"
@@ -36,3 +64,4 @@ default = { solve-group = "default" }
 unit-tests = { features = ["unit-tests"], solve-group = "default" }
 integration-tests = { features = ["integration-tests"], solve-group = "default" }
 bench = { features = ["bench"], solve-group = "default" }
+util = { features = ["util"], solve-group = "default" }

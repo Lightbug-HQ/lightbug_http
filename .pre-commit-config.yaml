@@ -9,7 +9,13 @@ repos:
     hooks:
       - id: mojo-format
         name: mojo-format
-        entry: pixi run mojo format -l 120
+        entry: pixi run format
         language: system
-        files: '\.(mojo|🔥)$'
+        pass_filenames: false
         stages: [pre-commit]
+      # - id: mojo-docs
+      #   name: mojo-docs
+      #   entry: pixi run lint_docs
+      #   language: system
+      #   pass_filenames: false
+      #   stages: [pre-commit]

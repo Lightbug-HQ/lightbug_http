@@ -1,12 +1,13 @@
-from collections import Optional, List, Dict, KeyElement
+from collections import Dict, KeyElement, List, Optional
 from hashlib.hash import Hasher
-from lightbug_http.strings import to_string
+
 from lightbug_http.header import HeaderKey, write_header
 from lightbug_http.io.bytes import ByteWriter
+from lightbug_http.strings import to_string
 
 
 @fieldwise_init
-struct ResponseCookieKey(KeyElement, ImplicitlyCopyable):
+struct ResponseCookieKey(ImplicitlyCopyable, KeyElement):
     var name: String
     var domain: String
     var path: String
@@ -25,11 +26,7 @@ struct ResponseCookieKey(KeyElement, ImplicitlyCopyable):
         return not (self == other)
 
     fn __eq__(self: Self, other: Self) -> Bool:
-        return (
-            self.name == other.name
-            and self.domain == other.domain
-            and self.path == other.path
-        )
+        return self.name == other.name and self.domain == other.domain and self.path == other.path
 
     fn __moveinit__(out self: Self, deinit existing: Self):
         self.name = existing.name
@@ -43,6 +40,7 @@ struct ResponseCookieKey(KeyElement, ImplicitlyCopyable):
 
     fn __hash__[H: Hasher](self: Self, mut hasher: H):
         hasher.update(self.name + "~" + self.domain + "~" + self.path)
+
 
 @fieldwise_init
 struct ResponseCookieJar(Copyable, Movable, Sized, Stringable, Writable):
@@ -90,9 +88,7 @@ struct ResponseCookieJar(Copyable, Movable, Sized, Stringable, Writable):
 
     @always_inline
     fn set_cookie(mut self, cookie: Cookie):
-        self[
-            ResponseCookieKey(cookie.name, cookie.domain, cookie.path)
-        ] = cookie
+        self[ResponseCookieKey(cookie.name, cookie.domain, cookie.path)] = cookie
 
     @always_inline
     fn empty(self) -> Bool:

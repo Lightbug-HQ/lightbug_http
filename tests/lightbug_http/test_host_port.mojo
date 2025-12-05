@@ -1,5 +1,5 @@
-from testing import assert_equal, assert_false, assert_raises, assert_true, TestSuite
-from lightbug_http.address import TCPAddr, NetworkType, join_host_port, parse_address
+from lightbug_http.address import NetworkType, TCPAddr, join_host_port, parse_address
+from testing import TestSuite, assert_equal, assert_false, assert_raises, assert_true
 
 
 def test_split_host_port():

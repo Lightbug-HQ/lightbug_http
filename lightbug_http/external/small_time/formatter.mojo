@@ -2,10 +2,12 @@
 # https://github.com/thatstoasty/small-time/
 from collections import InlineArray
 from collections.string import StringSlice
-from utils import StaticTuple
-from lightbug_http.external.small_time.time_zone import UTC_TZ
 
-alias MONTH_NAMES = InlineArray[String, 13](
+from lightbug_http.external.small_time.time_zone import UTC_TZ
+from utils import StaticTuple
+
+
+comptime MONTH_NAMES = InlineArray[String, 13](
     "",
     "January",
     "February",
@@ -22,7 +24,7 @@ alias MONTH_NAMES = InlineArray[String, 13](
 )
 """The full month names."""
 
-alias MONTH_ABBREVIATIONS = InlineArray[String, 13](
+comptime MONTH_ABBREVIATIONS = InlineArray[String, 13](
     "",
     "Jan",
     "Feb",
@@ -39,7 +41,7 @@ alias MONTH_ABBREVIATIONS = InlineArray[String, 13](
 )
 """The month name abbreviations."""
 
-alias DAY_NAMES = InlineArray[String, 8](
+comptime DAY_NAMES = InlineArray[String, 8](
     "",
     "Monday",
     "Tuesday",
@@ -50,9 +52,9 @@ alias DAY_NAMES = InlineArray[String, 8](
     "Sunday",
 )
 """The full day names."""
-alias DAY_ABBREVIATIONS = InlineArray[String, 8]("", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+comptime DAY_ABBREVIATIONS = InlineArray[String, 8]("", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 """The day name abbreviations."""
-alias formatter = _Formatter()
+comptime formatter = _Formatter()
 """Default formatter instance."""
 
 
@@ -249,17 +251,17 @@ struct _Formatter(ImplicitlyCopyable):
         return ""
 
 
-alias _Y = ord("Y")
-alias _M = ord("M")
-alias _D = ord("D")
-alias _d = ord("d")
-alias _H = ord("H")
-alias _h = ord("h")
-alias _m = ord("m")
-alias _s = ord("s")
-alias _S = ord("S")
-alias _X = ord("X")
-alias _x = ord("x")
-alias _Z = ord("Z")
-alias _A = ord("A")
-alias _a = ord("a")
+comptime _Y = ord("Y")
+comptime _M = ord("M")
+comptime _D = ord("D")
+comptime _d = ord("d")
+comptime _H = ord("H")
+comptime _h = ord("h")
+comptime _m = ord("m")
+comptime _s = ord("s")
+comptime _S = ord("S")
+comptime _X = ord("X")
+comptime _x = ord("x")
+comptime _Z = ord("Z")
+comptime _A = ord("A")
+comptime _a = ord("a")

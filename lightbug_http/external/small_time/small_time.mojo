@@ -1,21 +1,22 @@
 # small_time library, courtesy @thatstoasty , 2025
-# https://github.com/thatstoasty/small-time/ 
+# https://github.com/thatstoasty/small-time/
 from collections import InlineArray, Optional
+
 import lightbug_http.external.small_time.c
 import lightbug_http.external.small_time.time_zone
-from lightbug_http.external.small_time.time_delta import TimeDelta
 from lightbug_http.external.small_time.formatter import formatter
+from lightbug_http.external.small_time.time_delta import TimeDelta
 
 
-alias _DI400Y = 146097
+comptime _DI400Y = 146097
 """Number of days in 400 years."""
-alias _DI100Y = 36524
+comptime _DI100Y = 36524
 """Number of days in 100 years."""
-alias _DI4Y = 1461
+comptime _DI4Y = 1461
 """Number of days in 4 years."""
-alias _DAYS_IN_MONTH = InlineArray[Int, 13](-1, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+comptime _DAYS_IN_MONTH = InlineArray[Int, 13](-1, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
 """Number of days in each month, not counting leap years."""
-alias _DAYS_BEFORE_MONTH = InlineArray[Int, 13](
+comptime _DAYS_BEFORE_MONTH = InlineArray[Int, 13](
     -1, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334
 )  # -1 is a placeholder for indexing purposes.
 """Number of days before each month in a common year."""
@@ -23,13 +24,13 @@ alias _DAYS_BEFORE_MONTH = InlineArray[Int, 13](
 
 fn _is_leap(year: Int) -> Bool:
     """If the year is a leap year.
-    
+
     Args:
         year: The year to check.
-    
+
     Returns:
         True if the year is a leap year, False otherwise.
-    
+
     Notes:
         A year is a leap year if it is divisible by 4, but not by 100, unless it is divisible by 400.
     """
@@ -41,10 +42,10 @@ fn _days_before_year(year: Int) -> Int:
 
     Args:
         year: The year to check.
-    
+
     Returns:
         Number of days before January 1st of year.
-    
+
     Notes:
         year -> number of days before January 1st of year.
     """
@@ -58,10 +59,10 @@ fn _days_in_month(year: Int, month: Int) -> Int:
     Args:
         year: The year to check.
         month: The month to check.
-    
+
     Returns:
         Number of days in that month in that year.
-    
+
     Notes:
         year, month -> number of days in that month in that year.
     """
@@ -76,10 +77,10 @@ fn _days_before_month(year: Int, month: Int) -> Int:
     Args:
         year: The year to check.
         month: The month to check.
-    
+
     Returns:
         Number of days in year preceding first day of month.
-    
+
     Notes:
         year, month -> number of days in year preceding first day of month.
     """
@@ -90,35 +91,35 @@ fn _days_before_month(year: Int, month: Int) -> Int:
 
 fn _ymd2ord(year: Int, month: Int, day: Int) -> Int:
     """Convert year, month, day to ordinal, considering 01-Jan-0001 as day 1.
-    
+
     Args:
         year: The year to check.
         month: The month to check.
         day: The day to check.
-    
+
     Returns:
         Ordinal, considering 01-Jan-0001 as day 1.
     """
     return _days_before_year(year) + _days_before_month(year, month) + day
 
 
-alias MAX_TIMESTAMP: Int = 32503737600
+comptime MAX_TIMESTAMP: Int = 32503737600
 """Maximum timestamp."""
-alias MAX_TIMESTAMP_MS = MAX_TIMESTAMP * 1000
+comptime MAX_TIMESTAMP_MS = MAX_TIMESTAMP * 1000
 """Maximum timestamp in milliseconds."""
-alias MAX_TIMESTAMP_US = MAX_TIMESTAMP * 1_000_000
+comptime MAX_TIMESTAMP_US = MAX_TIMESTAMP * 1_000_000
 """Maximum timestamp in microseconds."""
 
 
 fn normalize_timestamp(var timestamp: Float64) raises -> Float64:
     """Normalize millisecond and microsecond timestamps into normal timestamps.
-    
+
     Args:
         timestamp: The timestamp to normalize.
-    
+
     Returns:
         The normalized timestamp.
-    
+
     Raises:
         Error: If the timestamp is too large.
     """
@@ -137,7 +138,7 @@ fn now(*, utc: Bool = False) raises -> SmallTime:
 
     Args:
         utc: If True, return the current time in UTC. Otherwise, return the current time in local time.
-    
+
     Returns:
         The current time.
     """
@@ -151,10 +152,10 @@ fn _validate_timestamp(tm: c.Tm, time_val: c.TimeVal, time_zone: TimeZone) raise
         tm: The time struct.
         time_val: The time value.
         time_zone: The time zone.
-    
+
     Returns:
         The validated timestamp.
-    
+
     Raises:
         Error: If the timestamp is invalid.
     """
@@ -168,9 +169,7 @@ fn _validate_timestamp(tm: c.Tm, time_val: c.TimeVal, time_zone: TimeZone) raise
 
     var day = Int(tm.tm_mday)
     if not -1 < day < 32:
-        raise Error(
-            "The day of the month parsed out from the timestamp is too large or negative. Received: ", day
-        )
+        raise Error("The day of the month parsed out from the timestamp is too large or negative. Received: ", day)
 
     var hours = Int(tm.tm_hour)
     if not -1 < hours < 25:
@@ -182,9 +181,7 @@ fn _validate_timestamp(tm: c.Tm, time_val: c.TimeVal, time_zone: TimeZone) raise
 
     var seconds = Int(tm.tm_sec)
     if not -1 < seconds < 61:
-        raise Error(
-            "The day of the month parsed out from the timestamp is too large or negative. Received: ", seconds
-        )
+        raise Error("The day of the month parsed out from the timestamp is too large or negative. Received: ", seconds)
 
     var microseconds = time_val.tv_usec
     if microseconds < 0:
@@ -208,10 +205,10 @@ fn from_timestamp(t: c.TimeVal, utc: Bool) raises -> SmallTime:
     Args:
         t: The timestamp.
         utc: If True, the timestamp is in UTC. Otherwise, the timestamp is in local time.
-    
+
     Returns:
         The SmallTime instance.
-    
+
     Raises:
         Error: If the timestamp is invalid.
     """
@@ -229,10 +226,10 @@ fn from_timestamp(timestamp: Float64, *, utc: Bool = False) raises -> SmallTime:
     Args:
         timestamp: The timestamp.
         utc: If True, the timestamp is in UTC. Otherwise, the timestamp is in local time.
-    
+
     Returns:
         The SmallTime instance.
-    
+
     Raises:
         Error: If the timestamp is invalid.
     """
@@ -248,10 +245,10 @@ fn strptime(date_str: String, fmt: String, tzinfo: TimeZone = TimeZone()) raises
         date_str: The date string.
         fmt: The format string.
         tzinfo: The time zone.
-    
+
     Returns:
         The SmallTime instance.
-    
+
     Raises:
         Error: If the timestamp is invalid.
 
@@ -275,10 +272,10 @@ fn strptime(date_str: String, fmt: String, tz_str: String) raises -> SmallTime:
         date_str: The date string.
         fmt: The format string.
         tz_str: The time zone.
-    
+
     Returns:
         The SmallTime instance.
-    
+
     Raises:
         Error: If the timestamp is invalid.
 
@@ -297,10 +294,10 @@ fn from_ordinal(ordinal: Int) -> SmallTime:
 
     Args:
         ordinal: The proleptic Gregorian ordinal.
-    
+
     Returns:
         The SmallTime instance.
-    
+
     Notes:
         January 1 of year 1 is day 1.  Only the year, month and day are
         non-zero in the result.
@@ -374,8 +371,9 @@ fn from_ordinal(ordinal: Int) -> SmallTime:
     return SmallTime(year, month, n + 1)
 
 
-struct SmallTime(Stringable, Writable, Representable, Copyable, Movable):
+struct SmallTime(Copyable, Movable, Representable, Stringable, Writable):
     """Datetime representation."""
+
     var year: Int
     """Year."""
     var month: Int
@@ -434,7 +432,7 @@ struct SmallTime(Stringable, Writable, Representable, Copyable, Movable):
 
         Returns:
             The formatted string.
-        
+
         Examples:
         ```mojo
         import small_time
@@ -455,10 +453,10 @@ struct SmallTime(Stringable, Writable, Representable, Copyable, Movable):
 
         Args:
             sep: The separator between date and time.
-        
+
         Returns:
             The formatted string.
-        
+
         Notes:
             The full format looks like 'YYYY-MM-DD HH:MM:SS.mmmmmm'.
 
@@ -472,7 +470,7 @@ struct SmallTime(Stringable, Writable, Representable, Copyable, Movable):
             terms of the time to include. Valid options are 'auto', 'hours',
             'minutes', 'seconds', 'milliseconds' and 'microseconds'.
         """
-        alias valid = InlineArray[String, 6]("auto", "hours", "minutes", "seconds", "milliseconds", "microseconds")
+        comptime valid = InlineArray[String, 6]("auto", "hours", "minutes", "seconds", "milliseconds", "microseconds")
         """Valid timespec values."""
         constrained[
             timespec in valid,
@@ -486,13 +484,13 @@ struct SmallTime(Stringable, Writable, Representable, Copyable, Movable):
         @parameter
         if timespec == "auto" or timespec == "microseconds":
             time_str = String(
-                String(self.hour).rjust(2, "0"), 
+                String(self.hour).rjust(2, "0"),
                 ":",
                 String(self.minute).rjust(2, "0"),
                 ":",
                 String(self.second).rjust(2, "0"),
                 ".",
-                String(self.microsecond).rjust(6, "0")
+                String(self.microsecond).rjust(6, "0"),
             )
         elif timespec == "milliseconds":
             time_str = String(
@@ -502,7 +500,7 @@ struct SmallTime(Stringable, Writable, Representable, Copyable, Movable):
                 ":",
                 String(self.second).rjust(2, "0"),
                 ".",
-                String(self.microsecond // 1000).rjust(3, "0")
+                String(self.microsecond // 1000).rjust(3, "0"),
             )
         elif timespec == "seconds":
             time_str = String(
@@ -510,7 +508,7 @@ struct SmallTime(Stringable, Writable, Representable, Copyable, Movable):
                 ":",
                 String(self.minute).rjust(2, "0"),
                 ":",
-                String(self.second).rjust(2, "0")
+                String(self.second).rjust(2, "0"),
             )
         elif timespec == "minutes":
             time_str = String(String(self.hour).rjust(2, "0"), ":", String(self.minute).rjust(2, "0"))
@@ -527,7 +525,7 @@ struct SmallTime(Stringable, Writable, Representable, Copyable, Movable):
 
         Returns:
             Proleptic Gregorian ordinal for the year, month and day.
-        
+
         Notes:
             January 1 of year 1 is day 1.  Only the year, month and day values
             contribute to the result.
@@ -544,15 +542,15 @@ struct SmallTime(Stringable, Writable, Representable, Copyable, Movable):
 
     fn __str__(self) -> String:
         """Return the string representation of the `SmallTime` instance.
-        
+
         Returns:
             The string representation.
         """
         return self.isoformat()
-    
+
     fn __repr__(self) -> String:
         """Return the string representation of the `SmallTime` instance.
-        
+
         Returns:
             The string representation.
         """
@@ -563,7 +561,7 @@ struct SmallTime(Stringable, Writable, Representable, Copyable, Movable):
 
         Args:
             other: The other `SmallTime` instance.
-        
+
         Returns:
             The time difference.
         """
@@ -573,7 +571,7 @@ struct SmallTime(Stringable, Writable, Representable, Copyable, Movable):
         var secs2 = other.second + other.minute * 60 + other.hour * 3600
         var base = TimeDelta(days1 - days2, secs1 - secs2, self.microsecond - other.microsecond)
         return base
-    
+
     fn write_to[W: Writer, //](self, mut writer: W):
         """Writes a representation of the `SmallTime` instance to a writer.
 
@@ -583,6 +581,7 @@ struct SmallTime(Stringable, Writable, Representable, Copyable, Movable):
         Args:
             writer: The writer to write the contents to.
         """
+
         @parameter
         fn write_optional(opt: Optional[String]):
             if opt:
@@ -590,18 +589,24 @@ struct SmallTime(Stringable, Writable, Representable, Copyable, Movable):
             else:
                 writer.write(repr(None))
 
-        writer.write("SmallTime(",
-        "year=", self.year,
-        ", month=", self.month,
-        ", day=", self.day,
-        ", hour=", self.hour,
-        ", minute=", self.minute,
-        ", second=", self.second,
-        ", microsecond=", self.microsecond,
+        writer.write(
+            "SmallTime(",
+            "year=",
+            self.year,
+            ", month=",
+            self.month,
+            ", day=",
+            self.day,
+            ", hour=",
+            self.hour,
+            ", minute=",
+            self.minute,
+            ", second=",
+            self.second,
+            ", microsecond=",
+            self.microsecond,
         )
-        writer.write(", tz=", "TimeZone(",
-        "offset=", self.tz.offset,
-        ", name=")
+        writer.write(", tz=", "TimeZone(", "offset=", self.tz.offset, ", name=")
         write_optional(self.tz.name)
         writer.write(")")
         writer.write(")")

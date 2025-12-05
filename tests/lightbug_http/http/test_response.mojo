@@ -1,10 +1,11 @@
 import testing
-from lightbug_http.http import HTTPResponse, StatusCode
 from lightbug_http.strings import to_string
+
+from lightbug_http.http import HTTPResponse, StatusCode
 
 
 def test_response_from_bytes():
-    alias data = "HTTP/1.1 200 OK\r\nServer: example.com\r\nUser-Agent: Mozilla/5.0\r\nContent-Type: text/html\r\nContent-Encoding: gzip\r\nContent-Length: 17\r\n\r\nThis is the body!"
+    comptime data = "HTTP/1.1 200 OK\r\nServer: example.com\r\nUser-Agent: Mozilla/5.0\r\nContent-Type: text/html\r\nContent-Encoding: gzip\r\nContent-Length: 17\r\n\r\nThis is the body!"
     var response = HTTPResponse.from_bytes(data.as_bytes())
     testing.assert_equal(response.protocol, "HTTP/1.1")
     testing.assert_equal(response.status_code, 200)
@@ -26,7 +27,7 @@ def test_response_from_bytes():
 
 
 def test_is_redirect():
-    alias data = "HTTP/1.1 200 OK\r\nServer: example.com\r\nUser-Agent: Mozilla/5.0\r\nContent-Type: text/html\r\nContent-Encoding: gzip\r\nContent-Length: 17\r\n\r\nThis is the body!"
+    comptime data = "HTTP/1.1 200 OK\r\nServer: example.com\r\nUser-Agent: Mozilla/5.0\r\nContent-Type: text/html\r\nContent-Encoding: gzip\r\nContent-Length: 17\r\n\r\nThis is the body!"
     var response = HTTPResponse.from_bytes(data.as_bytes())
     testing.assert_false(response.is_redirect())
 

@@ -1,32 +1,25 @@
 from collections import Optional
-from lightbug_http.external.small_time.small_time import now
-from lightbug_http.uri import URI
-from lightbug_http.io.bytes import Bytes, bytes, byte, ByteReader, ByteWriter
+
 from lightbug_http.connection import TCPConnection, default_buffer_size
-from lightbug_http.strings import (
-    strHttp11,
-    strHttp,
-    strSlash,
-    whitespace,
-    rChar,
-    nChar,
-    lineBreak,
-    to_string,
-)
+from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter, byte, bytes
+from lightbug_http.strings import lineBreak, nChar, rChar, strHttp, strHttp11, strSlash, to_string, whitespace
+from lightbug_http.uri import URI
+
+from lightbug_http.external.small_time.small_time import now
 
 
 struct StatusCode:
-    alias OK = 200
-    alias MOVED_PERMANENTLY = 301
-    alias FOUND = 302
-    alias TEMPORARY_REDIRECT = 307
-    alias PERMANENT_REDIRECT = 308
-    alias NOT_FOUND = 404
-    alias INTERNAL_ERROR = 500
+    comptime OK = 200
+    comptime MOVED_PERMANENTLY = 301
+    comptime FOUND = 302
+    comptime TEMPORARY_REDIRECT = 307
+    comptime PERMANENT_REDIRECT = 308
+    comptime NOT_FOUND = 404
+    comptime INTERNAL_ERROR = 500
 
 
 @fieldwise_init
-struct HTTPResponse(Writable, Stringable, Encodable, Sized, Movable):
+struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
     var headers: Headers
     var cookies: ResponseCookieJar
     var body_raw: Bytes

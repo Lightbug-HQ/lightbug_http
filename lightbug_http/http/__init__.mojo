@@ -1,7 +1,7 @@
 from .common_response import *
-from .response import *
-from .request import *
 from .http_version import HttpVersion
+from .request import *
+from .response import *
 
 
 trait Encodable:

@@ -1,10 +1,9 @@
+from collections import Optional
 from os import abort
 from sys import size_of
 from sys.intrinsics import _type_is_eq
 
-from memory import Pointer, LegacyUnsafePointer, memcpy, Span
-
-from collections import Optional
+from memory import LegacyUnsafePointer, Pointer, Span, memcpy
 
 
 # ===-----------------------------------------------------------------------===#
@@ -28,7 +27,7 @@ struct _OwningListIter[
         forward: The iteration direction. `False` is backwards.
     """
 
-    alias list_type = OwningList[T]
+    comptime list_type = OwningList[T]
 
     var index: Int
     var src: Pointer[Self.list_type, list_origin]
@@ -59,7 +58,7 @@ struct _OwningListIter[
             return self.index
 
 
-struct OwningList[T: Movable](Movable, Sized, Boolable):
+struct OwningList[T: Movable](Boolable, Movable, Sized):
     """The `List` type is a dynamically-allocated list.
 
     It supports pushing and popping from the back resizing the underlying

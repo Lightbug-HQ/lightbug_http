@@ -1,5 +1,5 @@
-from testing import assert_equal, TestSuite
 from lightbug_http.server import Server
+from testing import TestSuite, assert_equal
 
 
 # fn test_server() raises:

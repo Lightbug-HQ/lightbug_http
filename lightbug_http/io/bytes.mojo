@@ -1,9 +1,9 @@
-from memory.span import Span, _SpanIter
-from lightbug_http.strings import BytesConstant
 from lightbug_http.connection import default_buffer_size
+from lightbug_http.strings import BytesConstant
+from memory.span import Span, _SpanIter
 
 
-alias Bytes = List[Byte]
+comptime Bytes = List[Byte]
 
 
 @always_inline
@@ -69,8 +69,8 @@ struct ByteWriter(Writer):
         return ret^
 
 
-alias EndOfReaderError = "No more bytes to read."
-alias OutOfBoundsError = "Tried to read past the end of the ByteReader."
+comptime EndOfReaderError = "No more bytes to read."
+comptime OutOfBoundsError = "Tried to read past the end of the ByteReader."
 
 
 struct ByteView[origin: Origin](Sized, Stringable):

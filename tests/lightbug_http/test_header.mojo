@@ -1,7 +1,6 @@
-from testing import assert_equal, assert_true, TestSuite
-from memory import Span
-from lightbug_http.header import Headers, Header
-from lightbug_http.io.bytes import Bytes, bytes, ByteReader
+from lightbug_http.header import Header, Headers
+from lightbug_http.io.bytes import ByteReader, Bytes, bytes
+from testing import TestSuite, assert_equal, assert_true
 
 
 def test_header_case_insensitive():

@@ -1,13 +1,13 @@
+from sys import stderr, stdout
 from sys.param_env import env_get_string
-from sys import stdout, stderr
 
 
 struct LogLevel:
-    alias FATAL = 0
-    alias ERROR = 1
-    alias WARN = 2
-    alias INFO = 3
-    alias DEBUG = 4
+    comptime FATAL = 0
+    comptime ERROR = 1
+    comptime WARN = 2
+    comptime INFO = 3
+    comptime DEBUG = 4
 
 
 fn get_log_level() -> Int:
@@ -16,7 +16,7 @@ fn get_log_level() -> Int:
     Returns:
         The log level.
     """
-    alias level = env_get_string["LB_LOG_LEVEL", "INFO"]()
+    comptime level = env_get_string["LB_LOG_LEVEL", "INFO"]()
 
     @parameter
     if level == "INFO":
@@ -33,7 +33,7 @@ fn get_log_level() -> Int:
         return LogLevel.INFO
 
 
-alias LOG_LEVEL = get_log_level()
+comptime LOG_LEVEL = get_log_level()
 """Logger level determined by the `LB_LOG_LEVEL` param environment variable.
 
 When building or running the application, you can set `LB_LOG_LEVEL` by providing the the following option:
@@ -47,7 +47,7 @@ mojo ... -D LB_LOG_LEVEL=DEBUG
 
 
 @fieldwise_init
-struct Logger[level: Int](Movable, ImplicitlyCopyable):
+struct Logger[level: Int](ImplicitlyCopyable, Movable):
     fn _log_message[event_level: Int](self, message: String):
         @parameter
         if level >= event_level:
@@ -105,4 +105,4 @@ struct Logger[level: Int](Movable, ImplicitlyCopyable):
         self._log_message[LogLevel.FATAL](msg)
 
 
-alias logger = Logger[LOG_LEVEL]()
+comptime logger = Logger[LOG_LEVEL]()

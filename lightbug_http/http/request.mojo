@@ -1,37 +1,29 @@
-from memory import Span
-from lightbug_http.io.bytes import Bytes, bytes, ByteReader, ByteWriter
-from lightbug_http.header import Headers, HeaderKey, Header, write_header
-from lightbug_http.cookie import RequestCookieJar
-from lightbug_http.uri import URI
 from lightbug_http._logger import logger
+from lightbug_http.header import Header, HeaderKey, Headers, write_header
+from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter, bytes
 from lightbug_http.io.sync import Duration
-from lightbug_http.strings import (
-    strHttp11,
-    strHttp,
-    strSlash,
-    whitespace,
-    rChar,
-    nChar,
-    lineBreak,
-    to_string,
-)
+from lightbug_http.strings import lineBreak, nChar, rChar, strHttp, strHttp11, strSlash, to_string, whitespace
+from lightbug_http.uri import URI
+from memory import Span
+
+from lightbug_http.cookie import RequestCookieJar
 
 
 @fieldwise_init
 struct RequestMethod:
     var value: String
 
-    alias get = RequestMethod("GET")
-    alias post = RequestMethod("POST")
-    alias put = RequestMethod("PUT")
-    alias delete = RequestMethod("DELETE")
-    alias head = RequestMethod("HEAD")
-    alias patch = RequestMethod("PATCH")
-    alias options = RequestMethod("OPTIONS")
+    comptime get = RequestMethod("GET")
+    comptime post = RequestMethod("POST")
+    comptime put = RequestMethod("PUT")
+    comptime delete = RequestMethod("DELETE")
+    comptime head = RequestMethod("HEAD")
+    comptime patch = RequestMethod("PATCH")
+    comptime options = RequestMethod("OPTIONS")
 
 
 @fieldwise_init
-struct HTTPRequest(Writable, Stringable, Encodable, Movable, Copyable):
+struct HTTPRequest(Copyable, Encodable, Movable, Stringable, Writable):
     var headers: Headers
     var cookies: RequestCookieJar
     var uri: URI
@@ -192,7 +184,7 @@ struct HTTPRequest(Writable, Stringable, Encodable, Movable, Copyable):
 
     fn __str__(self) -> String:
         return String.write(self)
-    
+
     fn __eq__(self, other: HTTPRequest) -> Bool:
         return (
             self.method == other.method
@@ -202,10 +194,9 @@ struct HTTPRequest(Writable, Stringable, Encodable, Movable, Copyable):
             and self.cookies == other.cookies
             and self.body_raw.__str__() == other.body_raw.__str__()
         )
-    
+
     fn __isnot__(self, other: HTTPRequest) -> Bool:
         return not self.__eq__(other)
 
     fn __isnot__(self, other: None) -> Bool:
         return self.get_body() or self.uri.request_uri
-
