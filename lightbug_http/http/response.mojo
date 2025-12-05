@@ -4,8 +4,7 @@ from lightbug_http.connection import TCPConnection, default_buffer_size
 from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter, byte, bytes
 from lightbug_http.strings import lineBreak, nChar, rChar, strHttp, strHttp11, strSlash, to_string, whitespace
 from lightbug_http.uri import URI
-
-from lightbug_http.external.small_time.small_time import now
+from small_time.small_time import now
 
 
 struct StatusCode:

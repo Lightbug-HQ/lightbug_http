@@ -42,6 +42,7 @@ backend = { name = "pixi-build-mojo", version = "*" }
 
 [dependencies]
 mojo = "*"
+small_time = { path = "../../small-time" }
 
 [package.host-dependencies]
 mojo-compiler = ">=0.25.7.0,<0.26.1.0"

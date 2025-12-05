@@ -3,9 +3,8 @@ from collections import Dict, List, Optional
 from lightbug_http.header import HeaderKey, write_header
 from lightbug_http.io.bytes import ByteReader, ByteWriter, is_newline, is_space
 from lightbug_http.strings import lineBreak, to_string
-
-from lightbug_http.external.small_time import SmallTime, TimeZone
-from lightbug_http.external.small_time.small_time import strptime
+from small_time import SmallTime, TimeZone
+from small_time.small_time import strptime
 
 
 @fieldwise_init

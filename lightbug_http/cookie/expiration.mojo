@@ -1,12 +1,11 @@
 from collections import Optional
 
 from lightbug_http.strings import to_string
-
-from lightbug_http.external.small_time import SmallTime
+from small_time import SmallTime
 
 
 comptime HTTP_DATE_FORMAT = "ddd, DD MMM YYYY HH:mm:ss ZZZ"
-comptime TZ_GMT = TimeZone(0, "GMT")
+comptime TZ_GMT = TimeZone.GMT
 
 
 @fieldwise_init
@@ -45,8 +44,8 @@ struct Expiration(Copyable, Movable):
 
         # TODO fix this it breaks time and space (replacing timezone might add or remove something sometimes)
         var dt = self.datetime.value().copy()
-        dt.tz = TZ_GMT
-        return Optional[String](dt.format(HTTP_DATE_FORMAT))
+        dt.time_zone = TZ_GMT
+        return Optional[String](dt.format[HTTP_DATE_FORMAT]())
 
     fn __eq__(self, other: Self) -> Bool:
         if self.variant != other.variant:
