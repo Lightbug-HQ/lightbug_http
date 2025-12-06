@@ -1,4 +1,4 @@
-from collections import Dict, KeyElement, List, Optional
+from collections import KeyElement
 from hashlib.hash import Hasher
 
 from lightbug_http.header import HeaderKey, write_header
@@ -42,7 +42,7 @@ struct ResponseCookieKey(ImplicitlyCopyable, KeyElement):
 
 
 @fieldwise_init
-struct ResponseCookieJar(Copyable, Movable, Sized, Stringable, Writable):
+struct ResponseCookieJar(Copyable, Sized, Stringable, Writable):
     var _inner: Dict[ResponseCookieKey, Cookie]
 
     fn __init__(out self):

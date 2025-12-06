@@ -1,6 +1,6 @@
 from lightbug_http.connection import default_buffer_size
 from lightbug_http.strings import BytesConstant
-from memory.span import ContiguousSlice, Span, _SpanIter
+from memory.span import ContiguousSlice, _SpanIter
 
 
 comptime Bytes = List[Byte]
@@ -59,11 +59,7 @@ struct ByteWriter(Writer):
         return self._inner^
 
 
-comptime EndOfReaderError = "No more bytes to read."
-comptime OutOfBoundsError = "Tried to read past the end of the ByteReader."
-
-
-struct ByteView[origin: Origin](Boolable, Copyable, Equatable, Movable, Sized, Stringable):
+struct ByteView[origin: ImmutOrigin](Boolable, Copyable, Equatable, Sized, Stringable):
     """Convenience wrapper around a Span of Bytes."""
 
     var _inner: Span[Byte, Self.origin]
@@ -105,7 +101,7 @@ struct ByteView[origin: Origin](Boolable, Copyable, Equatable, Movable, Sized, S
         return Self(self._inner[slc])
 
     fn __str__(self) -> String:
-        return String(StringSlice(unsafe_from_utf8=self._inner))
+        return String(bytes=self._inner)
 
     fn __eq__(self, other: Self) -> Bool:
         # both empty
@@ -142,9 +138,6 @@ struct ByteView[origin: Origin](Boolable, Copyable, Equatable, Movable, Sized, S
                 return False
         return True
 
-    fn __ne__(self, other: Self) -> Bool:
-        return not self == other
-
     fn __ne__(self, other: Span[Byte]) -> Bool:
         return not self == other
 
@@ -170,7 +163,35 @@ struct ByteView[origin: Origin](Boolable, Copyable, Equatable, Movable, Sized, S
         return self._inner
 
 
-struct ByteReader[origin: Origin](Sized):
+@fieldwise_init
+struct OutOfBoundsError(Stringable, Writable):
+    var message: String
+
+    fn __init__(out self):
+        self.message = "Tried to read past the end of the ByteReader."
+
+    fn write_to[W: Writer, //](self, mut writer: W) -> None:
+        writer.write(self.message)
+
+    fn __str__(self) -> String:
+        return self.message.copy()
+
+
+@fieldwise_init
+struct EndOfReaderError(Stringable, Writable):
+    var message: String
+
+    fn __init__(out self):
+        self.message = "No more bytes to read."
+
+    fn write_to[W: Writer, //](self, mut writer: W) -> None:
+        writer.write(self.message)
+
+    fn __str__(self) -> String:
+        return self.message.copy()
+
+
+struct ByteReader[origin: ImmutOrigin](Copyable, Sized):
     var _inner: Span[Byte, Self.origin]
     var read_pos: Int
 
@@ -194,19 +215,19 @@ struct ByteReader[origin: Origin](Sized):
     fn __len__(self) -> Int:
         return len(self._inner) - self.read_pos
 
-    fn peek(self) raises -> Byte:
+    fn peek(self) raises EndOfReaderError -> Byte:
         if not self.available():
-            raise EndOfReaderError
+            raise EndOfReaderError()
         return self._inner[self.read_pos]
 
-    fn read_bytes(mut self, n: Int = -1) raises -> ByteView[Self.origin]:
+    fn read_bytes(mut self, n: Int = -1) raises OutOfBoundsError -> ByteView[Self.origin]:
         var count = n
         var start = self.read_pos
         if n == -1:
             count = len(self)
 
         if start + count > len(self._inner):
-            raise OutOfBoundsError
+            raise OutOfBoundsError()
 
         self.read_pos += count
         return self._inner[start : start + count]

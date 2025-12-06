@@ -1,5 +1,4 @@
 from .common_response import *
-from .http_version import HttpVersion
 from .request import *
 from .response import *
 

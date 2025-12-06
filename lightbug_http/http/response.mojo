@@ -1,5 +1,3 @@
-from collections import Optional
-
 from lightbug_http.connection import TCPConnection, default_buffer_size
 from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter, byte
 from lightbug_http.strings import http, lineBreak, nChar, rChar, strHttp11, whitespace

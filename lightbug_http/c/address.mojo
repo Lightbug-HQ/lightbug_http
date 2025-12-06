@@ -5,7 +5,7 @@ from lightbug_http.c.aliases import ExternalImmutUnsafePointer, ExternalMutUnsaf
 
 @fieldwise_init
 @register_passable("trivial")
-struct ShutdownOption(Copyable, Equatable, Movable, Stringable, Writable):
+struct ShutdownOption(Copyable, Equatable, Stringable, Writable):
     var value: c_int
     comptime AI_PASSIVE = Self(1)
     comptime AI_CANONNAME = Self(2)
@@ -65,7 +65,7 @@ struct ShutdownOption(Copyable, Equatable, Movable, Stringable, Writable):
 # Taken from: https://github.com/openbsd/src/blob/master/sys/sys/socket.h#L250
 @fieldwise_init
 @register_passable("trivial")
-struct AddressFamily(Copyable, Equatable, Movable, Stringable, Writable):
+struct AddressFamily(Copyable, Equatable, Stringable, Writable):
     """Address families, used to specify the type of addresses that your socket can communicate with."""
 
     var value: c_int
@@ -201,7 +201,7 @@ struct AddressFamily(Copyable, Equatable, Movable, Stringable, Writable):
 
 @fieldwise_init
 @register_passable("trivial")
-struct AddressLength(Copyable, Equatable, Movable, Stringable, Writable):
+struct AddressLength(Copyable, Equatable, Stringable, Writable):
     var value: Int
     comptime INET_ADDRSTRLEN = Self(16)
     comptime INET6_ADDRSTRLEN = Self(46)
@@ -244,7 +244,7 @@ struct AddressLength(Copyable, Equatable, Movable, Stringable, Writable):
 
 @fieldwise_init
 @register_passable("trivial")
-struct ProtocolFamily(Copyable, Equatable, Movable, Stringable, Writable):
+struct ProtocolFamily(Copyable, Equatable, Stringable, Writable):
     """Protocol families, same as address families for now."""
 
     var value: c_int

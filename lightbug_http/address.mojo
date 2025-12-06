@@ -22,7 +22,7 @@ struct AddressConstants:
     comptime EMPTY = ""
 
 
-trait Addr(Copyable, Defaultable, Equatable, Movable, Representable, Stringable, Writable):
+trait Addr(Copyable, Defaultable, Equatable, ImplicitlyCopyable, Representable, Stringable, Writable):
     comptime _type: StaticString
 
     fn __init__(out self, ip: String, port: UInt16):
@@ -50,20 +50,20 @@ trait AnAddrInfo:
 
 
 @fieldwise_init
-struct NetworkType(Equatable, ImplicitlyCopyable, Movable):
-    var value: String
+struct NetworkType(Equatable, ImplicitlyCopyable):
+    var value: UInt8
 
-    comptime empty = NetworkType("")
-    comptime tcp = NetworkType("tcp")
-    comptime tcp4 = NetworkType("tcp4")
-    comptime tcp6 = NetworkType("tcp6")
-    comptime udp = NetworkType("udp")
-    comptime udp4 = NetworkType("udp4")
-    comptime udp6 = NetworkType("udp6")
-    comptime ip = NetworkType("ip")
-    comptime ip4 = NetworkType("ip4")
-    comptime ip6 = NetworkType("ip6")
-    comptime unix = NetworkType("unix")
+    comptime empty = Self(0)
+    comptime tcp = Self(1)
+    comptime tcp4 = Self(2)
+    comptime tcp6 = Self(3)
+    comptime udp = Self(4)
+    comptime udp4 = Self(5)
+    comptime udp6 = Self(6)
+    comptime ip = Self(7)
+    comptime ip4 = Self(8)
+    comptime ip6 = Self(9)
+    comptime unix = Self(10)
 
     comptime SUPPORTED_TYPES = [
         Self.tcp,
@@ -377,7 +377,7 @@ fn parse_ipv6_bracketed_address[
     if address[colon_index] != ":":
         raise MissingPortError
 
-    return (address[1:end_bracket_index], UInt16(end_bracket_index + 1))
+    return address[1:end_bracket_index], UInt16(end_bracket_index + 1)
 
 
 fn validate_no_brackets[

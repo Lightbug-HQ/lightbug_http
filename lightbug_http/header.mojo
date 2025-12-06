@@ -19,7 +19,7 @@ struct HeaderKey:
 
 
 @fieldwise_init
-struct Header(Copyable, Movable, Stringable, Writable):
+struct Header(Copyable, Stringable, Writable):
     var key: String
     var value: String
 
@@ -36,7 +36,7 @@ fn write_header[T: Writer](mut writer: T, key: String, value: String):
 
 
 @fieldwise_init
-struct Headers(Copyable, Movable, Stringable, Writable):
+struct Headers(Copyable, Stringable, Writable):
     """Represents the header key/values in an http request/response.
 
     Header keys are normalized to lowercase
@@ -82,9 +82,12 @@ struct Headers(Copyable, Movable, Stringable, Writable):
             return 0
 
     fn parse_raw(mut self, mut r: ByteReader) raises -> Tuple[String, String, String, List[String]]:
-        var first_byte = r.peek()
-        if not first_byte:
-            raise Error("Headers.parse_raw: Failed to read first byte from response header")
+        var first_byte: Byte
+        try:
+            first_byte = r.peek()
+        except EndOfReaderError:
+            logger.error(EndOfReaderError)
+            raise Error("Headers.parse_raw: Failed to read first byte from response header.")
 
         var first = r.read_word()
         r.increment()
@@ -93,19 +96,24 @@ struct Headers(Copyable, Movable, Stringable, Writable):
         var third = r.read_line()
         var cookies = List[String]()
 
-        while not is_newline(r.peek()):
-            var key = r.read_until(BytesConstant.colon)
-            r.increment()
-            if is_space(r.peek()):
+        try:
+            while not is_newline(r.peek()):
+                var key = r.read_until(BytesConstant.colon)
                 r.increment()
-            # TODO (bgreni): Handle possible trailing whitespace
-            var value = r.read_line()
-            var k = String(key).lower()
-            if k == HeaderKey.SET_COOKIE:
-                cookies.append(String(value))
-                continue
+                if is_space(r.peek()):
+                    r.increment()
 
-            self._inner[k] = String(value)
+                # TODO (bgreni): Handle possible trailing whitespace
+                var value = r.read_line()
+                var k = String(key).lower()
+                if k == HeaderKey.SET_COOKIE:
+                    cookies.append(String(value))
+                    continue
+                self._inner[k] = String(value)
+        except EndOfReaderError:
+            logger.error(EndOfReaderError)
+            raise Error("Headers.parse_raw: Failed to read full response headers.")
+
         return (String(first), String(second), String(third), cookies^)
 
     fn write_to[T: Writer, //](self, mut writer: T):

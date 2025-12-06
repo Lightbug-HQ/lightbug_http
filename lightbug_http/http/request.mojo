@@ -26,7 +26,7 @@ comptime strSlash = "/"
 
 
 @fieldwise_init
-struct HTTPRequest(Copyable, Encodable, Movable, Stringable, Writable):
+struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
     var headers: Headers
     var cookies: RequestCookieJar
     var uri: URI

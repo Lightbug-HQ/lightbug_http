@@ -44,7 +44,7 @@ comptime SocketClosedError = "Socket: Socket is already closed"
 
 @fieldwise_init
 struct Socket[
-    AddrType: Addr & ImplicitlyCopyable,
+    addr_type: Addr,
     address_family: AddressFamily = AddressFamily.AF_INET,
 ](Movable, Representable, Stringable, Writable):
     """Represents a network file descriptor. Wraps around a file descriptor and provides network functions.
@@ -63,9 +63,9 @@ struct Socket[
     """The socket type."""
     var protocol: ProtocolFamily
     """The protocol."""
-    var local_address: Self.AddrType
+    var local_address: Self.addr_type
     """The local address of the socket (local address if bound)."""
-    var remote_address: Self.AddrType
+    var remote_address: Self.addr_type
     """The remote address of the socket (peer's address if connected)."""
     var _closed: Bool
     """Whether the socket is closed."""
@@ -74,8 +74,8 @@ struct Socket[
 
     fn __init__(
         out self,
-        local_address: Self.AddrType = Self.AddrType(),
-        remote_address: Self.AddrType = Self.AddrType(),
+        local_address: Self.addr_type = Self.addr_type(),
+        remote_address: Self.addr_type = Self.addr_type(),
         socket_type: SocketType = SocketType.SOCK_STREAM,
         protocol: ProtocolFamily = ProtocolFamily.PF_UNSPEC,
     ) raises:
@@ -103,8 +103,8 @@ struct Socket[
         fd: FileDescriptor,
         socket_type: SocketType,
         protocol: ProtocolFamily,
-        local_address: Self.AddrType,
-        remote_address: Self.AddrType = Self.AddrType(),
+        local_address: Self.addr_type,
+        remote_address: Self.addr_type = Self.addr_type(),
     ):
         """
         Create a new socket object when you already have a socket file descriptor. Typically through socket.accept().
@@ -154,7 +154,7 @@ struct Socket[
     fn write_to[W: Writer, //](self, mut writer: W):
         writer.write(
             "Socket[",
-            Self.AddrType._type,
+            Self.addr_type._type,
             ", ",
             Self.address_family,
             "]",
@@ -197,7 +197,7 @@ struct Socket[
             local_address=self.local_address,
         )
         var peer = new_socket.get_peer_name()
-        new_socket.remote_address = Self.AddrType(peer[0], peer[1])
+        new_socket.remote_address = Self.addr_type(peer[0], peer[1])
         return new_socket^
 
     fn listen(self, backlog: UInt = 0) raises:
@@ -252,7 +252,7 @@ struct Socket[
             raise Error("Socket.bind: Binding socket failed.")
 
         var local = self.get_sock_name()
-        self.local_address = Self.AddrType(local[0], local[1])
+        self.local_address = Self.addr_type(local[0], local[1])
 
     fn get_sock_name(self) raises -> Tuple[String, UInt16] where Self.address_family.is_inet():
         """Return the address of the socket.
@@ -363,7 +363,7 @@ struct Socket[
             raise e
 
         var remote = self.get_peer_name()
-        self.remote_address = Self.AddrType(remote[0], remote[1])
+        self.remote_address = Self.addr_type(remote[0], remote[1])
 
     fn send(self, buffer: Span[Byte]) raises -> UInt:
         try:

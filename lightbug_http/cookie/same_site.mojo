@@ -1,5 +1,5 @@
 @fieldwise_init
-struct SameSite(Copyable, Movable, Stringable):
+struct SameSite(Copyable, Stringable):
     var value: UInt8
 
     comptime none = SameSite(0)

@@ -7,7 +7,7 @@ comptime HTTP_DATE_FORMAT = "ddd, DD MMM YYYY HH:mm:ss ZZZ"
 
 
 @fieldwise_init
-struct Expiration(Copyable, Movable):
+struct Expiration(Copyable):
     var variant: UInt8
     var datetime: Optional[SmallTime]
 

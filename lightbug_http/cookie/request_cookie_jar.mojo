@@ -1,5 +1,3 @@
-from collections import Dict, List, Optional
-
 from lightbug_http.header import HeaderKey, write_header
 from lightbug_http.io.bytes import ByteWriter
 from lightbug_http.strings import lineBreak
@@ -8,7 +6,7 @@ from small_time.small_time import parse_time_with_format
 
 
 @fieldwise_init
-struct RequestCookieJar(Copyable, Movable, Stringable, Writable):
+struct RequestCookieJar(Copyable, Stringable, Writable):
     var _inner: Dict[String, String]
 
     fn __init__(out self):

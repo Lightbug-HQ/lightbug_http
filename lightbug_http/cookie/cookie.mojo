@@ -1,9 +1,7 @@
-from collections import Optional
-
 from lightbug_http.header import HeaderKey
 
 
-struct Cookie(Copyable, Movable):
+struct Cookie(Copyable):
     comptime EXPIRES = "Expires"
     comptime MAX_AGE = "Max-Age"
     comptime DOMAIN = "Domain"
