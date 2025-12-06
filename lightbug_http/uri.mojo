@@ -1,7 +1,16 @@
 from hashlib.hash import Hasher
 
-from lightbug_http.io.bytes import ByteReader, Bytes, bytes
-from lightbug_http.strings import find_all, http, https, strHttp, strHttp10, strHttp11, strHttps, strSlash
+from lightbug_http.io.bytes import ByteReader, Bytes
+from lightbug_http.strings import http, https, strHttp10, strHttp11
+
+
+fn find_all(s: String, sub_str: String) -> List[Int]:
+    match_idxs = List[Int]()
+    var current_idx: Int = s.find(sub_str)
+    while current_idx > -1:
+        match_idxs.append(current_idx)
+        current_idx = s.find(sub_str, start=current_idx + 1)
+    return match_idxs^
 
 
 fn unquote[expand_plus: Bool = False](input_str: String, disallowed_escapes: List[String] = List[String]()) -> String:
@@ -71,8 +80,8 @@ struct QueryDelimiters:
 
 struct URIDelimiters:
     comptime SCHEMA = "://"
-    comptime PATH = strSlash
-    comptime ROOT_PATH = strSlash
+    comptime PATH = "/"
+    comptime ROOT_PATH = "/"
     comptime CHAR_ESCAPE = "%"
     comptime AUTHORITY = "@"
     comptime QUERY = "?"
@@ -87,9 +96,9 @@ struct PortBounds:
 
 @fieldwise_init
 struct Scheme(Equatable, Hashable, ImplicitlyCopyable, Movable, Representable, Stringable, Writable):
-    var value: String
-    comptime HTTP = Self("http")
-    comptime HTTPS = Self("https")
+    var value: UInt8
+    comptime HTTP = Self(0)
+    comptime HTTPS = Self(1)
 
     fn __hash__[H: Hasher](self, mut hasher: H):
         hasher.update(self.value)
@@ -97,17 +106,17 @@ struct Scheme(Equatable, Hashable, ImplicitlyCopyable, Movable, Representable, S
     fn __eq__(self, other: Self) -> Bool:
         return self.value == other.value
 
-    fn __ne__(self, other: Self) -> Bool:
-        return self.value != other.value
-
-    fn write_to[W: Writer, //](self, mut writer: W) -> None:
-        writer.write("Scheme(value=", repr(self.value), ")")
+    fn write_to[W: Writer, //](self, mut writer: W):
+        if self == Self.HTTP:
+            writer.write("HTTP")
+        else:
+            writer.write("HTTPS")
 
     fn __repr__(self) -> String:
-        return String.write(self)
+        return String.write("Scheme(", self, ")")
 
     fn __str__(self) -> String:
-        return self.value.upper()
+        return String.write(self)
 
 
 @fieldwise_init

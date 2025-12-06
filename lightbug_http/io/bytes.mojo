@@ -7,13 +7,9 @@ comptime Bytes = List[Byte]
 
 
 @always_inline
-fn byte(s: String) -> Byte:
-    return ord(s)
-
-
-@always_inline
-fn bytes(s: String) -> Bytes:
-    return Bytes(s.as_bytes())
+fn byte[s: StringSlice]() -> Byte:
+    __comptime_assert len(s) == 1, "StringSlice must be of length 1 to convert to Byte."
+    return s.as_bytes()[0]
 
 
 @always_inline
@@ -59,21 +55,15 @@ struct ByteWriter(Writer):
     fn consuming_write(mut self, var b: Bytes):
         self._inner.extend(b^)
 
-    @always_inline
-    fn write_byte(mut self, b: Byte):
-        self._inner.append(b)
-
-    fn consume(var self) -> Bytes:
-        var ret = self._inner^
-        self._inner = Bytes()
-        return ret^
+    fn consume(deinit self) -> Bytes:
+        return self._inner^
 
 
 comptime EndOfReaderError = "No more bytes to read."
 comptime OutOfBoundsError = "Tried to read past the end of the ByteReader."
 
 
-struct ByteView[origin: Origin](Sized, Stringable):
+struct ByteView[origin: Origin](Boolable, Copyable, Equatable, Movable, Sized, Stringable):
     """Convenience wrapper around a Span of Bytes."""
 
     var _inner: Span[Byte, Self.origin]
@@ -86,7 +76,7 @@ struct ByteView[origin: Origin](Sized, Stringable):
         return len(self._inner)
 
     fn __bool__(self) -> Bool:
-        return self._inner.__bool__()
+        return Bool(self._inner)
 
     fn __contains__(self, b: Byte) -> Bool:
         for i in range(len(self._inner)):
@@ -176,26 +166,8 @@ struct ByteView[origin: Origin](Sized, Stringable):
 
         return -1
 
-    fn rfind(self, target: Byte) -> Int:
-        """Finds the index of the last occurrence of a byte in a byte span.
-
-        Args:
-            target: The byte to find.
-
-        Returns:
-            The index of the last occurrence of the byte in the span, or -1 if not found.
-        """
-        # Start from the end and work backwards
-        var i = len(self) - 1
-        while i >= 0:
-            if self[i] == target:
-                return i
-            i -= 1
-
-        return -1
-
-    fn to_bytes(self) -> Bytes:
-        return Bytes(self._inner)
+    fn as_bytes(self) -> Span[Byte, Self.origin]:
+        return self._inner
 
 
 struct ByteReader[origin: Origin](Sized):

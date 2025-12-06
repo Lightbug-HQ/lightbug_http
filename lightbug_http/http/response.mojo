@@ -1,8 +1,8 @@
 from collections import Optional
 
 from lightbug_http.connection import TCPConnection, default_buffer_size
-from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter, byte, bytes
-from lightbug_http.strings import lineBreak, nChar, rChar, strHttp, strHttp11, strSlash, to_string, whitespace
+from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter, byte
+from lightbug_http.strings import http, lineBreak, nChar, rChar, strHttp11, whitespace
 from lightbug_http.uri import URI
 from small_time.small_time import now
 
@@ -85,22 +85,22 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
 
         var transfer_encoding = response.headers.get(HeaderKey.TRANSFER_ENCODING)
         if transfer_encoding and transfer_encoding.value() == "chunked":
-            var b = reader.read_bytes().to_bytes()
+            var b = Bytes(reader.read_bytes().as_bytes())
             var buff = Bytes(capacity=default_buffer_size)
             try:
                 while conn.read(buff) > 0:
-                    b += buff.copy()
+                    b.extend(buff.copy())
 
                     if (
-                        buff[-5] == byte("0")
-                        and buff[-4] == byte("\r")
-                        and buff[-3] == byte("\n")
-                        and buff[-2] == byte("\r")
-                        and buff[-1] == byte("\n")
+                        buff[-5] == byte["0"]()
+                        and buff[-4] == byte["\r"]()
+                        and buff[-3] == byte["\n"]()
+                        and buff[-2] == byte["\r"]()
+                        and buff[-1] == byte["\n"]()
                     ):
                         break
 
-                    # buff.clear()
+                    buff.clear()  # TODO: Should this be cleared? This was commented out before.
                 response.read_chunks(b)
                 return response^
             except e:
@@ -158,7 +158,7 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
         self.status_code = status_code
         self.status_text = status_text
         self.protocol = protocol
-        self.body_raw = reader.read_bytes().to_bytes()
+        self.body_raw = Bytes(reader.read_bytes().as_bytes())
         self.set_content_length(len(self.body_raw))
         if HeaderKey.CONNECTION not in self.headers:
             self.set_connection_keep_alive()
@@ -213,7 +213,7 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
 
     @always_inline
     fn read_body(mut self, mut r: ByteReader) raises -> None:
-        self.body_raw = r.read_bytes(self.content_length()).to_bytes()
+        self.body_raw = Bytes(r.read_bytes(self.content_length()).as_bytes())
         self.set_content_length(len(self.body_raw))
 
     fn read_chunks(mut self, chunks: Span[Byte]) raises:
@@ -222,10 +222,10 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
             var size = atol(String(reader.read_line()), 16)
             if size == 0:
                 break
-            var data = reader.read_bytes(size).to_bytes()
+            var data = reader.read_bytes(size).as_bytes()
             reader.skip_carriage_return()
             self.set_content_length(self.content_length() + len(data))
-            self.body_raw += data^
+            self.body_raw.extend(data)
 
     fn write_to[T: Writer](self, mut writer: T):
         writer.write(self.protocol, whitespace, self.status_code, whitespace, self.status_text, lineBreak)
@@ -233,9 +233,9 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
         if HeaderKey.SERVER not in self.headers:
             writer.write("server: lightbug_http", lineBreak)
 
-        writer.write(self.headers, self.cookies, lineBreak, to_string(self.body_raw.copy()))
+        writer.write(self.headers, self.cookies, lineBreak, StringSlice(unsafe_from_utf8=self.body_raw))
 
-    fn encode(var self) -> Bytes:
+    fn encode(deinit self) -> Bytes:
         """Encodes response as bytes.
 
         This method consumes the data in this request and it should
@@ -259,7 +259,6 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
                 pass
         writer.write(self.headers, self.cookies, lineBreak)
         writer.consuming_write(self.body_raw^)
-        self.body_raw = Bytes()
         return writer^.consume()
 
     fn __str__(self) -> String:

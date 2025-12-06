@@ -4,7 +4,7 @@ from lightbug_http.connection import ListenConfig, NoTLSListener, TCPConnection,
 from lightbug_http.error import ErrorHandler
 from lightbug_http.header import Headers
 from lightbug_http.http.common_response import BadRequest, InternalError, URITooLong
-from lightbug_http.io.bytes import ByteReader, Bytes, BytesConstant, ByteView, bytes
+from lightbug_http.io.bytes import Bytes, BytesConstant, ByteView
 from lightbug_http.io.sync import Duration
 from lightbug_http.service import HTTPService
 from lightbug_http.socket import Socket

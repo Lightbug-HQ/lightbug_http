@@ -1,10 +1,10 @@
 from collections import Dict, List, Optional
 
 from lightbug_http.header import HeaderKey, write_header
-from lightbug_http.io.bytes import ByteReader, ByteWriter, is_newline, is_space
-from lightbug_http.strings import lineBreak, to_string
+from lightbug_http.io.bytes import ByteWriter
+from lightbug_http.strings import lineBreak
 from small_time import SmallTime, TimeZone
-from small_time.small_time import strptime
+from small_time.small_time import parse_time_with_format
 
 
 @fieldwise_init
@@ -79,7 +79,7 @@ struct RequestCookieJar(Copyable, Movable, Stringable, Writable):
             write_header(writer, header.value().key, header.value().value)
 
     fn __str__(self) -> String:
-        return to_string(self)
+        return String.write(self)
 
     fn __eq__(self, other: RequestCookieJar) -> Bool:
         if len(self._inner) != len(other._inner):

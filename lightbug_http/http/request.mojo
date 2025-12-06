@@ -1,8 +1,8 @@
 from lightbug_http._logger import logger
 from lightbug_http.header import Header, HeaderKey, Headers, write_header
-from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter, bytes
+from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter
 from lightbug_http.io.sync import Duration
-from lightbug_http.strings import lineBreak, nChar, rChar, strHttp, strHttp11, strSlash, to_string, whitespace
+from lightbug_http.strings import http, lineBreak, nChar, rChar, strHttp11, whitespace
 from lightbug_http.uri import URI
 from memory import Span
 
@@ -20,6 +20,9 @@ struct RequestMethod:
     comptime head = RequestMethod("HEAD")
     comptime patch = RequestMethod("PATCH")
     comptime options = RequestMethod("OPTIONS")
+
+
+comptime strSlash = "/"
 
 
 @fieldwise_init
@@ -62,7 +65,7 @@ struct HTTPRequest(Copyable, Encodable, Movable, Stringable, Writable):
             raise Error("HTTPRequest.from_bytes: Request body too large.")
 
         var request = HTTPRequest(
-            URI.parse(addr + uri), headers=headers, method=method, protocol=protocol, cookies=cookies
+            URI.parse(addr + uri), headers=headers^, method=method^, protocol=protocol^, cookies=cookies^
         )
 
         if content_length > 0:
@@ -70,38 +73,37 @@ struct HTTPRequest(Copyable, Encodable, Movable, Stringable, Writable):
                 reader.skip_carriage_return()
                 request.read_body(reader, content_length, max_body_size)
             except e:
-                raise Error("HTTPRequest.from_bytes: Failed to read request body: " + String(e))
+                raise Error("HTTPRequest.from_bytes: Failed to read request body: ", e)
 
         return request^
 
     fn __init__(
         out self,
-        uri: URI,
-        headers: Headers = Headers(),
-        cookies: RequestCookieJar = RequestCookieJar(),
-        method: String = "GET",
-        protocol: String = strHttp11,
-        body: Bytes = Bytes(),
+        var uri: URI,
+        var headers: Headers = Headers(),
+        var cookies: RequestCookieJar = RequestCookieJar(),
+        var method: String = "GET",
+        var protocol: String = strHttp11,
+        var body: Bytes = Bytes(),
         server_is_tls: Bool = False,
         timeout: Duration = Duration(),
     ):
-        self.headers = headers.copy()
-        self.cookies = cookies.copy()
-        self.method = method
-        self.protocol = protocol
-        self.uri = uri.copy()
-        self.body_raw = body.copy()
+        self.headers = headers^
+        self.cookies = cookies^
+        self.method = method^
+        self.protocol = protocol^
+        self.uri = uri^
+        self.body_raw = body^
         self.server_is_tls = server_is_tls
         self.timeout = timeout
-        self.set_content_length(len(body))
+        self.set_content_length(len(self.body_raw))
         if HeaderKey.CONNECTION not in self.headers:
             self.headers[HeaderKey.CONNECTION] = "keep-alive"
         if HeaderKey.HOST not in self.headers:
-            if uri.port:
-                var host = String.write(uri.host, ":", String(uri.port.value()))
-                self.headers[HeaderKey.HOST] = host
+            if self.uri.port:
+                self.headers[HeaderKey.HOST] = String(self.uri.host, ":", self.uri.port.value())
             else:
-                self.headers[HeaderKey.HOST] = uri.host
+                self.headers[HeaderKey.HOST] = self.uri.host
 
     fn get_body(self) -> StringSlice[origin_of(self.body_raw)]:
         return StringSlice(unsafe_from_utf8=Span(self.body_raw))
@@ -124,7 +126,7 @@ struct HTTPRequest(Copyable, Encodable, Movable, Stringable, Writable):
             raise Error("Request body too large")
 
         try:
-            self.body_raw = r.read_bytes(content_length).to_bytes()
+            self.body_raw = Bytes(r.read_bytes(content_length).as_bytes())
             self.set_content_length(len(self.body_raw))
         except OutOfBoundsError:
             logger.debug(
@@ -132,7 +134,7 @@ struct HTTPRequest(Copyable, Encodable, Movable, Stringable, Writable):
             )
             var available_bytes = len(r._inner) - r.read_pos
             if available_bytes > 0:
-                self.body_raw = r.read_bytes(available_bytes).to_bytes()
+                self.body_raw = Bytes(r.read_bytes(available_bytes).as_bytes())
                 self.set_content_length(len(self.body_raw))
             else:
                 logger.debug("No body bytes available. Setting content-length to 0.")
@@ -154,10 +156,10 @@ struct HTTPRequest(Copyable, Encodable, Movable, Stringable, Writable):
             self.headers,
             self.cookies,
             lineBreak,
-            to_string(self.body_raw.copy()),
+            StringSlice(unsafe_from_utf8=self.body_raw),
         )
 
-    fn encode(var self) -> Bytes:
+    fn encode(deinit self) -> Bytes:
         """Encodes request as bytes.
 
         This method consumes the data in this request and it should
@@ -179,7 +181,7 @@ struct HTTPRequest(Copyable, Encodable, Movable, Stringable, Writable):
             self.cookies,
             lineBreak,
         )
-        writer.consuming_write(self^.body_raw.copy())
+        writer.consuming_write(self.body_raw^)
         return writer^.consume()
 
     fn __str__(self) -> String:

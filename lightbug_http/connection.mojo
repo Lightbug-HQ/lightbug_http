@@ -4,7 +4,7 @@ from time import sleep
 from lightbug_http._logger import logger
 from lightbug_http.address import NetworkType, TCPAddr, UDPAddr, parse_address
 from lightbug_http.c.address import AddressFamily
-from lightbug_http.io.bytes import Bytes, ByteView, bytes
+from lightbug_http.io.bytes import Bytes
 from lightbug_http.io.sync import Duration
 from lightbug_http.socket import Socket, SocketOption, SocketType
 
@@ -170,14 +170,12 @@ struct TCPConnection(Connection):
 
 
 struct UDPConnection[network: NetworkType, address_family: AddressFamily = AddressFamily.AF_INET](Movable):
-    var socket: Socket[UDPAddr[network], address_family]
+    var socket: Socket[UDPAddr[Self.network], Self.address_family]
 
-    fn __init__(out self, var socket: Socket[UDPAddr[network], address_family]):
+    fn __init__(out self, var socket: Socket[UDPAddr[Self.network], Self.address_family]):
         self.socket = socket^
 
-    fn read_from(
-        mut self, size: Int = default_buffer_size
-    ) raises -> Tuple[Bytes, String, UInt16] where self.address_family.is_inet():
+    fn read_from(mut self, size: Int = default_buffer_size) raises -> Tuple[Bytes, String, UInt16]:
         """Reads data from the underlying file descriptor.
 
         Args:
@@ -189,9 +187,10 @@ struct UDPConnection[network: NetworkType, address_family: AddressFamily = Addre
         Raises:
             Error: If an error occurred while reading data.
         """
+        __comptime_assert Self.address_family.is_inet(), "Must be an inet address family type."
         return self.socket.receive_from(size)
 
-    fn read_from(mut self, mut dest: Bytes) raises -> Tuple[UInt, String, UInt16] where self.address_family.is_inet():
+    fn read_from(mut self, mut dest: Bytes) raises -> Tuple[UInt, String, UInt16]:
         """Reads data from the underlying file descriptor.
 
         Args:
@@ -203,9 +202,10 @@ struct UDPConnection[network: NetworkType, address_family: AddressFamily = Addre
         Raises:
             Error: If an error occurred while reading data.
         """
+        __comptime_assert Self.address_family.is_inet(), "Must be an inet address family type."
         return self.socket.receive_from(dest)
 
-    fn write_to(mut self, src: Span[Byte], mut address: UDPAddr) raises -> UInt where self.address_family.is_inet():
+    fn write_to(mut self, src: Span[Byte], mut address: UDPAddr) raises -> UInt:
         """Writes data to the underlying file descriptor.
 
         Args:
@@ -218,11 +218,10 @@ struct UDPConnection[network: NetworkType, address_family: AddressFamily = Addre
         Raises:
             Error: If an error occurred while writing data.
         """
+        __comptime_assert Self.address_family.is_inet(), "Must be an inet address family type."
         return self.socket.send_to(src, address.ip, address.port)
 
-    fn write_to(
-        mut self, src: Span[Byte], mut host: String, port: UInt16
-    ) raises -> UInt where self.address_family.is_inet():
+    fn write_to(mut self, src: Span[Byte], mut host: String, port: UInt16) raises -> UInt:
         """Writes data to the underlying file descriptor.
 
         Args:
@@ -236,6 +235,7 @@ struct UDPConnection[network: NetworkType, address_family: AddressFamily = Addre
         Raises:
             Error: If an error occurred while writing data.
         """
+        __comptime_assert Self.address_family.is_inet(), "Must be an inet address family type."
         return self.socket.send_to(src, host, port)
 
     fn close(mut self) raises:

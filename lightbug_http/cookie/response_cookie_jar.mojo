@@ -3,7 +3,6 @@ from hashlib.hash import Hasher
 
 from lightbug_http.header import HeaderKey, write_header
 from lightbug_http.io.bytes import ByteWriter
-from lightbug_http.strings import to_string
 
 
 @fieldwise_init
@@ -81,7 +80,7 @@ struct ResponseCookieJar(Copyable, Movable, Sized, Stringable, Writable):
         return ResponseCookieKey(key.name, key.domain, key.path) in self
 
     fn __str__(self) -> String:
-        return to_string(self)
+        return String.write(self)
 
     fn __len__(self) -> Int:
         return len(self._inner)

@@ -1,6 +1,6 @@
 from lightbug_http._logger import logger
-from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter, is_newline, is_space
-from lightbug_http.strings import BytesConstant, lineBreak, nChar, rChar, to_string
+from lightbug_http.io.bytes import ByteReader, Bytes, is_newline, is_space
+from lightbug_http.strings import BytesConstant, lineBreak, nChar, rChar
 
 
 struct HeaderKey:

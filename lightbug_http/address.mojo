@@ -6,7 +6,6 @@ from lightbug_http.c.aliases import ExternalImmutUnsafePointer, ExternalMutUnsaf
 from lightbug_http.c.network import in_addr, inet_ntop, ntohs, sockaddr, sockaddr_in, socklen_t
 from lightbug_http.c.socket import SocketType, socket
 from lightbug_http.socket import Socket
-from lightbug_http.strings import to_string
 
 
 comptime MAX_PORT = 65535

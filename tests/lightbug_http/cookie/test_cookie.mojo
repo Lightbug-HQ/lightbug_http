@@ -1,6 +1,6 @@
 from collections import Optional
 
-from lightbug_http.external.small_time.small_time import SmallTime, now
+from small_time.small_time import SmallTime, now
 from testing import TestSuite, assert_equal, assert_true
 
 from lightbug_http.cookie import Cookie, Duration, Expiration, SameSite
