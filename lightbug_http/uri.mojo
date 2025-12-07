@@ -151,7 +151,7 @@ struct URI(Copyable, Representable, Stringable, Writable):
     var password: String
 
     @staticmethod
-    fn parse(var uri: String) raises (URIParseError) -> URI:
+    fn parse(var uri: String) raises URIParseError -> URI:
         """Parses a URI which is defined using the following format.
 
         `[scheme:][//[user_info@]host][/]path[?query][#fragment]`
@@ -247,11 +247,7 @@ struct URI(Copyable, Representable, Stringable, Writable):
         if path_delimiter == ord(URIDelimiters.PATH):
             # Copy the remaining bytes to read the request uri.
             var request_uri_reader = reader.copy()
-            try:
-                request_uri = String(request_uri_reader.read_bytes())
-            except EndOfReaderError:
-                logger.error(EndOfReaderError)
-                raise URIParseError("URI.parse: Failed to read request URI path.")
+            request_uri = String(request_uri_reader.read_bytes())
 
             # Read until the query string, or the end if there is none.
             path = unquote(String(reader.read_until(ord(URIDelimiters.QUERY))), disallowed_escapes=["/"])
@@ -269,11 +265,7 @@ struct URI(Copyable, Representable, Stringable, Writable):
         var query: String = ""
         if query_delimiter == ord(URIDelimiters.QUERY):
             # TODO: Handle fragments for anchors
-            try:
-                query = String(reader.read_bytes()[1:])
-            except EndOfReaderError:
-                logger.error(EndOfReaderError)
-                raise URIParseError("URI.parse: Failed to read query string.")
+            query = String(reader.read_bytes()[1:])
 
         var queries = QueryMap()
         if query:

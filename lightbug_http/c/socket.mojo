@@ -2,7 +2,7 @@ from sys.ffi import c_int, c_size_t, c_ssize_t, c_uchar, external_call, get_errn
 from sys.info import CompilationTarget, size_of
 
 from lightbug_http.c.aliases import c_void
-from lightbug_http.c.network import sockaddr, sockaddr_in, socklen_t
+from lightbug_http.c.network import SocketAddress, sockaddr, sockaddr_in, socklen_t
 from memory import stack_allocation
 
 
@@ -493,13 +493,12 @@ fn _getsockname[
     ](socket, address, address_len)
 
 
-fn getsockname(socket: FileDescriptor, address: MutUnsafePointer[sockaddr], mut address_len: socklen_t) raises:
+fn getsockname(socket: FileDescriptor, mut address: SocketAddress) raises:
     """Libc POSIX `getsockname` function.
 
     Args:
         socket: A File Descriptor.
-        address: A UnsafePointer to a buffer to store the address of the peer.
-        address_len: A UnsafePointer to the size of the buffer.
+        address: A to a buffer to store the address of the peer.
 
     Raises:
         Error: If an error occurs while getting the socket name.
@@ -517,7 +516,8 @@ fn getsockname(socket: FileDescriptor, address: MutUnsafePointer[sockaddr], mut 
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/getsockname.3p.html .
     """
-    var result = _getsockname(socket.value, address, Pointer(to=address_len))
+    var sockaddr_size = address.SIZE
+    var result = _getsockname(socket.value, address.ptr(), Pointer(to=sockaddr_size))
     if result == -1:
         var errno = get_errno()
         if errno == errno.EBADF:
@@ -537,7 +537,7 @@ fn getsockname(socket: FileDescriptor, address: MutUnsafePointer[sockaddr], mut 
 
 
 fn _getpeername[
-    origin: Origin
+    origin: MutOrigin
 ](sockfd: c_int, addr: MutUnsafePointer[sockaddr], address_len: Pointer[socklen_t, origin]) -> c_int:
     """Libc POSIX `getpeername` function.
 
@@ -566,7 +566,7 @@ fn _getpeername[
     ](sockfd, addr, address_len)
 
 
-fn getpeername(file_descriptor: FileDescriptor) raises -> sockaddr_in:
+fn getpeername(file_descriptor: FileDescriptor) raises -> SocketAddress:
     """Libc POSIX `getpeername` function.
 
     Args:
@@ -589,8 +589,9 @@ fn getpeername(file_descriptor: FileDescriptor) raises -> sockaddr_in:
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man2/getpeername.2.html .
     """
-    var remote_address = stack_allocation[1, sockaddr]()
-    var result = _getpeername(file_descriptor.value, remote_address, Pointer(to=socklen_t(size_of[sockaddr]())))
+    var remote_address = SocketAddress()
+    var sockaddr_size = remote_address.SIZE
+    var result = _getpeername(file_descriptor.value, remote_address.ptr(), Pointer(to=sockaddr_size))
     if result == -1:
         var errno = get_errno()
         if errno == errno.EBADF:
@@ -611,7 +612,7 @@ fn getpeername(file_descriptor: FileDescriptor) raises -> sockaddr_in:
             raise Error("getpeername: An error occurred while getting the socket name. Error code: ", errno)
 
     # Cast sockaddr struct to sockaddr_in
-    return remote_address.bitcast[sockaddr_in]().take_pointee()
+    return remote_address^
 
 
 fn _bind[origin: ImmutOrigin](socket: c_int, address: Pointer[sockaddr_in, origin], address_len: socklen_t) -> c_int:
@@ -639,7 +640,7 @@ fn _bind[origin: ImmutOrigin](socket: c_int, address: Pointer[sockaddr_in, origi
     )
 
 
-fn bind(socket: FileDescriptor, address: sockaddr_in) raises:
+fn bind(socket: FileDescriptor, mut address: SocketAddress) raises:
     """Libc POSIX `bind` function.
 
     Args:
@@ -674,7 +675,7 @@ fn bind(socket: FileDescriptor, address: sockaddr_in) raises:
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/bind.3p.html .
     """
-    var result = _bind(socket.value, Pointer(to=address), size_of[sockaddr_in]())
+    var result = _bind(socket.value, Pointer(to=address.as_sockaddr_in()), address.SIZE)
     if result == -1:
         var errno = get_errno()
         if errno == errno.EACCES:
@@ -906,7 +907,7 @@ fn _connect[origin: ImmutOrigin](socket: c_int, address: Pointer[sockaddr_in, or
     )
 
 
-fn connect(socket: FileDescriptor, address: sockaddr_in) raises:
+fn connect(socket: FileDescriptor, mut address: SocketAddress) raises:
     """Libc POSIX `connect` function.
 
     Args:
@@ -938,7 +939,7 @@ fn connect(socket: FileDescriptor, address: sockaddr_in) raises:
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/connect.3p.html .
     """
-    var result = _connect(socket.value, Pointer(to=address), size_of[sockaddr_in]())
+    var result = _connect(socket.value, Pointer(to=address.as_sockaddr_in()), address.SIZE)
     if result == -1:
         var errno = get_errno()
         if errno == errno.EACCES:
@@ -1134,7 +1135,7 @@ fn recvfrom[
     buffer: Span[c_uchar, origin],
     length: c_size_t,
     flags: c_int,
-    address: MutUnsafePointer[sockaddr],
+    mut address: SocketAddress,
 ) raises -> c_size_t:
     """Libc POSIX `recvfrom` function.
 
@@ -1162,14 +1163,14 @@ fn recvfrom[
         * `MSG_OOB`: Requests out-of-band data. The significance and semantics of out-of-band data are protocol-specific.
         * `MSG_WAITALL`: On SOCK_STREAM sockets this requests that the function block until the full amount of data can be returned. The function may return the smaller amount of data if the socket is a message-based socket, if a signal is caught, if the connection is terminated, if MSG_PEEK was specified, or if an error is pending for the socket.
     """
-    var address_buffer_size = socklen_t(size_of[sockaddr]())
+    var address_buffer_size = address.SIZE
     var result = _recvfrom(
         socket.value,
         buffer.unsafe_ptr().bitcast[c_void](),
         length,
         flags,
-        address,
-        Pointer[socklen_t](to=address_buffer_size),
+        address.ptr(),
+        Pointer(to=address_buffer_size),
     )
     if result == -1:
         var errno = get_errno()
@@ -1387,7 +1388,7 @@ fn sendto[
     message: Span[c_uchar, origin],
     length: c_size_t,
     flags: c_int,
-    dest_addr: ImmutUnsafePointer[sockaddr],
+    mut dest_addr: SocketAddress,
 ) raises -> c_size_t:
     """Libc POSIX `sendto` function.
 
@@ -1437,7 +1438,12 @@ fn sendto[
 
     """
     var result = _sendto(
-        socket.value, message.unsafe_ptr().bitcast[c_void](), length, flags, dest_addr, size_of[sockaddr]()
+        socket.value,
+        message.unsafe_ptr().bitcast[c_void](),
+        length,
+        flags,
+        dest_addr.ptr().as_immutable(),
+        dest_addr.SIZE,
     )
     if result == -1:
         var errno = get_errno()

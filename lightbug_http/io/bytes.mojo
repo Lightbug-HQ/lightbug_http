@@ -215,20 +215,25 @@ struct ByteReader[origin: ImmutOrigin](Copyable, Sized):
     fn __len__(self) -> Int:
         return len(self._inner) - self.read_pos
 
+    fn remaining(self) -> Int:
+        return len(self._inner) - self.read_pos
+
     fn peek(self) raises EndOfReaderError -> Byte:
         if not self.available():
             raise EndOfReaderError()
         return self._inner[self.read_pos]
 
-    fn read_bytes(mut self, n: Int = -1) raises OutOfBoundsError -> ByteView[Self.origin]:
+    fn read_bytes(mut self) -> ByteView[Self.origin]:
+        var count = len(self)
+        var start = self.read_pos
+        self.read_pos += count
+        return self._inner[start : start + count]
+
+    fn read_bytes(mut self, n: Int) raises OutOfBoundsError -> ByteView[Self.origin]:
+        if self.read_pos + n > len(self._inner):
+            raise OutOfBoundsError()
         var count = n
         var start = self.read_pos
-        if n == -1:
-            count = len(self)
-
-        if start + count > len(self._inner):
-            raise OutOfBoundsError()
-
         self.read_pos += count
         return self._inner[start : start + count]
 

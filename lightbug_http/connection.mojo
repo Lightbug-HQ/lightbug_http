@@ -6,7 +6,7 @@ from lightbug_http.address import NetworkType, TCPAddr, UDPAddr, parse_address
 from lightbug_http.c.address import AddressFamily
 from lightbug_http.io.bytes import Bytes
 from lightbug_http.io.sync import Duration
-from lightbug_http.socket import Socket, SocketOption, SocketType
+from lightbug_http.socket import Socket, SocketOption, SocketType, TCPSocket, UDPSocket
 
 
 comptime default_buffer_size = 4096
@@ -41,17 +41,15 @@ trait Connection(Movable):
 struct NoTLSListener(Movable):
     """A TCP listener that listens for incoming connections and can accept them."""
 
-    comptime _socket_type = Socket[TCPAddr]
-    var socket: Self._socket_type
+    var socket: TCPSocket[TCPAddr]
 
-    fn __init__(out self, var socket: Self._socket_type):
+    fn __init__(out self, var socket: TCPSocket[TCPAddr]):
         self.socket = socket^
 
     fn __init__(out self) raises:
         self.socket = Socket[TCPAddr]()
 
     fn accept(self) raises -> TCPConnection:
-        __comptime_assert Self._socket_type.address_family.is_inet(), "Must be an inet address family type."
         return TCPConnection(self.socket.accept())
 
     fn close(mut self) raises -> None:
@@ -73,9 +71,14 @@ struct ListenConfig:
     fn __init__(out self, keep_alive: Duration = default_tcp_keep_alive):
         self._keep_alive = keep_alive
 
-    fn listen[network: NetworkType = NetworkType.tcp4](mut self, address: String) raises -> NoTLSListener:
-        var local = parse_address(network, address)
-        var addr = TCPAddr(ip=String(local[0]), port=local[1])
+    fn listen[network: NetworkType = NetworkType.tcp4](self, address: StringSlice) raises -> NoTLSListener:
+        var local: Tuple[String, UInt16]
+        try:
+            local = parse_address[network](address)
+        except ParseError:
+            logger.error(ParseError)
+            raise Error("ListenConfig.listen: Failed to create listener due to invalid address.")
+
         var socket: Socket[TCPAddr]
         try:
             socket = Socket[TCPAddr]()
@@ -91,11 +94,11 @@ struct ListenConfig:
             except e:
                 logger.warn("ListenConfig.listen: Failed to set socket as reusable", e)
 
+        var addr = TCPAddr(ip=String(local[0]), port=local[1])
         var bind_success = False
         var bind_fail_logged = False
         while not bind_success:
             try:
-                __comptime_assert socket.address_family.is_inet(), "Must be an inet address family type."
                 socket.bind(addr.ip, addr.port)
                 bind_success = True
             except e:
@@ -119,7 +122,7 @@ struct ListenConfig:
             raise Error("ListenConfig.listen: Listen failed on sockfd: ", socket.fd.value)
 
         var listener = NoTLSListener(socket^)
-        var msg = String.write("\n🔥🐝 Lightbug is listening on ", "http://", addr.ip, ":", String(addr.port))
+        var msg = String("\n🔥🐝 Lightbug is listening on ", "http://", addr.ip, ":", String(addr.port))
         print(msg)
         print("Ready to accept connections...")
 
@@ -127,9 +130,9 @@ struct ListenConfig:
 
 
 struct TCPConnection(Connection):
-    var socket: Socket[TCPAddr]
+    var socket: TCPSocket[TCPAddr]
 
-    fn __init__(out self, var socket: Socket[TCPAddr]):
+    fn __init__(out self, var socket: TCPSocket[TCPAddr]):
         self.socket = socket^
 
     fn read(self, mut buf: Bytes) raises -> UInt:
@@ -169,10 +172,15 @@ struct TCPConnection(Connection):
         return self.socket.remote_address
 
 
-struct UDPConnection[network: NetworkType, address_family: AddressFamily = AddressFamily.AF_INET](Movable):
-    var socket: Socket[UDPAddr[Self.network], Self.address_family]
+struct UDPConnection[network: NetworkType = NetworkType.udp4, address_family: AddressFamily = AddressFamily.AF_INET](
+    Movable
+):
+    comptime _sock_type = Socket[
+        sock_type = SocketType.SOCK_DGRAM, address = UDPAddr[Self.network], address_family = Self.address_family
+    ]
+    var socket: Self._sock_type
 
-    fn __init__(out self, var socket: Socket[UDPAddr[Self.network], Self.address_family]):
+    fn __init__(out self, var socket: Self._sock_type):
         self.socket = socket^
 
     fn read_from(mut self, size: Int = default_buffer_size) raises -> Tuple[Bytes, String, UInt16]:
@@ -187,7 +195,7 @@ struct UDPConnection[network: NetworkType, address_family: AddressFamily = Addre
         Raises:
             Error: If an error occurred while reading data.
         """
-        __comptime_assert Self.address_family.is_inet(), "Must be an inet address family type."
+
         return self.socket.receive_from(size)
 
     fn read_from(mut self, mut dest: Bytes) raises -> Tuple[UInt, String, UInt16]:
@@ -202,7 +210,7 @@ struct UDPConnection[network: NetworkType, address_family: AddressFamily = Addre
         Raises:
             Error: If an error occurred while reading data.
         """
-        __comptime_assert Self.address_family.is_inet(), "Must be an inet address family type."
+
         return self.socket.receive_from(dest)
 
     fn write_to(mut self, src: Span[Byte], mut address: UDPAddr) raises -> UInt:
@@ -218,7 +226,7 @@ struct UDPConnection[network: NetworkType, address_family: AddressFamily = Addre
         Raises:
             Error: If an error occurred while writing data.
         """
-        __comptime_assert Self.address_family.is_inet(), "Must be an inet address family type."
+
         return self.socket.send_to(src, address.ip, address.port)
 
     fn write_to(mut self, src: Span[Byte], mut host: String, port: UInt16) raises -> UInt:
@@ -235,7 +243,7 @@ struct UDPConnection[network: NetworkType, address_family: AddressFamily = Addre
         Raises:
             Error: If an error occurred while writing data.
         """
-        __comptime_assert Self.address_family.is_inet(), "Must be an inet address family type."
+
         return self.socket.send_to(src, host, port)
 
     fn close(mut self) raises:
@@ -267,9 +275,8 @@ fn create_connection(mut host: String, port: UInt16) raises -> TCPConnection:
     Returns:
         The socket file descriptor.
     """
-    var socket = Socket[TCPAddr, AddressFamily.AF_INET]()
+    var socket = Socket[TCPAddr, address_family = AddressFamily.AF_INET]()
     try:
-        __comptime_assert socket.address_family.is_inet(), "Must be an inet address family type."
         socket.connect(host, port)
     except e:
         logger.error(e)
@@ -282,98 +289,97 @@ fn create_connection(mut host: String, port: UInt16) raises -> TCPConnection:
     return TCPConnection(socket^)
 
 
-fn listen_udp[network: NetworkType = NetworkType.udp4](local_address: UDPAddr) raises -> UDPConnection[network]:
-    """Creates a new UDP listener.
+# fn listen_udp[network: NetworkType = NetworkType.udp4](local_address: UDPAddr[network]) raises -> UDPConnection[network]:
+#     """Creates a new UDP listener.
 
-    Args:
-        local_address: The local address to listen on.
+#     Args:
+#         local_address: The local address to listen on.
 
-    Returns:
-        A UDP connection.
+#     Returns:
+#         A UDP connection.
 
-    Raises:
-        Error: If the address is invalid or failed to bind the socket.
-    """
-    var socket = Socket[UDPAddr[network]](socket_type=SocketType.SOCK_DGRAM)
-    __comptime_assert socket.address_family.is_inet(), "Must be an inet address family type."
-    socket.bind(local_address.ip, local_address.port)
-    return UDPConnection[network](socket^)
-
-
-fn listen_udp[network: NetworkType = NetworkType.udp4](local_address: String) raises -> UDPConnection[network]:
-    """Creates a new UDP listener.
-
-    Args:
-        local_address: The address to listen on. The format is "host:port".
-
-    Returns:
-        A UDP connection.
-
-    Raises:
-        Error: If the address is invalid or failed to bind the socket.
-    """
-    var address = parse_address(NetworkType.udp4, local_address)
-    return listen_udp[network](UDPAddr[network](String(address[0]), address[1]))
+#     Raises:
+#         Error: If the address is invalid or failed to bind the socket.
+#     """
+#     var socket = Socket[UDPAddr[network], sock_type=SocketType.SOCK_DGRAM]()
+#     socket.bind(local_address.ip, local_address.port)
+#     return UDPConnection(socket^)
 
 
-fn listen_udp[network: NetworkType = NetworkType.udp4](host: String, port: UInt16) raises -> UDPConnection[network]:
-    """Creates a new UDP listener.
+# fn listen_udp[network: NetworkType = NetworkType.udp4](local_address: String) raises -> UDPConnection[network]:
+#     """Creates a new UDP listener.
 
-    Args:
-        host: The address to listen on in ipv4 format.
-        port: The port number.
+#     Args:
+#         local_address: The address to listen on. The format is "host:port".
 
-    Returns:
-        A UDP connection.
+#     Returns:
+#         A UDP connection.
 
-    Raises:
-        Error: If the address is invalid or failed to bind the socket.
-    """
-    return listen_udp[network](UDPAddr[network](host, port))
-
-
-fn dial_udp[network: NetworkType = NetworkType.udp4](local_address: UDPAddr[network]) raises -> UDPConnection[network]:
-    """Connects to the address on the named network. The network must be "udp", "udp4", or "udp6".
-
-    Args:
-        local_address: The local address.
-
-    Returns:
-        The UDP connection.
-
-    Raises:
-        Error: If the network type is not supported or failed to connect to the address.
-    """
-    return UDPConnection(Socket[UDPAddr[network]](local_address=local_address, socket_type=SocketType.SOCK_DGRAM))
+#     Raises:
+#         Error: If the address is invalid or failed to bind the socket.
+#     """
+#     var address = parse_address[network](local_address)
+#     return listen_udp[network](UDPAddr[network](String(address[0]), address[1]))
 
 
-fn dial_udp[network: NetworkType = NetworkType.udp4](local_address: String) raises -> UDPConnection[network]:
-    """Connects to the address on the named network. The network must be "udp", "udp4", or "udp6".
+# fn listen_udp[network: NetworkType = NetworkType.udp4](host: String, port: UInt16) raises -> UDPConnection[network]:
+#     """Creates a new UDP listener.
 
-    Args:
-        local_address: The local address.
+#     Args:
+#         host: The address to listen on in ipv4 format.
+#         port: The port number.
 
-    Returns:
-        The UDP connection.
+#     Returns:
+#         A UDP connection.
 
-    Raises:
-        Error: If the network type is not supported or failed to connect to the address.
-    """
-    var address = parse_address(network, local_address)
-    return dial_udp[network](UDPAddr[network](String(address[0]), address[1]))
+#     Raises:
+#         Error: If the address is invalid or failed to bind the socket.
+#     """
+#     return listen_udp[network](UDPAddr[network](host, port))
 
 
-fn dial_udp[network: NetworkType = NetworkType.udp4](host: String, port: UInt16) raises -> UDPConnection[network]:
-    """Connects to the address on the udp network.
+# fn dial_udp[network: NetworkType = NetworkType.udp4](local_address: UDPAddr[network]) raises -> UDPConnection[network]:
+#     """Connects to the address on the named network. The network must be "udp", "udp4", or "udp6".
 
-    Args:
-        host: The host to connect to.
-        port: The port to connect on.
+#     Args:
+#         local_address: The local address.
 
-    Returns:
-        The UDP connection.
+#     Returns:
+#         The UDP connection.
 
-    Raises:
-        Error: If failed to connect to the address.
-    """
-    return dial_udp[network](UDPAddr[network](host, port))
+#     Raises:
+#         Error: If the network type is not supported or failed to connect to the address.
+#     """
+#     return UDPConnection(Socket[UDPAddr[network], sock_type=SocketType.SOCK_DGRAM](local_address=local_address))
+
+
+# fn dial_udp[network: NetworkType = NetworkType.udp4](local_address: String) raises -> UDPConnection[network]:
+#     """Connects to the address on the named network. The network must be "udp", "udp4", or "udp6".
+
+#     Args:
+#         local_address: The local address.
+
+#     Returns:
+#         The UDP connection.
+
+#     Raises:
+#         Error: If the network type is not supported or failed to connect to the address.
+#     """
+#     var address = parse_address[network](local_address)
+#     return dial_udp[network](UDPAddr[network](String(address[0]), address[1]))
+
+
+# fn dial_udp[network: NetworkType = NetworkType.udp4](host: String, port: UInt16) raises -> UDPConnection[network]:
+#     """Connects to the address on the udp network.
+
+#     Args:
+#         host: The host to connect to.
+#         port: The port to connect on.
+
+#     Returns:
+#         The UDP connection.
+
+#     Raises:
+#         Error: If failed to connect to the address.
+#     """
+#     return dial_udp[network](UDPAddr[network](host, port))

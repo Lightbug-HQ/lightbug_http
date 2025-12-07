@@ -1,4 +1,5 @@
 from sys.ffi import c_char, c_int, c_uint, c_ushort, external_call, get_errno
+from sys.info import size_of
 
 from lightbug_http.c.address import AddressFamily, AddressLength
 from lightbug_http.c.aliases import ExternalImmutUnsafePointer, ExternalMutUnsafePointer, c_void
@@ -152,6 +153,48 @@ struct sockaddr_in6:
 
 
 @fieldwise_init
+struct SocketAddress(Movable):
+    """A socket address wrapper."""
+
+    comptime SIZE = socklen_t(size_of[sockaddr]())
+    """The size of the underlying sockaddr struct."""
+    var addr: ExternalMutUnsafePointer[sockaddr]
+    """Pointer to the underlying sockaddr struct."""
+
+    fn __init__(out self):
+        self.addr = alloc[sockaddr](count=1)
+
+    fn __init__(out self, address_family: AddressFamily, port: UInt16, binary_ip: UInt32):
+        """Construct a SocketAddress from address family, port and binary IP.
+
+        This constructor creates a `sockaddr_in` struct owned by a pointer, then casts it to `sockaddr` and
+        gives ownership of the pointer to the `SocketAddress`.
+
+        Args:
+            address_family: The address family.
+            port: A 16-bit integer port in host byte order, gets converted to network byte order via `htons`.
+            binary_ip: The binary representation of the IP address.
+        """
+        var sockaddr_in_ptr = alloc[sockaddr_in](count=1)
+        sockaddr_in_ptr.init_pointee_move(
+            sockaddr_in(address_family=Int(address_family.value), port=port, binary_ip=binary_ip)
+        )
+        self.addr = sockaddr_in_ptr.bitcast[sockaddr]()
+
+    fn __del__(deinit self):
+        if self.addr:
+            self.addr.free()
+
+    fn ptr(mut self) -> MutUnsafePointer[sockaddr, origin_of(self)]:
+        """Get the underlying sockaddr pointer with an origin of the SocketAddress that wraps it."""
+        return self.addr.unsafe_origin_cast[origin_of(self)]()
+
+    fn as_sockaddr_in(mut self) -> ref [origin_of(self)] sockaddr_in:
+        """Cast the underlying sockaddr pointer to sockaddr_in and return a reference to it."""
+        return self.ptr().bitcast[sockaddr_in]()[]
+
+
+@fieldwise_init
 @register_passable("trivial")
 struct addrinfo:
     var ai_flags: c_int
@@ -209,9 +252,7 @@ fn _inet_ntop(
     ](af, src, dst, size)
 
 
-fn inet_ntop[
-    address_family: AddressFamily where address_family.is_inet(), address_length: AddressLength
-](ip_address: UInt32) raises -> String:
+fn inet_ntop[address_family: AddressFamily, address_length: AddressLength](ip_address: UInt32) raises -> String:
     """Libc POSIX `inet_ntop` function.
 
     Parameters:
@@ -292,7 +333,7 @@ fn _inet_pton(af: c_int, src: ImmutUnsafePointer[c_char], dst: MutUnsafePointer[
     ](af, src, dst)
 
 
-fn inet_pton[address_family: AddressFamily where address_family.is_inet()](var src: String) raises -> c_uint:
+fn inet_pton[address_family: AddressFamily](var src: String) raises -> c_uint:
     """Libc POSIX `inet_pton` function. Converts a presentation format address (that is, printable form as held in a character string)
     to network format (usually a struct in_addr or some other internal binary representation, in network byte order).
 

@@ -19,6 +19,5 @@ struct BytesConstant:
     comptime colon = byte[colonChar]()
     comptime rChar = byte[rChar]()
     comptime nChar = byte[nChar]()
-
     comptime CRLF = Bytes("\r\n".as_bytes())
     comptime DOUBLE_CRLF = Bytes("\r\n\r\n".as_bytes())

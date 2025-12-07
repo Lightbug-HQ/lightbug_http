@@ -6,6 +6,7 @@ from lightbug_http.c.aliases import ExternalImmutUnsafePointer, ExternalMutUnsaf
 from lightbug_http.c.network import in_addr, inet_ntop, ntohs, sockaddr, sockaddr_in, socklen_t
 from lightbug_http.c.socket import SocketType, socket
 from lightbug_http.socket import Socket
+from utils import Variant
 
 
 comptime MAX_PORT = 65535
@@ -247,13 +248,13 @@ struct addrinfo_macos(AnAddrInfo):
         ai_flags: c_int = 0,
         ai_family: AddressFamily = AddressFamily.AF_UNSPEC,
         ai_socktype: SocketType = SocketType.SOCK_STREAM,
-        ai_protocol: c_int = 0,
+        ai_protocol: AddressFamily = AddressFamily.AF_UNSPEC,
         ai_addrlen: socklen_t = 0,
     ):
         self.ai_flags = ai_flags
         self.ai_family = ai_family.value
         self.ai_socktype = ai_socktype.value
-        self.ai_protocol = ai_protocol
+        self.ai_protocol = 0
         self.ai_addrlen = ai_addrlen
         self.ai_canonname = {}
         self.ai_addr = {}
@@ -281,25 +282,26 @@ struct addrinfo_unix(AnAddrInfo):
         ai_flags: c_int = 0,
         ai_family: AddressFamily = AddressFamily.AF_UNSPEC,
         ai_socktype: SocketType = SocketType.SOCK_STREAM,
-        ai_protocol: c_int = 0,
+        ai_protocol: AddressFamily = AddressFamily.AF_UNSPEC,
         ai_addrlen: socklen_t = 0,
     ):
         self.ai_flags = ai_flags
         self.ai_family = ai_family.value
         self.ai_socktype = ai_socktype.value
-        self.ai_protocol = ai_protocol
+        self.ai_protocol = ai_protocol.value
         self.ai_addrlen = ai_addrlen
         self.ai_addr = {}
         self.ai_canonname = {}
         self.ai_next = {}
 
 
-fn get_ip_address(mut host: String) raises -> in_addr:
+fn get_ip_address(mut host: String, address_family: AddressFamily) raises -> in_addr:
     """Returns an IP address based on the host.
     This is a Unix-specific implementation.
 
     Args:
-        host: String - The host to get IP from.
+        host: The host to get IP from.
+        address_family: The address family to use.
 
     Returns:
         The IP address.
@@ -309,7 +311,7 @@ fn get_ip_address(mut host: String) raises -> in_addr:
     if CompilationTarget.is_macos():
         var result: CAddrInfo[addrinfo_macos]
         var hints = addrinfo_macos(
-            ai_flags=0, ai_family=AddressFamily.AF_INET, ai_socktype=SocketType.SOCK_STREAM, ai_protocol=0
+            ai_flags=0, ai_family=address_family, ai_socktype=SocketType.SOCK_STREAM, ai_protocol=address_family
         )
         var service = String()
         try:
@@ -325,7 +327,7 @@ fn get_ip_address(mut host: String) raises -> in_addr:
     else:
         var result: CAddrInfo[addrinfo_unix]
         var hints = addrinfo_unix(
-            ai_flags=0, ai_family=AddressFamily.AF_INET, ai_socktype=SocketType.SOCK_STREAM, ai_protocol=0
+            ai_flags=0, ai_family=address_family, ai_socktype=SocketType.SOCK_STREAM, ai_protocol=address_family
         )
         var service = String()
         try:
@@ -355,9 +357,25 @@ fn is_ipv6(network: NetworkType) -> Bool:
     return network in (NetworkType.tcp6, NetworkType.udp6, NetworkType.ip6)
 
 
+struct ParseError(Stringable, Writable):
+    var message: String
+
+    fn __init__(out self, var message: String):
+        self.message = message^
+
+    fn write_to[W: Writer, //](self, mut writer: W) -> None:
+        writer.write(self.message)
+
+    fn __str__(self) -> String:
+        return self.message.copy()
+
+
+comptime TooManyColonsError = ParseError("too many colons in address")
+
+
 fn parse_ipv6_bracketed_address[
     origin: ImmutOrigin
-](address: StringSlice[origin]) raises -> Tuple[StringSlice[origin], UInt16]:
+](address: StringSlice[origin]) raises ParseError -> Tuple[StringSlice[origin], UInt16]:
     """Parse an IPv6 address enclosed in brackets.
 
     Returns:
@@ -368,21 +386,21 @@ fn parse_ipv6_bracketed_address[
 
     var end_bracket_index = address.find("]")
     if end_bracket_index == -1:
-        raise Error("missing ']' in address")
+        raise ParseError("Failed to parse ipv6 address: missing ']'")
 
     if end_bracket_index + 1 == len(address):
-        raise MissingPortError
+        raise ParseError("Failed to parse ipv6 address: missing port in address")
 
     var colon_index = end_bracket_index + 1
     if address[colon_index] != ":":
-        raise MissingPortError
+        raise ParseError("Failed to parse ipv6 address: missing port in address")
 
     return address[1:end_bracket_index], UInt16(end_bracket_index + 1)
 
 
 fn validate_no_brackets[
     origin: ImmutOrigin
-](address: StringSlice[origin], start_idx: UInt16, end_idx: Optional[UInt16] = None) raises:
+](address: StringSlice[origin], start_idx: UInt16, end_idx: Optional[UInt16] = None) raises ParseError:
     """Validate that the address segment contains no brackets."""
     var segment: StringSlice[origin]
 
@@ -392,37 +410,47 @@ fn validate_no_brackets[
         segment = address[Int(start_idx) : Int(end_idx.value())]
 
     if segment.find("[") != -1:
-        raise Error("unexpected '[' in address")
+        raise ParseError("Address failed bracket validation, unexpectedly contained '['")
     if segment.find("]") != -1:
-        raise Error("unexpected ']' in address")
+        raise ParseError("Address failed bracket validation, unexpectedly contained ']'")
 
 
-fn parse_port[origin: ImmutOrigin](port_str: StringSlice[origin]) raises -> UInt16:
+fn parse_port[origin: ImmutOrigin](port_str: StringSlice[origin]) raises ParseError -> UInt16:
     """Parse and validate port number."""
     if port_str == AddressConstants.EMPTY:
-        raise MissingPortError
+        raise ParseError("Failed to parse port: port string is empty.")
 
-    var port = Int(String(port_str))
+    var port: Int
+    try:
+        port = Int(String(port_str))
+    except e:
+        logger.error(e)
+        raise ParseError(String("Failed to parse port: invalid integer value. Received: ", port_str))
+
     if port < MIN_PORT or port > MAX_PORT:
-        raise Error("Port number out of range (0-65535)")
+        raise ParseError(String("Failed to parse port: Port number out of range (0-65535). Received: ", port_str))
 
     return UInt16(port)
 
 
 fn parse_address[
-    origin: ImmutOrigin
-](network: NetworkType, address: StringSlice[origin]) raises -> Tuple[String, UInt16]:
+    origin: ImmutOrigin, //,
+    network: NetworkType,
+](address: StringSlice[origin]) raises ParseError -> Tuple[String, UInt16]:
     """Parse an address string into a host and port.
 
+    Parameters:
+        origin: The origin of the address string.
+        network: The network type.
+
     Args:
-        network: The network type (tcp, tcp4, tcp6, udp, udp4, udp6, ip, ip4, ip6, unix).
         address: The address string.
 
     Returns:
         Tuple containing the host and port.
     """
     if address == AddressConstants.EMPTY:
-        raise Error("missing host")
+        raise ParseError("Failed to parse address: received empty address string.")
 
     if address == AddressConstants.LOCALHOST:
         if network.is_ipv4():
@@ -430,37 +458,36 @@ fn parse_address[
         elif network.is_ipv6():
             return String(AddressConstants.IPV6_LOCALHOST), DEFAULT_IP_PORT
 
+    @parameter
     if network.is_ip_protocol():
         if network == NetworkType.ip6 and address.find(":") != -1:
             return String(address), DEFAULT_IP_PORT
 
         if address.find(":") != -1:
-            raise Error("IP protocol addresses should not include ports")
+            raise ParseError("IP protocol addresses should not include ports")
 
         return String(address), DEFAULT_IP_PORT
 
     var colon_index = address.rfind(":")
     if colon_index == -1:
-        raise MissingPortError
+        raise ParseError("Failed to parse address: missing port separator ':' in address.")
 
     var host: StringSlice[origin]
     var port: UInt16
 
     if address[0] == "[":
-        try:
-            var bracket_offset: UInt16
-            (host, bracket_offset) = parse_ipv6_bracketed_address(address)
-            validate_no_brackets(address, bracket_offset)
-        except e:
-            raise e
+        var bracket_offset: UInt16
+        (host, bracket_offset) = parse_ipv6_bracketed_address(address)
+        validate_no_brackets(address, bracket_offset)
     else:
         host = address[:colon_index]
         if host.find(":") != -1:
-            raise TooManyColonsError
+            raise ParseError("Failed to parse address: too many colons in address")
 
     port = parse_port(address[colon_index + 1 :])
-
     if host == AddressConstants.LOCALHOST:
+
+        @parameter
         if network.is_ipv4():
             return String(AddressConstants.IPV4_LOCALHOST), port
         elif network.is_ipv6():
@@ -476,10 +503,6 @@ fn join_host_port(host: String, port: String) -> String:
     return host + ":" + port
 
 
-comptime MissingPortError = Error("missing port in address")
-comptime TooManyColonsError = Error("too many colons in address")
-
-
 fn binary_port_to_int(port: UInt16) -> Int:
     """Convert a binary port to an integer.
 
@@ -492,9 +515,7 @@ fn binary_port_to_int(port: UInt16) -> Int:
     return Int(ntohs(port))
 
 
-fn binary_ip_to_string[
-    address_family: AddressFamily
-](var ip_address: UInt32) raises -> String where address_family.is_inet():
+fn binary_ip_to_string[address_family: AddressFamily](var ip_address: UInt32) raises -> String:
     """Convert a binary IP address to a string by calling `inet_ntop`.
 
     Parameters:

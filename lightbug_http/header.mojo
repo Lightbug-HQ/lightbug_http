@@ -82,11 +82,7 @@ struct Headers(Copyable, Stringable, Writable):
             return 0
 
     fn parse_raw(mut self, mut r: ByteReader) raises -> Tuple[String, String, String, List[String]]:
-        var first_byte: Byte
-        try:
-            first_byte = r.peek()
-        except EndOfReaderError:
-            logger.error(EndOfReaderError)
+        if not r.available():
             raise Error("Headers.parse_raw: Failed to read first byte from response header.")
 
         var first = r.read_word()

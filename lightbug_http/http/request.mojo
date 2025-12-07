@@ -64,8 +64,15 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
         if content_length > 0 and max_body_size > 0 and content_length > max_body_size:
             raise Error("HTTPRequest.from_bytes: Request body too large.")
 
+        var parsed_uri: URI
+        try:
+            parsed_uri = URI.parse(String(addr, uri))
+        except URIParseError:
+            logger.error(URIParseError)
+            raise Error("HTTPRequest.from_bytes: Failed to parse request URI.")
+
         var request = HTTPRequest(
-            URI.parse(addr + uri), headers=headers^, method=method^, protocol=protocol^, cookies=cookies^
+            uri=parsed_uri^, headers=headers^, method=method^, protocol=protocol^, cookies=cookies^
         )
 
         if content_length > 0:
@@ -89,7 +96,7 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
         timeout: Duration = Duration(),
     ):
         self.headers = headers^
-        self.cookies = cookies^
+        self.cookies = cookies.copy()
         self.method = method^
         self.protocol = protocol^
         self.uri = uri^
@@ -125,21 +132,29 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
         if content_length > max_body_size:
             raise Error("Request body too large")
 
-        try:
-            self.body_raw = Bytes(r.read_bytes(content_length).as_bytes())
+        if r.remaining() > content_length:
+            try:
+                self.body_raw = Bytes(r.read_bytes(content_length).as_bytes())
+            except OutOfBoundsError:
+                raise Error(
+                    "Failed to read request body: reached the end of the reader before reaching content length."
+                )
+
+            if len(self.body_raw) != content_length:
+                raise Error("Content length mismatch, expected ", content_length, " but got ", len(self.body_raw))
+
             self.set_content_length(len(self.body_raw))
-        except OutOfBoundsError:
-            logger.debug(
-                "Failed to read full request body as per content-length header. Proceeding with the available bytes."
-            )
-            var available_bytes = len(r._inner) - r.read_pos
-            if available_bytes > 0:
-                self.body_raw = Bytes(r.read_bytes(available_bytes).as_bytes())
-                self.set_content_length(len(self.body_raw))
-            else:
-                logger.debug("No body bytes available. Setting content-length to 0.")
-                self.body_raw = Bytes()
-                self.set_content_length(0)
+            return
+
+        # TODO: Handle content length mismatches?
+        elif r.remaining() == 0:
+            logger.debug("No body bytes available. Setting content-length to 0.")
+            self.body_raw = Bytes()
+            self.set_content_length(0)
+            return
+
+        self.body_raw = Bytes(r.read_bytes().as_bytes())
+        self.set_content_length(len(self.body_raw))
 
     fn write_to[T: Writer, //](self, mut writer: T):
         path = self.uri.path if len(self.uri.path) > 1 else strSlash

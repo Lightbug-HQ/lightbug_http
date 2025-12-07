@@ -1,3 +1,5 @@
+from io.write import _WriteBufferStack
+
 from lightbug_http._logger import logger
 from lightbug_http.address import NetworkType
 from lightbug_http.connection import ListenConfig, NoTLSListener, TCPConnection, default_buffer_size
@@ -34,18 +36,18 @@ struct Server(Movable):
 
     fn __init__(
         out self,
-        error_handler: ErrorHandler = ErrorHandler(),
-        name: String = "lightbug_http",
-        address: String = "127.0.0.1",
+        var error_handler: ErrorHandler = ErrorHandler(),
+        var name: String = "lightbug_http",
+        var address: String = "127.0.0.1",
         max_concurrent_connections: Int = 1000,
         max_requests_per_connection: Int = 0,
         max_request_body_size: Int = default_max_request_body_size,
         max_request_uri_length: Int = default_max_request_uri_length,
         tcp_keep_alive: Bool = False,
-    ) raises:
-        self.error_handler = error_handler.copy()
-        self.name = name
-        self._address = address
+    ):
+        self.error_handler = error_handler^
+        self.name = name^
+        self._address = address^
         self.max_requests_per_connection = max_requests_per_connection
         self._max_request_body_size = max_request_body_size
         self._max_request_uri_length = max_request_uri_length
@@ -55,21 +57,11 @@ struct Server(Movable):
         else:
             self.max_concurrent_connections = max_concurrent_connections
 
-    fn __moveinit__(out self, deinit other: Server):
-        self.error_handler = other.error_handler^
-        self.name = other.name^
-        self._address = other._address^
-        self.max_concurrent_connections = other.max_concurrent_connections
-        self.max_requests_per_connection = other.max_requests_per_connection
-        self._max_request_body_size = other._max_request_body_size
-        self._max_request_uri_length = other._max_request_uri_length
-        self.tcp_keep_alive = other.tcp_keep_alive
-
     fn address(self) -> ref [self._address] String:
         return self._address
 
-    fn set_address(mut self, own_address: String) -> None:
-        self._address = own_address
+    fn set_address(mut self, var own_address: String) -> None:
+        self._address = own_address^
 
     fn max_request_body_size(self) -> Int:
         return self._max_request_body_size
@@ -92,7 +84,7 @@ struct Server(Movable):
         """
         return self.max_concurrent_connections
 
-    fn listen_and_serve[T: HTTPService](mut self, address: String, mut handler: T) raises:
+    fn listen_and_serve[T: HTTPService](mut self, address: StringSlice, mut handler: T) raises:
         """Listen for incoming connections and serve HTTP requests.
 
         Parameters:
@@ -102,12 +94,11 @@ struct Server(Movable):
             address: The address (host:port) to listen on.
             handler: An object that handles incoming HTTP requests.
         """
-        var config = ListenConfig()
-        var listener = config.listen(address)
-        self.set_address(address)
-        self.serve(listener^, handler)
+        var listener = ListenConfig().listen(address)
+        self.set_address(String(address))
+        self.serve(listener, handler)
 
-    fn serve[T: HTTPService](mut self, var ln: NoTLSListener, mut handler: T) raises:
+    fn serve[T: HTTPService](self, ln: NoTLSListener, mut handler: T) raises:
         """Serve HTTP requests.
 
         Parameters:
@@ -120,14 +111,16 @@ struct Server(Movable):
         Raises:
             If there is an error while serving requests.
         """
+        print("Server", self.name, "listening on", self.address())
         while True:
             var conn = ln.accept()
+            print("Accepted connection from", conn.socket.remote_address.ip, ":", conn.socket.remote_address.port)
             try:
                 self.serve_connection(conn, handler)
             finally:
                 conn^.teardown()
 
-    fn serve_connection[T: HTTPService](mut self, mut conn: TCPConnection, mut handler: T) raises -> None:
+    fn serve_connection[T: HTTPService](self, mut conn: TCPConnection, mut handler: T) raises -> None:
         """Serve a single connection.
 
         Parameters:
