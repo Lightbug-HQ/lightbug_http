@@ -517,7 +517,7 @@ fn getsockname(socket: FileDescriptor, mut address: SocketAddress) raises:
     * Reference: https://man7.org/linux/man-pages/man3/getsockname.3p.html .
     """
     var sockaddr_size = address.SIZE
-    var result = _getsockname(socket.value, address.ptr(), Pointer(to=sockaddr_size))
+    var result = _getsockname(socket.value, address.unsafe_ptr(), Pointer(to=sockaddr_size))
     if result == -1:
         var errno = get_errno()
         if errno == errno.EBADF:
@@ -591,7 +591,7 @@ fn getpeername(file_descriptor: FileDescriptor) raises -> SocketAddress:
     """
     var remote_address = SocketAddress()
     var sockaddr_size = remote_address.SIZE
-    var result = _getpeername(file_descriptor.value, remote_address.ptr(), Pointer(to=sockaddr_size))
+    var result = _getpeername(file_descriptor.value, remote_address.unsafe_ptr(), Pointer(to=sockaddr_size))
     if result == -1:
         var errno = get_errno()
         if errno == errno.EBADF:
@@ -1169,7 +1169,7 @@ fn recvfrom[
         buffer.unsafe_ptr().bitcast[c_void](),
         length,
         flags,
-        address.ptr(),
+        address.unsafe_ptr(),
         Pointer(to=address_buffer_size),
     )
     if result == -1:
@@ -1442,7 +1442,7 @@ fn sendto[
         message.unsafe_ptr().bitcast[c_void](),
         length,
         flags,
-        dest_addr.ptr().as_immutable(),
+        dest_addr.unsafe_ptr().as_immutable(),
         dest_addr.SIZE,
     )
     if result == -1:

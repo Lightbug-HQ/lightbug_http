@@ -289,97 +289,99 @@ fn create_connection(mut host: String, port: UInt16) raises -> TCPConnection:
     return TCPConnection(socket^)
 
 
-# fn listen_udp[network: NetworkType = NetworkType.udp4](local_address: UDPAddr[network]) raises -> UDPConnection[network]:
-#     """Creates a new UDP listener.
+fn listen_udp[
+    network: NetworkType = NetworkType.udp4
+](local_address: UDPAddr[network]) raises -> UDPConnection[network]:
+    """Creates a new UDP listener.
 
-#     Args:
-#         local_address: The local address to listen on.
+    Args:
+        local_address: The local address to listen on.
 
-#     Returns:
-#         A UDP connection.
+    Returns:
+        A UDP connection.
 
-#     Raises:
-#         Error: If the address is invalid or failed to bind the socket.
-#     """
-#     var socket = Socket[UDPAddr[network], sock_type=SocketType.SOCK_DGRAM]()
-#     socket.bind(local_address.ip, local_address.port)
-#     return UDPConnection(socket^)
-
-
-# fn listen_udp[network: NetworkType = NetworkType.udp4](local_address: String) raises -> UDPConnection[network]:
-#     """Creates a new UDP listener.
-
-#     Args:
-#         local_address: The address to listen on. The format is "host:port".
-
-#     Returns:
-#         A UDP connection.
-
-#     Raises:
-#         Error: If the address is invalid or failed to bind the socket.
-#     """
-#     var address = parse_address[network](local_address)
-#     return listen_udp[network](UDPAddr[network](String(address[0]), address[1]))
+    Raises:
+        Error: If the address is invalid or failed to bind the socket.
+    """
+    var socket = Socket[UDPAddr[network], sock_type = SocketType.SOCK_DGRAM]()
+    socket.bind(local_address.ip, local_address.port)
+    return UDPConnection(socket^)
 
 
-# fn listen_udp[network: NetworkType = NetworkType.udp4](host: String, port: UInt16) raises -> UDPConnection[network]:
-#     """Creates a new UDP listener.
+fn listen_udp[network: NetworkType = NetworkType.udp4](local_address: String) raises -> UDPConnection[network]:
+    """Creates a new UDP listener.
 
-#     Args:
-#         host: The address to listen on in ipv4 format.
-#         port: The port number.
+    Args:
+        local_address: The address to listen on. The format is "host:port".
 
-#     Returns:
-#         A UDP connection.
+    Returns:
+        A UDP connection.
 
-#     Raises:
-#         Error: If the address is invalid or failed to bind the socket.
-#     """
-#     return listen_udp[network](UDPAddr[network](host, port))
-
-
-# fn dial_udp[network: NetworkType = NetworkType.udp4](local_address: UDPAddr[network]) raises -> UDPConnection[network]:
-#     """Connects to the address on the named network. The network must be "udp", "udp4", or "udp6".
-
-#     Args:
-#         local_address: The local address.
-
-#     Returns:
-#         The UDP connection.
-
-#     Raises:
-#         Error: If the network type is not supported or failed to connect to the address.
-#     """
-#     return UDPConnection(Socket[UDPAddr[network], sock_type=SocketType.SOCK_DGRAM](local_address=local_address))
+    Raises:
+        Error: If the address is invalid or failed to bind the socket.
+    """
+    var address = parse_address[network](local_address)
+    return listen_udp[network](UDPAddr[network](String(address[0]), address[1]))
 
 
-# fn dial_udp[network: NetworkType = NetworkType.udp4](local_address: String) raises -> UDPConnection[network]:
-#     """Connects to the address on the named network. The network must be "udp", "udp4", or "udp6".
+fn listen_udp[network: NetworkType = NetworkType.udp4](host: String, port: UInt16) raises -> UDPConnection[network]:
+    """Creates a new UDP listener.
 
-#     Args:
-#         local_address: The local address.
+    Args:
+        host: The address to listen on in ipv4 format.
+        port: The port number.
 
-#     Returns:
-#         The UDP connection.
+    Returns:
+        A UDP connection.
 
-#     Raises:
-#         Error: If the network type is not supported or failed to connect to the address.
-#     """
-#     var address = parse_address[network](local_address)
-#     return dial_udp[network](UDPAddr[network](String(address[0]), address[1]))
+    Raises:
+        Error: If the address is invalid or failed to bind the socket.
+    """
+    return listen_udp[network](UDPAddr[network](host, port))
 
 
-# fn dial_udp[network: NetworkType = NetworkType.udp4](host: String, port: UInt16) raises -> UDPConnection[network]:
-#     """Connects to the address on the udp network.
+fn dial_udp[network: NetworkType = NetworkType.udp4](local_address: UDPAddr[network]) raises -> UDPConnection[network]:
+    """Connects to the address on the named network. The network must be "udp", "udp4", or "udp6".
 
-#     Args:
-#         host: The host to connect to.
-#         port: The port to connect on.
+    Args:
+        local_address: The local address.
 
-#     Returns:
-#         The UDP connection.
+    Returns:
+        The UDP connection.
 
-#     Raises:
-#         Error: If failed to connect to the address.
-#     """
-#     return dial_udp[network](UDPAddr[network](host, port))
+    Raises:
+        Error: If the network type is not supported or failed to connect to the address.
+    """
+    return UDPConnection(Socket[UDPAddr[network], sock_type = SocketType.SOCK_DGRAM](local_address=local_address))
+
+
+fn dial_udp[network: NetworkType = NetworkType.udp4](local_address: String) raises -> UDPConnection[network]:
+    """Connects to the address on the named network. The network must be "udp", "udp4", or "udp6".
+
+    Args:
+        local_address: The local address.
+
+    Returns:
+        The UDP connection.
+
+    Raises:
+        Error: If the network type is not supported or failed to connect to the address.
+    """
+    var address = parse_address[network](local_address)
+    return dial_udp[network](UDPAddr[network](String(address[0]), address[1]))
+
+
+fn dial_udp[network: NetworkType = NetworkType.udp4](host: String, port: UInt16) raises -> UDPConnection[network]:
+    """Connects to the address on the udp network.
+
+    Args:
+        host: The host to connect to.
+        port: The port to connect on.
+
+    Returns:
+        The UDP connection.
+
+    Raises:
+        Error: If failed to connect to the address.
+    """
+    return dial_udp[network](UDPAddr[network](host, port))

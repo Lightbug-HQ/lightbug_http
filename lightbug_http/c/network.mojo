@@ -185,13 +185,23 @@ struct SocketAddress(Movable):
         if self.addr:
             self.addr.free()
 
-    fn ptr(mut self) -> MutUnsafePointer[sockaddr, origin_of(self)]:
-        """Get the underlying sockaddr pointer with an origin of the SocketAddress that wraps it."""
-        return self.addr.unsafe_origin_cast[origin_of(self)]()
+    fn unsafe_ptr[
+        origin: Origin, address_space: AddressSpace, //
+    ](ref [origin, address_space]self) -> UnsafePointer[sockaddr, origin, address_space=address_space]:
+        """Retrieves a pointer to the underlying memory.
+
+        Parameters:
+            origin: The origin of the `SocketAddress`.
+            address_space: The `AddressSpace` of the `SocketAddress`.
+
+        Returns:
+            The pointer to the underlying memory.
+        """
+        return self.addr.unsafe_mut_cast[origin.mut]().unsafe_origin_cast[origin]().address_space_cast[address_space]()
 
     fn as_sockaddr_in(mut self) -> ref [origin_of(self)] sockaddr_in:
         """Cast the underlying sockaddr pointer to sockaddr_in and return a reference to it."""
-        return self.ptr().bitcast[sockaddr_in]()[]
+        return self.unsafe_ptr().bitcast[sockaddr_in]()[]
 
 
 @fieldwise_init
@@ -281,12 +291,13 @@ fn inet_ntop[address_family: AddressFamily, address_length: AddressLength](ip_ad
     var dst = List[Byte](capacity=address_length.value + 1)
 
     # `inet_ntop` returns NULL on error.
-    if not _inet_ntop(
+    var result = _inet_ntop(
         address_family.value,
         UnsafePointer(to=ip_address).bitcast[c_void](),
         dst.unsafe_ptr().bitcast[c_char](),
         address_length.value,
-    ):
+    )
+    if not result:
         var errno = get_errno()
         if errno == errno.EAFNOSUPPORT:
             raise Error("inet_ntop Error: `*src` was not an `AF_INET` or `AF_INET6` family address.")
@@ -299,7 +310,7 @@ fn inet_ntop[address_family: AddressFamily, address_length: AddressLength](ip_ad
             raise Error("inet_ntop Error: An error occurred while converting the address. Error code: ", errno)
 
     # Copy the dst contents into a new String.
-    return String(bytes=Span(dst))
+    return String(unsafe_from_utf8_ptr=dst.unsafe_ptr())
 
 
 fn _inet_pton(af: c_int, src: ImmutUnsafePointer[c_char], dst: MutUnsafePointer[c_void]) -> c_int:

@@ -3,7 +3,7 @@ from sys.ffi import CompilationTarget, c_char, c_int, c_uchar, external_call
 from lightbug_http._logger import logger
 from lightbug_http.c.address import AddressFamily, AddressLength
 from lightbug_http.c.aliases import ExternalImmutUnsafePointer, ExternalMutUnsafePointer, c_void
-from lightbug_http.c.network import in_addr, inet_ntop, ntohs, sockaddr, sockaddr_in, socklen_t
+from lightbug_http.c.network import in_addr_t, inet_ntop, ntohs, sockaddr, sockaddr_in, socklen_t
 from lightbug_http.c.socket import SocketType, socket
 from lightbug_http.socket import Socket
 from utils import Variant
@@ -46,8 +46,12 @@ trait Addr(Copyable, Defaultable, Equatable, ImplicitlyCopyable, Representable, 
         ...
 
 
-trait AnAddrInfo:
-    ...
+trait AnAddrInfo(Copyable):
+    fn has_next(self) -> Bool:
+        ...
+
+    fn next(self) -> ExternalMutUnsafePointer[Self]:
+        ...
 
 
 @fieldwise_init
@@ -241,7 +245,7 @@ struct addrinfo_macos(AnAddrInfo):
     var ai_addrlen: socklen_t
     var ai_canonname: ExternalMutUnsafePointer[c_char]
     var ai_addr: ExternalMutUnsafePointer[sockaddr]
-    var ai_next: ExternalMutUnsafePointer[c_void]
+    var ai_next: ExternalMutUnsafePointer[addrinfo_macos]
 
     fn __init__(
         out self,
@@ -260,6 +264,12 @@ struct addrinfo_macos(AnAddrInfo):
         self.ai_addr = {}
         self.ai_next = {}
 
+    fn has_next(self) -> Bool:
+        return Bool(self.ai_next)
+
+    fn next(self) -> ExternalMutUnsafePointer[Self]:
+        return self.ai_next
+
 
 @fieldwise_init
 @register_passable("trivial")
@@ -275,7 +285,7 @@ struct addrinfo_unix(AnAddrInfo):
     var ai_addrlen: socklen_t
     var ai_addr: ExternalMutUnsafePointer[sockaddr]
     var ai_canonname: ExternalMutUnsafePointer[c_char]
-    var ai_next: ExternalMutUnsafePointer[c_void]
+    var ai_next: ExternalMutUnsafePointer[addrinfo_unix]
 
     fn __init__(
         out self,
@@ -294,14 +304,21 @@ struct addrinfo_unix(AnAddrInfo):
         self.ai_canonname = {}
         self.ai_next = {}
 
+    fn has_next(self) -> Bool:
+        return Bool(self.ai_addr)
 
-fn get_ip_address(mut host: String, address_family: AddressFamily) raises -> in_addr:
+    fn next(self) -> ExternalMutUnsafePointer[Self]:
+        return self.ai_next
+
+
+fn get_ip_address(mut host: String, address_family: AddressFamily, sock_type: SocketType) raises -> in_addr_t:
     """Returns an IP address based on the host.
     This is a Unix-specific implementation.
 
     Args:
         host: The host to get IP from.
         address_family: The address family to use.
+        sock_type: The socket type to use.
 
     Returns:
         The IP address.
@@ -311,7 +328,7 @@ fn get_ip_address(mut host: String, address_family: AddressFamily) raises -> in_
     if CompilationTarget.is_macos():
         var result: CAddrInfo[addrinfo_macos]
         var hints = addrinfo_macos(
-            ai_flags=0, ai_family=address_family, ai_socktype=SocketType.SOCK_STREAM, ai_protocol=address_family
+            ai_flags=0, ai_family=address_family, ai_socktype=sock_type, ai_protocol=address_family
         )
         var service = String()
         try:
@@ -320,14 +337,20 @@ fn get_ip_address(mut host: String, address_family: AddressFamily) raises -> in_
             logger.error("Failed to get IP address.")
             raise e
 
-        if not result.ptr[].ai_addr:
+        if not result.unsafe_ptr()[].ai_addr:
             raise Error("Failed to get IP address because the response's `ai_addr` was null.")
 
-        return result.ptr[].ai_addr.bitcast[sockaddr_in]()[].sin_addr
+        # extend result's lifetime to avoid invalid access of pointer, it'd get freed early
+        return (
+            result.unsafe_ptr()[]
+            .ai_addr.bitcast[sockaddr_in]()
+            .unsafe_origin_cast[origin_of(result)]()[]
+            .sin_addr.s_addr
+        )
     else:
         var result: CAddrInfo[addrinfo_unix]
         var hints = addrinfo_unix(
-            ai_flags=0, ai_family=address_family, ai_socktype=SocketType.SOCK_STREAM, ai_protocol=address_family
+            ai_flags=0, ai_family=address_family, ai_socktype=sock_type, ai_protocol=address_family
         )
         var service = String()
         try:
@@ -336,10 +359,15 @@ fn get_ip_address(mut host: String, address_family: AddressFamily) raises -> in_
             logger.error("Failed to get IP address.")
             raise e
 
-        if not result.ptr[].ai_addr:
+        if not result.unsafe_ptr()[].ai_addr:
             raise Error("Failed to get IP address because the response's `ai_addr` was null.")
 
-        return result.ptr[].ai_addr.bitcast[sockaddr_in]()[].sin_addr
+        return (
+            result.unsafe_ptr()[]
+            .ai_addr.bitcast[sockaddr_in]()
+            .unsafe_origin_cast[origin_of(result)]()[]
+            .sin_addr.s_addr
+        )
 
 
 fn is_ip_protocol(network: NetworkType) -> Bool:
@@ -541,7 +569,57 @@ fn freeaddrinfo[T: AnAddrInfo, //](ptr: ExternalMutUnsafePointer[T]):
 
 
 @fieldwise_init
-struct CAddrInfo[T: AnAddrInfo]:
+struct _CAddrInfoIterator[
+    mut: Bool, //,
+    T: AnAddrInfo,
+    origin: Origin[mut],
+](ImplicitlyCopyable, Iterable, Iterator):
+    """Iterator for List.
+
+    Parameters:
+        mut: Whether the reference to the list is mutable.
+        T: The type of the elements in the list.
+        origin: The origin of the List
+    """
+
+    comptime Element = Self.T  # FIXME(MOCO-2068): shouldn't be needed.
+
+    comptime IteratorType[iterable_mut: Bool, //, iterable_origin: Origin[iterable_mut]]: Iterator = Self
+
+    var index: Int
+    var src: Pointer[CAddrInfo[Self.T], Self.origin]
+
+    @always_inline
+    fn __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
+        return self.copy()
+
+    fn __has_next__(self) -> Bool:
+        """Checks if there are more elements in the iterator.
+
+        Returns:
+            True if there are more elements, False otherwise.
+        """
+        if not self.src[].ptr:
+            return False
+
+        return self.src[].ptr[].has_next()
+
+    fn __next__(mut self) -> Self.Element:
+        """Returns the next element from the iterator.
+
+        Returns:
+            The next element.
+        """
+        var current = self.src[].ptr
+        for _ in range(self.index):
+            current = current[].next()
+        self.index += 1
+
+        return current[].copy()
+
+
+@fieldwise_init
+struct CAddrInfo[T: AnAddrInfo](Iterable):
     """A wrapper around an ExternalMutUnsafePointer to an addrinfo struct.
 
     This struct will call `freeaddrinfo` when it is deinitialized to free the memory allocated
@@ -550,14 +628,37 @@ struct CAddrInfo[T: AnAddrInfo]:
     the struct and free the pointer while you're still using it.
     """
 
+    comptime IteratorType[iterable_mut: Bool, //, iterable_origin: Origin[iterable_mut]]: Iterator = _CAddrInfoIterator[
+        Self.T, iterable_origin
+    ]
     var ptr: ExternalMutUnsafePointer[Self.T]
 
-    fn data(mut self) -> MutUnsafePointer[Self.T, origin = origin_of(self)]:
-        return self.ptr.unsafe_origin_cast[origin_of(self)]()
+    fn unsafe_ptr[
+        origin: Origin, address_space: AddressSpace, //
+    ](ref [origin, address_space]self) -> UnsafePointer[Self.T, origin, address_space=address_space]:
+        """Retrieves a pointer to the underlying memory.
+
+        Parameters:
+            origin: The origin of the `CAddrInfo`.
+            address_space: The `AddressSpace` of the `CAddrInfo`.
+
+        Returns:
+            The pointer to the underlying memory.
+        """
+        return self.ptr.unsafe_mut_cast[origin.mut]().unsafe_origin_cast[origin]().address_space_cast[address_space]()
 
     fn __del__(deinit self):
         if self.ptr:
+            print("Freeing addrinfo memory...")
             freeaddrinfo(self.ptr)
+
+    fn __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
+        """Iterate over elements of the list, returning immutable references.
+
+        Returns:
+            An iterator of immutable references to the list elements.
+        """
+        return {0, Pointer(to=self)}
 
 
 fn gai_strerror(ecode: c_int) -> ExternalImmutUnsafePointer[c_char]:
@@ -658,7 +759,7 @@ fn getaddrinfo[T: AnAddrInfo, //](mut node: String, mut service: String, hints: 
     )
 
     if result != 0:
-        raise Error("getaddrinfo: ", gai_strerror(result))
+        raise Error("getaddrinfo: ", StringSlice(unsafe_from_utf8_ptr=gai_strerror(result)))
 
     # CAddrInfo will be responsible for freeing the memory allocated by getaddrinfo.
     return CAddrInfo[T](ptr=ptr)

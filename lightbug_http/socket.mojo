@@ -1,5 +1,4 @@
-from sys import external_call, size_of
-from sys.ffi import c_char, c_int, c_uint
+from sys.ffi import c_uint
 from sys.info import CompilationTarget
 
 from lightbug_http._logger import logger
@@ -13,8 +12,7 @@ from lightbug_http.address import (
     get_ip_address,
 )
 from lightbug_http.c.address import AddressFamily, AddressLength
-from lightbug_http.c.aliases import c_void
-from lightbug_http.c.network import SocketAddress, htons, in_addr, inet_ntop, inet_pton, ntohs, sockaddr, sockaddr_in
+from lightbug_http.c.network import SocketAddress, inet_pton
 from lightbug_http.c.socket import (
     SOL_SOCKET,
     CloseInvalidDescriptorError,
@@ -37,11 +35,9 @@ from lightbug_http.c.socket import (
     setsockopt,
     shutdown,
     socket,
-    socklen_t,
 )
 from lightbug_http.connection import default_buffer_size
 from lightbug_http.io.bytes import Bytes
-from memory import stack_allocation
 
 
 comptime SocketClosedError = "Socket: Socket is already closed"
@@ -344,8 +340,8 @@ struct Socket[
         Raises:
             Error: If connecting to the remote socket fails.
         """
-        var ip = get_ip_address(ip_address, Self.address_family)
-        var remote_address = SocketAddress(address_family=Self.address_family, port=port, binary_ip=ip.s_addr)
+        var ip = get_ip_address(ip_address, Self.address_family, Self.sock_type)
+        var remote_address = SocketAddress(address_family=Self.address_family, port=port, binary_ip=ip)
         try:
             connect(self.fd, remote_address)
         except e:
@@ -362,7 +358,7 @@ struct Socket[
             logger.error("Socket.send: Failed to write data to connection.")
             raise e
 
-    fn send_to(mut self, src: Span[Byte], mut host: String, port: UInt16) raises -> UInt:
+    fn send_to(self, src: Span[Byte], mut host: String, port: UInt16) raises -> UInt:
         """Send data to the a remote address by connecting to the remote socket before sending.
         The socket must be not already be connected to a remote socket.
 
@@ -377,8 +373,8 @@ struct Socket[
         Raises:
             Error: If sending the data fails.
         """
-        var ip = get_ip_address(host, Self.address_family)
-        var remote_address = SocketAddress(address_family=Self.address_family, port=port, binary_ip=ip.s_addr)
+        var ip = get_ip_address(host, Self.address_family, Self.sock_type)
+        var remote_address = SocketAddress(address_family=Self.address_family, port=port, binary_ip=ip)
         return sendto(self.fd, src, UInt(len(src)), 0, remote_address)
 
     fn _receive(self, mut buffer: Bytes) raises -> UInt:
