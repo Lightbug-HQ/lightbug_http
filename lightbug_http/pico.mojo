@@ -552,7 +552,7 @@ fn decode_hex(ch: UInt8) -> Int:
 
 fn phr_decode_chunked[
     buf_origin: ImmutOrigin
-](mut decoder: PhrChunkedDecoder, buf: Span[UInt8, buf_origin],) -> Tuple[Int, Int]:
+](mut decoder: PhrChunkedDecoder, buf: Span[UInt8, buf_origin]) -> Tuple[Int, Int]:
     """Decode chunked transfer encoding.
 
     Returns (ret, new_bufsz) where:
@@ -770,11 +770,11 @@ fn create_string_from_ptr[origin: ImmutOrigin](ptr: UnsafePointer[UInt8, origin]
 
     # Copy raw bytes directly - this preserves the exact bytes from HTTP messages
     var result = String()
-    var buf = List[UInt8](capacity=length)
-    for i in range(length):
-        buf.append(ptr[i])
+    # var buf = List[UInt8](capacity=length)
+    # for i in range(length):
+    #     buf.append(ptr[i])
 
-    result.write_bytes(buf)
+    result.write_bytes(Span(ptr=ptr, length=length))
 
     return result^
 
