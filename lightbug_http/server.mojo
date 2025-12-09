@@ -114,7 +114,6 @@ struct Server(Movable):
         print("Server", self.name, "listening on", self.address())
         while True:
             var conn = ln.accept()
-            print("Accepted connection from", conn.socket.remote_address.ip, ":", conn.socket.remote_address.port)
             try:
                 self.serve_connection(conn, handler)
             finally:

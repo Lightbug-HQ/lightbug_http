@@ -14,7 +14,7 @@ fn byte[s: StringSlice]() -> Byte:
 
 @always_inline
 fn is_newline(b: Byte) -> Bool:
-    return b == BytesConstant.nChar or b == BytesConstant.rChar
+    return b == BytesConstant.LF or b == BytesConstant.CR
 
 
 @always_inline
@@ -202,6 +202,9 @@ struct ByteReader[origin: ImmutOrigin](Copyable, Sized):
     fn copy(self) -> Self:
         return ByteReader(self._inner[self.read_pos :])
 
+    fn as_bytes(self) -> Span[Byte, Self.origin]:
+        return self._inner[self.read_pos :]
+
     fn __contains__(self, b: Byte) -> Bool:
         for i in range(self.read_pos, len(self._inner)):
             if self._inner[i] == b:
@@ -262,7 +265,7 @@ struct ByteReader[origin: ImmutOrigin](Copyable, Sized):
         if not self.available():
             return ret
 
-        if self._inner[self.read_pos] == BytesConstant.rChar:
+        if self._inner[self.read_pos] == BytesConstant.CR:
             self.increment(2)
         else:
             self.increment()
@@ -279,7 +282,7 @@ struct ByteReader[origin: ImmutOrigin](Copyable, Sized):
     @always_inline
     fn skip_carriage_return(mut self):
         for i in range(self.read_pos, len(self._inner)):
-            if self._inner[i] == BytesConstant.rChar:
+            if self._inner[i] == BytesConstant.CR:
                 self.increment(2)
             else:
                 break

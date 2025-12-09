@@ -2,7 +2,7 @@ from lightbug_http._logger import logger
 from lightbug_http.header import Header, HeaderKey, Headers, write_header
 from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter
 from lightbug_http.io.sync import Duration
-from lightbug_http.strings import http, lineBreak, nChar, rChar, strHttp11, whitespace
+from lightbug_http.strings import CR, LF, http, lineBreak, strHttp11, whitespace
 from lightbug_http.uri import URI
 from memory import Span
 

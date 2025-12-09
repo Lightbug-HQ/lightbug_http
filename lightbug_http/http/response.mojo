@@ -1,6 +1,7 @@
 from lightbug_http.connection import TCPConnection, default_buffer_size
 from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter, byte
-from lightbug_http.strings import http, lineBreak, nChar, rChar, strHttp11, whitespace
+from lightbug_http.pico import PhrChunkedDecoder, phr_decode_chunked
+from lightbug_http.strings import CR, LF, http, lineBreak, strHttp11, whitespace
 from lightbug_http.uri import URI
 from small_time.small_time import now
 
@@ -83,14 +84,21 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
 
         var transfer_encoding = response.headers.get(HeaderKey.TRANSFER_ENCODING)
         if transfer_encoding and transfer_encoding.value() == "chunked":
+            # Use pico's chunked decoder for proper RFC-compliant parsing
+            var decoder = PhrChunkedDecoder()
+            decoder.consume_trailer = True  # Consume trailing headers
+
             var b = Bytes(reader.read_bytes().as_bytes())
             var buff = Bytes(capacity=default_buffer_size)
             try:
+                # Read chunks from connection
                 while conn.read(buff) > 0:
                     b.extend(buff.copy())
 
+                    # Check if we've reached the end of chunked data (0\r\n\r\n)
                     if (
-                        buff[-5] == byte["0"]()
+                        len(buff) >= 5
+                        and buff[-5] == byte["0"]()
                         and buff[-4] == byte["\r"]()
                         and buff[-3] == byte["\n"]()
                         and buff[-2] == byte["\r"]()
@@ -98,8 +106,10 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
                     ):
                         break
 
-                    buff.clear()  # TODO: Should this be cleared? This was commented out before.
-                response.read_chunks(b)
+                    # buff.clear()  # TODO: Should this be cleared? This was commented out before.
+                # response.read_chunks(b)
+                # Decode chunks using pico
+                response._decode_chunks_pico(decoder, b^)
                 return response^
             except e:
                 logger.error(e)
@@ -111,6 +121,38 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
         except e:
             logger.error(e)
             raise Error("Failed to read request body: ")
+
+    fn _decode_chunks_pico(mut self, mut decoder: PhrChunkedDecoder, var chunks: Bytes) raises:
+        """Decode chunked transfer encoding using picohttpparser.
+        Args:
+            decoder: The chunked decoder state machine.
+            chunks: The raw chunked data to decode.
+        """
+        # Convert Bytes to UnsafePointer for pico API
+        # var buf_ptr = Span(chunks)
+        # var buf_ptr = alloc[Byte](count=len(chunks))
+        # for i in range(len(chunks)):
+        #     buf_ptr[i] = chunks[i]
+
+        # var bufsz = len(chunks)
+        var result = phr_decode_chunked(decoder, Span(chunks))
+        var ret = result[0]
+        var decoded_size = result[1]
+
+        if ret == -1:
+            # buf_ptr.free()
+            raise Error("HTTPResponse._decode_chunks_pico: Invalid chunked encoding")
+        # ret == -2 means incomplete, but we'll proceed with what we have
+        # ret >= 0 means complete, with ret bytes of trailing data
+
+        # Copy decoded data to body
+        self.body_raw = Bytes(capacity=decoded_size)
+        for i in range(decoded_size):
+            self.body_raw.append(Span(chunks)[i])
+        # self.body_raw = Bytes(Span(chunks))
+
+        self.set_content_length(len(self.body_raw))
+        # buf_ptr.free()
 
     fn __init__(
         out self,
