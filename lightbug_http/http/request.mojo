@@ -1,5 +1,5 @@
 from lightbug_http._logger import logger
-from lightbug_http.header import Header, HeaderKey, Headers, write_header
+from lightbug_http.header import Header, HeaderKey, Headers, ParsedRequestResult, write_header
 from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter
 from lightbug_http.io.sync import Duration
 from lightbug_http.strings import CR, LF, http, lineBreak, strHttp11, whitespace
@@ -42,23 +42,20 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
     fn from_bytes(addr: String, max_body_size: Int, max_uri_length: Int, b: Span[Byte]) raises -> HTTPRequest:
         var reader = ByteReader(b)
         var headers = Headers()
-        var method: String
-        var protocol: String
-        var uri: String
+        var rest: ParsedRequestResult
         try:
-            var rest = headers.parse_raw(reader)
-            method, uri, protocol = rest[0], rest[1], rest[2]
+            rest = headers.parse_raw_request(reader)
         except e:
-            raise Error("HTTPRequest.from_bytes: Failed to parse request headers: " + String(e))
+            raise Error("HTTPRequest.from_bytes: Failed to parse request headers: ", e)
 
-        if len(uri.as_bytes()) > max_uri_length:
+        if len(rest.path.as_bytes()) > max_uri_length:
             raise Error("HTTPRequest.from_bytes: Request URI too long")
 
         var cookies = RequestCookieJar()
         try:
             cookies.parse_cookies(headers)
         except e:
-            raise Error("HTTPRequest.from_bytes: Failed to parse cookies: " + String(e))
+            raise Error("HTTPRequest.from_bytes: Failed to parse cookies: ", e)
 
         var content_length = headers.content_length()
         if content_length > 0 and max_body_size > 0 and content_length > max_body_size:
@@ -66,13 +63,13 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
 
         var parsed_uri: URI
         try:
-            parsed_uri = URI.parse(String(addr, uri))
+            parsed_uri = URI.parse(String(addr, rest.path))
         except URIParseError:
             logger.error(URIParseError)
             raise Error("HTTPRequest.from_bytes: Failed to parse request URI.")
 
         var request = HTTPRequest(
-            uri=parsed_uri^, headers=headers^, method=method^, protocol=protocol^, cookies=cookies^
+            uri=parsed_uri^, headers=headers^, method=rest.method, protocol=rest.protocol, cookies=cookies^
         )
 
         if content_length > 0:

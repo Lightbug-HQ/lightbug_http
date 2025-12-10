@@ -1,6 +1,6 @@
 from lightbug_http._logger import logger
+from lightbug_http.http.pico import PhrHeader, phr_parse_headers, phr_parse_request, phr_parse_response
 from lightbug_http.io.bytes import ByteReader, Bytes, byte, is_newline, is_space
-from lightbug_http.pico import PhrHeader, phr_parse_headers, phr_parse_request, phr_parse_response
 from lightbug_http.strings import CR, LF, BytesConstant, lineBreak
 
 
@@ -34,6 +34,22 @@ struct Header(Copyable, Stringable, Writable):
 @always_inline
 fn write_header[T: Writer](mut writer: T, key: String, value: String):
     writer.write(key + ": ", value, lineBreak)
+
+
+@fieldwise_init
+struct ParsedRequestResult(Movable):
+    var method: String
+    var path: String
+    var protocol: String
+    var cookies: List[String]
+
+
+@fieldwise_init
+struct ParsedResponseResult(Movable):
+    var protocol: String
+    var status: Int
+    var msg: String
+    var cookies: List[String]
 
 
 @fieldwise_init
@@ -82,10 +98,11 @@ struct Headers(Copyable, Stringable, Writable):
         except:
             return 0
 
-    fn _parse_raw_request[
-        origin: ImmutOrigin
-    ](mut self, buf: Span[UInt8, origin],) raises -> Tuple[Int, Tuple[String, String, String, List[String]]]:
+    fn parse_raw_request(mut self, mut reader: ByteReader, out result: ParsedRequestResult) raises:
         """Parse HTTP request using picohttpparser."""
+        if self.check_if_response(reader):
+            raise Error("Headers.parse_raw: Not a valid HTTP request.")
+
         var method = String()
         var path = String()
         var minor_version = -1
@@ -93,14 +110,11 @@ struct Headers(Copyable, Stringable, Writable):
         # Allocate headers array (max 100 headers)
         var max_headers = 100
         var headers = InlineArray[PhrHeader, 100](fill=PhrHeader())
-        # var headers = alloc[PhrHeader](count=max_headers)
-        # for i in range(max_headers):
-        #     headers[i] = PhrHeader()
 
         var num_headers = max_headers
         var ret = phr_parse_request(
-            buf.unsafe_ptr(),
-            len(buf),
+            reader.as_bytes().unsafe_ptr(),
+            len(reader),
             method,
             path,
             minor_version,
@@ -110,7 +124,6 @@ struct Headers(Copyable, Stringable, Writable):
         )
 
         if ret < 0:
-            # headers.free()
             if ret == -1:
                 raise Error("Headers.parse_raw: Invalid HTTP request")
             else:  # ret == -2
@@ -128,15 +141,14 @@ struct Headers(Copyable, Stringable, Writable):
                 self._inner[key] = value
 
         # Build protocol string
-        var protocol = String("HTTP/1.", minor_version)
+        reader.read_pos += ret
+        result = ParsedRequestResult(method^, path^, String("HTTP/1.", minor_version), cookies^)
 
-        # headers.free()
-        return (ret, (method, path, protocol, cookies^))
-
-    fn _parse_raw_response[
-        origin: ImmutOrigin
-    ](mut self, buf: Span[UInt8, origin],) raises -> Tuple[Int, Tuple[String, String, String, List[String]]]:
+    fn parse_raw_response(mut self, mut reader: ByteReader, out result: ParsedResponseResult) raises:
         """Parse HTTP response using picohttpparser."""
+        if not self.check_if_response(reader):
+            raise Error("Headers.parse_raw: Not a valid HTTP response.")
+
         var minor_version = -1
         var status = 0
         var msg = String()
@@ -144,14 +156,10 @@ struct Headers(Copyable, Stringable, Writable):
         # Allocate headers array (max 100 headers)
         var max_headers = 100
         var headers = InlineArray[PhrHeader, 100](fill=PhrHeader())
-        # var headers = alloc[PhrHeader](count=max_headers)
-        # for i in range(max_headers):
-        #     headers[i] = PhrHeader()
-
         var num_headers = max_headers
         var ret = phr_parse_response(
-            buf.unsafe_ptr(),
-            len(buf),
+            reader.as_bytes().unsafe_ptr(),
+            len(reader),
             minor_version,
             status,
             msg,
@@ -161,7 +169,6 @@ struct Headers(Copyable, Stringable, Writable):
         )
 
         if ret < 0:
-            # headers.free()
             if ret == -1:
                 raise Error("Headers.parse_raw: Invalid HTTP response")
             else:  # ret == -2
@@ -179,80 +186,24 @@ struct Headers(Copyable, Stringable, Writable):
                 self._inner[key] = value
 
         # Build protocol string
-        var protocol = "HTTP/1." + String(minor_version)
+        var protocol = String("HTTP/1.", minor_version)
+        reader.read_pos += ret
+        result = ParsedResponseResult(protocol^, status, msg^, cookies^)
 
-        # headers.free()
-        return ret, (protocol, String(status), msg, cookies^)
-
-    fn parse_raw(mut self, mut r: ByteReader) raises -> Tuple[String, String, String, List[String]]:
+    fn check_if_response(mut self, r: ByteReader) raises -> Bool:
         if not r.available():
             raise Error("Headers.parse_raw: Failed to read first byte from response header.")
 
-        # Create buffer from ByteReader's remaining data
-        var buf_span = r.as_bytes()
-
         # Check if starts with "HTTP/" (response) or method name (request)
-        comptime _H = byte["H"]()
-        comptime _T = byte["T"]()
-        comptime _P = byte["P"]()
-        comptime _SLASH = byte["/"]()
-        var is_response = (
+        var buf_span = r.as_bytes()
+        return (
             len(buf_span) >= 5
-            and buf_span[0] == _H
-            and buf_span[1] == _T
-            and buf_span[2] == _T
-            and buf_span[3] == _P
-            and buf_span[4] == _SLASH
+            and buf_span[0] == BytesConstant.H
+            and buf_span[1] == BytesConstant.T
+            and buf_span[2] == BytesConstant.T
+            and buf_span[3] == BytesConstant.P
+            and buf_span[4] == BytesConstant.SLASH
         )
-
-        var bytes_consumed: Int
-        var result: Tuple[String, String, String, List[String]]
-        if is_response:
-            var parse_result = self._parse_raw_response(buf_span)
-            bytes_consumed = parse_result[0]
-            result = parse_result[1]
-        else:
-            var parse_result = self._parse_raw_request(buf_span)
-            bytes_consumed = parse_result[0]
-            result = parse_result[1]
-
-        # buf_ptr.free()
-
-        # Advance ByteReader position to start of body (after headers end)
-        r.read_pos += bytes_consumed
-
-        return result^
-
-    # fn parse_raw(mut self, mut r: ByteReader) raises -> Tuple[String, String, String, List[String]]:
-    #     if not r.available():
-    #         raise Error("Headers.parse_raw: Failed to read first byte from response header.")
-
-    #     var first = r.read_word()
-    #     r.increment()
-    #     var second = r.read_word()
-    #     r.increment()
-    #     var third = r.read_line()
-    #     var cookies = List[String]()
-
-    #     try:
-    #         while not is_newline(r.peek()):
-    #             var key = r.read_until(BytesConstant.colon)
-    #             r.increment()
-    #             if is_space(r.peek()):
-    #                 r.increment()
-
-    #             # TODO (bgreni): Handle possible trailing whitespace
-    #             var value = r.read_line()
-    #             var k = String(key).lower()
-    #             if k == HeaderKey.SET_COOKIE:
-    #                 cookies.append(String(value))
-    #                 continue
-    #             self._inner[k] = String(value)
-    #     except EndOfReaderError:
-    #         logger.error(EndOfReaderError)
-    #         raise Error("Headers.parse_raw: Failed to read full response headers.")
-
-    #     return (String(first), String(second), String(third), cookies^)
 
     fn write_to[T: Writer, //](self, mut writer: T):
         for header in self._inner.items():

@@ -1,6 +1,7 @@
 from lightbug_http.connection import TCPConnection, default_buffer_size
+from lightbug_http.header import ParsedResponseResult
+from lightbug_http.http.pico import PhrChunkedDecoder, phr_decode_chunked
 from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter, byte
-from lightbug_http.pico import PhrChunkedDecoder, phr_decode_chunked
 from lightbug_http.strings import CR, LF, http, lineBreak, strHttp11, whitespace
 from lightbug_http.uri import URI
 from small_time.small_time import now
@@ -31,26 +32,23 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
         var reader = ByteReader(b)
         var headers = Headers()
         var cookies = ResponseCookieJar()
-        var protocol: String
-        var status_code: String
-        var status_text: String
 
+        var properties: ParsedResponseResult
         try:
-            var properties = headers.parse_raw(reader)
-            protocol, status_code, status_text = properties[0], properties[1], properties[2]
-            cookies.from_headers(properties[3])
+            properties = headers.parse_raw_response(reader)
+            cookies.from_headers(properties.cookies^)
             reader.skip_carriage_return()
         except e:
-            raise Error("Failed to parse response headers: " + String(e))
+            raise Error("Failed to parse response headers: ", e)
 
         try:
             return HTTPResponse(
                 reader=reader,
-                headers=headers,
-                cookies=cookies,
-                protocol=protocol,
-                status_code=Int(status_code),
-                status_text=status_text,
+                headers=headers^,
+                cookies=cookies^,
+                protocol=properties.protocol^,
+                status_code=properties.status,
+                status_text=properties.msg^,
             )
         except e:
             logger.error(e)
@@ -61,25 +59,22 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
         var reader = ByteReader(b)
         var headers = Headers()
         var cookies = ResponseCookieJar()
-        var protocol: String
-        var status_code: String
-        var status_text: String
 
+        var properties: ParsedResponseResult
         try:
-            var properties = headers.parse_raw(reader)
-            protocol, status_code, status_text = properties[0], properties[1], properties[2]
-            cookies.from_headers(properties[3])
+            properties = headers.parse_raw_response(reader)
+            cookies.from_headers(properties.cookies^)
             reader.skip_carriage_return()
         except e:
             raise Error("Failed to parse response headers: " + String(e))
 
         var response = HTTPResponse(
             Bytes(),
-            headers=headers,
-            cookies=cookies,
-            protocol=protocol,
-            status_code=Int(status_code),
-            status_text=status_text,
+            headers=headers^,
+            cookies=cookies^,
+            protocol=properties.protocol^,
+            status_code=properties.status,
+            status_text=properties.msg^,
         )
 
         var transfer_encoding = response.headers.get(HeaderKey.TRANSFER_ENCODING)
