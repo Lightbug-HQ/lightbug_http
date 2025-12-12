@@ -80,7 +80,7 @@ struct ByteView[origin: ImmutOrigin](Boolable, Copyable, Equatable, Sized, Strin
                 return True
         return False
 
-    fn __contains__(self, b: Bytes) -> Bool:
+    fn __contains__(self, b: Span[Byte]) -> Bool:
         if len(b) > len(self._inner):
             return False
 

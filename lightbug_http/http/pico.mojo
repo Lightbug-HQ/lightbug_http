@@ -8,7 +8,7 @@ from memory import memcpy
 
 
 # Constants
-alias IS_PRINTABLE_ASCII_MASK = 0o137
+comptime IS_PRINTABLE_ASCII_MASK = 0o137
 
 
 # Token character map - represents which characters are valid in tokens
@@ -51,14 +51,14 @@ fn is_token_char(c: UInt8) -> Bool:
 
 
 # Chunked decoder states
-alias CHUNKED_IN_CHUNK_SIZE = 0
-alias CHUNKED_IN_CHUNK_EXT = 1
-alias CHUNKED_IN_CHUNK_HEADER_EXPECT_LF = 2
-alias CHUNKED_IN_CHUNK_DATA = 3
-alias CHUNKED_IN_CHUNK_DATA_EXPECT_CR = 4
-alias CHUNKED_IN_CHUNK_DATA_EXPECT_LF = 5
-alias CHUNKED_IN_TRAILERS_LINE_HEAD = 6
-alias CHUNKED_IN_TRAILERS_LINE_MIDDLE = 7
+comptime CHUNKED_IN_CHUNK_SIZE = 0
+comptime CHUNKED_IN_CHUNK_EXT = 1
+comptime CHUNKED_IN_CHUNK_HEADER_EXPECT_LF = 2
+comptime CHUNKED_IN_CHUNK_DATA = 3
+comptime CHUNKED_IN_CHUNK_DATA_EXPECT_CR = 4
+comptime CHUNKED_IN_CHUNK_DATA_EXPECT_LF = 5
+comptime CHUNKED_IN_TRAILERS_LINE_HEAD = 6
+comptime CHUNKED_IN_TRAILERS_LINE_MIDDLE = 7
 
 
 struct PhrHeader(Copyable):
@@ -551,7 +551,7 @@ fn decode_hex(ch: UInt8) -> Int:
 
 
 fn phr_decode_chunked[
-    buf_origin: ImmutOrigin
+    buf_origin: MutOrigin
 ](mut decoder: PhrChunkedDecoder, buf: Span[UInt8, buf_origin]) -> Tuple[Int, Int]:
     """Decode chunked transfer encoding.
 

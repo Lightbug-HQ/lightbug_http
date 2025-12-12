@@ -20,6 +20,28 @@ comptime default_max_request_body_size = 4 * 1024 * 1024  # 4MB
 comptime default_max_request_uri_length = 8192
 
 
+fn read_request(
+    mut request_buffer: Bytes, conn: TCPConnection, max_request_body_size: Int, max_request_uri_length: Int
+) raises -> Bool:
+    var buffer = Bytes(capacity=default_buffer_size)
+    var bytes_read: UInt
+    try:
+        bytes_read = conn.read(buffer)
+    except e:
+        # If EOF, 0 bytes were read from the peer, which indicates their side of the connection was closed.
+        if String(e) != "EOF":
+            logger.error("Server.serve_connection: Failed to read request. Expected EOF, got:", e)
+        return False
+
+    logger.debug("Bytes read:", bytes_read)
+    if bytes_read == 0:
+        return False
+
+    request_buffer.extend(buffer^)
+    logger.debug("Total buffer size:", len(request_buffer))
+    return True
+
+
 struct Server(Movable):
     """A Mojo-based server that accept incoming requests and delivers HTTP services."""
 
@@ -111,7 +133,6 @@ struct Server(Movable):
         Raises:
             If there is an error while serving requests.
         """
-        print("Server", self.name, "listening on", self.address())
         while True:
             var conn = ln.accept()
             try:
@@ -148,34 +169,17 @@ struct Server(Movable):
             req_number += 1
 
             var request_buffer = Bytes()
-
             while True:
-                try:
-                    var temp_buffer = Bytes(capacity=default_buffer_size)
-                    var bytes_read = conn.read(temp_buffer)
-                    logger.debug("Bytes read:", bytes_read)
+                # If the read_request returns False, it means the connection was closed, an error occurred, or no bytes were read.
+                if not read_request(request_buffer, conn, max_request_body_size, max_request_uri_length):
+                    return
 
-                    if bytes_read == 0:
-                        return
+                if BytesConstant.DOUBLE_CRLF in ByteView(request_buffer):
+                    logger.debug("Found end of headers")
+                    break
 
-                    request_buffer.extend(temp_buffer^)
-                    logger.debug("Total buffer size:", len(request_buffer))
-
-                    if materialize[BytesConstant.DOUBLE_CRLF]() in ByteView(request_buffer):
-                        logger.debug("Found end of headers")
-                        break
-
-                except e:
-                    # 0 bytes were read from the peer, which indicates their side of the connection was closed.
-                    if String(e) == "EOF":
-                        return
-                    else:
-                        logger.error("Server.serve_connection: Failed to read request. Expected EOF, got:", e)
-                        return
-
-            var request: HTTPRequest
             try:
-                request = HTTPRequest.from_bytes(
+                var request = HTTPRequest.from_bytes(
                     self.address(), max_request_body_size, max_request_uri_length, request_buffer
                 )
                 var response: HTTPResponse
@@ -186,7 +190,7 @@ struct Server(Movable):
                         response.set_connection_close()
                     logger.debug(
                         conn.socket.remote_address.ip,
-                        String(conn.socket.remote_address.port),
+                        conn.socket.remote_address.port,
                         request.method,
                         request.uri.path,
                         response.status_code,
@@ -195,13 +199,13 @@ struct Server(Movable):
                     try:
                         _ = conn.write(encode(response^))
                     except e:
-                        logger.error("Failed to write encoded response to the connection:", String(e))
+                        logger.error("Failed to write encoded response to the connection:", e)
                         break
 
                     if close_connection:
                         break
                 except e:
-                    logger.error("Handler error:", String(e))
+                    logger.error("Handler error:", e)
                     if not conn.is_closed():
                         try:
                             _ = conn.write(encode(InternalError()))
@@ -209,12 +213,12 @@ struct Server(Movable):
                             raise Error("Failed to send InternalError response")
                         return
             except e:
-                logger.error("Failed to parse HTTPRequest:", String(e))
+                logger.error("Failed to parse HTTPRequest:", e)
                 try:
                     if String(e) == "HTTPRequest.from_bytes: Request URI too long":
                         _ = conn.write(encode(URITooLong()))
                     else:
                         _ = conn.write(encode(BadRequest()))
                 except e:
-                    logger.error("Failed to write BadRequest response to the connection:", String(e))
+                    logger.error("Failed to write BadRequest response to the connection:", e)
                     break

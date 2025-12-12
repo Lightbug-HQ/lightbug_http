@@ -461,10 +461,16 @@ fn parse_port[origin: ImmutOrigin](port_str: StringSlice[origin]) raises ParseEr
     return UInt16(port)
 
 
+@fieldwise_init
+struct HostPort(Movable):
+    var host: String
+    var port: UInt16
+
+
 fn parse_address[
     origin: ImmutOrigin, //,
     network: NetworkType,
-](address: StringSlice[origin]) raises ParseError -> Tuple[String, UInt16]:
+](address: StringSlice[origin]) raises ParseError -> HostPort:
     """Parse an address string into a host and port.
 
     Parameters:
@@ -481,20 +487,22 @@ fn parse_address[
         raise ParseError("Failed to parse address: received empty address string.")
 
     if address == AddressConstants.LOCALHOST:
+
+        @parameter
         if network.is_ipv4():
-            return String(AddressConstants.IPV4_LOCALHOST), DEFAULT_IP_PORT
+            return HostPort(AddressConstants.IPV4_LOCALHOST, DEFAULT_IP_PORT)
         elif network.is_ipv6():
-            return String(AddressConstants.IPV6_LOCALHOST), DEFAULT_IP_PORT
+            return HostPort(AddressConstants.IPV6_LOCALHOST, DEFAULT_IP_PORT)
 
     @parameter
     if network.is_ip_protocol():
         if network == NetworkType.ip6 and address.find(":") != -1:
-            return String(address), DEFAULT_IP_PORT
+            return HostPort(String(address), DEFAULT_IP_PORT)
 
         if address.find(":") != -1:
             raise ParseError("IP protocol addresses should not include ports")
 
-        return String(address), DEFAULT_IP_PORT
+        return HostPort(String(address), DEFAULT_IP_PORT)
 
     var colon_index = address.rfind(":")
     if colon_index == -1:
@@ -517,18 +525,18 @@ fn parse_address[
 
         @parameter
         if network.is_ipv4():
-            return String(AddressConstants.IPV4_LOCALHOST), port
+            return HostPort(AddressConstants.IPV4_LOCALHOST, port)
         elif network.is_ipv6():
-            return String(AddressConstants.IPV6_LOCALHOST), port
+            return HostPort(AddressConstants.IPV6_LOCALHOST, port)
 
-    return String(host), port
+    return HostPort(String(host), port)
 
 
 # TODO: Support IPv6 long form.
 fn join_host_port(host: String, port: String) -> String:
     if host.find(":") != -1:  # must be IPv6 literal
-        return "[" + host + "]:" + port
-    return host + ":" + port
+        return String("[", host, "]:", port)
+    return String(host, ":", port)
 
 
 fn binary_port_to_int(port: UInt16) -> Int:
@@ -543,7 +551,7 @@ fn binary_port_to_int(port: UInt16) -> Int:
     return Int(ntohs(port))
 
 
-fn binary_ip_to_string[address_family: AddressFamily](var ip_address: UInt32) raises -> String:
+fn binary_ip_to_string[address_family: AddressFamily](ip_address: UInt32) raises -> String:
     """Convert a binary IP address to a string by calling `inet_ntop`.
 
     Parameters:

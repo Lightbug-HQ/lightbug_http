@@ -1,5 +1,5 @@
 from lightbug_http.header import Header, Headers
-from lightbug_http.io.bytes import ByteReader, Bytes, bytes
+from lightbug_http.io.bytes import ByteReader, Bytes
 from testing import TestSuite, assert_equal, assert_true
 
 
@@ -16,14 +16,10 @@ def test_parse_request_header():
     var headers_str = "GET /index.html HTTP/1.1\r\nHost:example.com\r\nUser-Agent: Mozilla/5.0\r\nContent-Type: text/html\r\nContent-Length: 1234\r\nConnection: close\r\nTrailer: end-of-message\r\n\r\n"
     var header = Headers()
     var reader = ByteReader(headers_str.as_bytes())
-    var method: String
-    var protocol: String
-    var uri: String
-    var properties = header.parse_raw(reader)
-    method, uri, protocol = properties[0], properties[1], properties[2]
-    assert_equal(uri, "/index.html")
-    assert_equal(protocol, "HTTP/1.1")
-    assert_equal(method, "GET")
+    var properties = header.parse_raw_request(reader)
+    assert_equal(properties.path, "/index.html")
+    assert_equal(properties.protocol, "HTTP/1.1")
+    assert_equal(properties.method, "GET")
     assert_equal(header["Host"], "example.com")
     assert_equal(header["User-Agent"], "Mozilla/5.0")
     assert_equal(header["Content-Type"], "text/html")
@@ -34,15 +30,11 @@ def test_parse_request_header():
 def test_parse_response_header():
     var headers_str = "HTTP/1.1 200 OK\r\nServer: example.com\r\nUser-Agent: Mozilla/5.0\r\nContent-Type: text/html\r\nContent-Encoding: gzip\r\nContent-Length: 1234\r\nConnection: close\r\nTrailer: end-of-message\r\n\r\n"
     var header = Headers()
-    var protocol: String
-    var status_code: String
-    var status_text: String
     var reader = ByteReader(headers_str.as_bytes())
-    var properties = header.parse_raw(reader)
-    protocol, status_code, status_text = properties[0], properties[1], properties[2]
-    assert_equal(protocol, "HTTP/1.1")
-    assert_equal(status_code, "200")
-    assert_equal(status_text, "OK")
+    var properties = header.parse_raw_response(reader)
+    assert_equal(properties.protocol, "HTTP/1.1")
+    assert_equal(properties.status, 200)
+    assert_equal(properties.msg, "OK")
     assert_equal(header["Server"], "example.com")
     assert_equal(header["Content-Type"], "text/html")
     assert_equal(header["Content-Encoding"], "gzip")

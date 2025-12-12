@@ -1,6 +1,5 @@
 import testing
 from lightbug_http.server import default_max_request_body_size, default_max_request_uri_length
-from lightbug_http.strings import to_string
 
 from lightbug_http.http import HTTPRequest, StatusCode
 

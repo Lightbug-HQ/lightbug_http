@@ -1,5 +1,4 @@
 import testing
-from lightbug_http.strings import to_string
 
 from lightbug_http.http import HTTPResponse, StatusCode
 

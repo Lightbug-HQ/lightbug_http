@@ -1,108 +1,162 @@
-from lightbug_http.address import NetworkType, TCPAddr, join_host_port, parse_address
+from lightbug_http.address import HostPort, NetworkType, ParseError, TCPAddr, join_host_port, parse_address
 from testing import TestSuite, assert_equal, assert_false, assert_raises, assert_true
 
 
-def test_split_host_port():
-    # TCP4
-    var hp = parse_address(NetworkType.tcp4, "127.0.0.1:8080")
-    assert_equal(hp[0], "127.0.0.1")
-    assert_equal(hp[1], 8080)
-
-    # TCP4 with localhost
-    hp = parse_address(NetworkType.tcp4, "localhost:8080")
-    assert_equal(hp[0], "127.0.0.1")
-    assert_equal(hp[1], 8080)
-
-    # TCP6
-    hp = parse_address(NetworkType.tcp6, "[::1]:8080")
-    assert_equal(hp[0], "::1")
-    assert_equal(hp[1], 8080)
-
-    # TCP6 with localhost
-    hp = parse_address(NetworkType.tcp6, "localhost:8080")
-    assert_equal(hp[0], "::1")
-    assert_equal(hp[1], 8080)
-
-    # UDP4
-    hp = parse_address(NetworkType.udp4, "192.168.1.1:53")
-    assert_equal(hp[0], "192.168.1.1")
-    assert_equal(hp[1], 53)
-
-    # UDP4 with localhost
-    hp = parse_address(NetworkType.udp4, "localhost:53")
-    assert_equal(hp[0], "127.0.0.1")
-    assert_equal(hp[1], 53)
-
-    # UDP6
-    hp = parse_address(NetworkType.udp6, "[2001:db8::1]:53")
-    assert_equal(hp[0], "2001:db8::1")
-    assert_equal(hp[1], 53)
-
-    # UDP6 with localhost
-    hp = parse_address(NetworkType.udp6, "localhost:53")
-    assert_equal(hp[0], "::1")
-    assert_equal(hp[1], 53)
-
-    # IP4 (no port)
-    hp = parse_address(NetworkType.ip4, "192.168.1.1")
-    assert_equal(hp[0], "192.168.1.1")
-    assert_equal(hp[1], 0)
-
-    # IP4 with localhost
-    hp = parse_address(NetworkType.ip4, "localhost")
-    assert_equal(hp[0], "127.0.0.1")
-    assert_equal(hp[1], 0)
-
-    # IP6 (no port)
-    hp = parse_address(NetworkType.ip6, "2001:db8::1")
-    assert_equal(hp[0], "2001:db8::1")
-    assert_equal(hp[1], 0)
-
-    # IP6 with localhost
-    hp = parse_address(NetworkType.ip6, "localhost")
-    assert_equal(hp[0], "::1")
-    assert_equal(hp[1], 0)
-
-    # TODO: IPv6 long form - Not supported yet.
-    # hp = parse_address("0:0:0:0:0:0:0:1:8080")
-    # assert_equal(hp[0], "0:0:0:0:0:0:0:1")
-    # assert_equal(hp[1], 8080)
-
-    # Error cases
-    # IP protocol with port
+fn test_split_host_port_tcp4() raises:
+    var hp: HostPort
     try:
-        _ = parse_address(NetworkType.ip4, "192.168.1.1:80")
-        assert_false("Should have raised an error for IP protocol with port")
-    except Error:
-        assert_true(True)
+        hp = parse_address[NetworkType.tcp4]("127.0.0.1:8080")
+    except e:
+        raise Error("Error in parse_address:", e)
 
-    # Missing port
-    try:
-        _ = parse_address(NetworkType.tcp4, "192.168.1.1")
-        assert_false("Should have raised MissingPortError")
-    except MissingPortError:
-        assert_true(True)
+    assert_equal(hp.host, "127.0.0.1")
+    assert_equal(hp.port, 8080)
 
-    # Missing port
-    try:
-        _ = parse_address(NetworkType.tcp6, "[::1]")
-        assert_false("Should have raised MissingPortError")
-    except MissingPortError:
-        assert_true(True)
 
-    # Port out of range
+fn test_split_host_port_tcp4_localhost() raises:
+    var hp: HostPort
     try:
-        _ = parse_address(NetworkType.tcp4, "192.168.1.1:70000")
-        assert_false("Should have raised error for invalid port")
-    except Error:
-        assert_true(True)
+        hp = parse_address[NetworkType.tcp4]("localhost:8080")
+    except e:
+        raise Error("Error in parse_address:", e)
 
-    # Missing closing bracket
+    assert_equal(hp.host, "127.0.0.1")
+    assert_equal(hp.port, 8080)
+
+
+fn test_split_host_port_tcp6() raises:
+    var hp: HostPort
     try:
-        _ = parse_address(NetworkType.tcp6, "[::1:8080")
-        assert_false("Should have raised error for missing bracket")
-    except Error:
-        assert_true(True)
+        hp = parse_address[NetworkType.tcp6]("[::1]:8080")
+    except e:
+        raise Error("Error in parse_address:", e)
+
+    assert_equal(hp.host, "::1")
+    assert_equal(hp.port, 8080)
+
+
+fn test_split_host_port_tcp6_localhost() raises:
+    var hp: HostPort
+    try:
+        hp = parse_address[NetworkType.tcp6]("localhost:8080")
+    except e:
+        raise Error("Error in parse_address:", e)
+
+    assert_equal(hp.host, "::1")
+    assert_equal(hp.port, 8080)
+
+
+fn test_split_host_port_udp4() raises:
+    var hp: HostPort
+    try:
+        hp = parse_address[NetworkType.udp4]("192.168.1.1:53")
+    except e:
+        raise Error("Error in parse_address:", e)
+
+    assert_equal(hp.host, "192.168.1.1")
+    assert_equal(hp.port, 53)
+
+
+fn test_split_host_port_udp4_localhost() raises:
+    var hp: HostPort
+    try:
+        hp = parse_address[NetworkType.udp4]("localhost:53")
+    except e:
+        raise Error("Error in parse_address:", e)
+
+    assert_equal(hp.host, "127.0.0.1")
+    assert_equal(hp.port, 53)
+
+
+fn test_split_host_port_udp6() raises:
+    var hp: HostPort
+    try:
+        hp = parse_address[NetworkType.udp6]("[2001:db8::1]:53")
+    except e:
+        raise Error("Error in parse_address:", e)
+
+    assert_equal(hp.host, "2001:db8::1")
+    assert_equal(hp.port, 53)
+
+
+fn test_split_host_port_udp6_localhost() raises:
+    var hp: HostPort
+    try:
+        hp = parse_address[NetworkType.udp6]("localhost:53")
+    except e:
+        raise Error("Error in parse_address:", e)
+
+    assert_equal(hp.host, "::1")
+    assert_equal(hp.port, 53)
+
+
+fn test_split_host_port_ip4() raises:
+    var hp: HostPort
+    try:
+        hp = parse_address[NetworkType.ip4]("192.168.1.1")
+    except e:
+        raise Error("Error in parse_address:", e)
+
+    assert_equal(hp.host, "192.168.1.1")
+    assert_equal(hp.port, 0)
+
+
+fn test_split_host_port_ip4_localhost() raises:
+    var hp: HostPort
+    try:
+        hp = parse_address[NetworkType.ip4]("localhost")
+    except e:
+        raise Error("Error in parse_address:", e)
+
+    assert_equal(hp.host, "127.0.0.1")
+    assert_equal(hp.port, 0)
+
+
+fn test_split_host_port_ip6() raises:
+    var hp: HostPort
+    try:
+        hp = parse_address[NetworkType.ip6]("2001:db8::1")
+    except e:
+        raise Error("Error in parse_address:", e)
+
+    assert_equal(hp.host, "2001:db8::1")
+    assert_equal(hp.port, 0)
+
+
+fn test_split_host_port_ip6_localhost() raises:
+    var hp: HostPort
+    try:
+        hp = parse_address[NetworkType.ip6]("localhost")
+    except e:
+        raise Error("Error in parse_address:", e)
+
+    assert_equal(hp.host, "::1")
+    assert_equal(hp.port, 0)
+
+
+fn test_split_host_port_error_ip_with_port() raises:
+    with assert_raises(contains="IP protocol addresses should not include ports"):
+        _ = parse_address[NetworkType.ip4]("192.168.1.1:80")
+
+
+fn test_split_host_port_error_missing_port_ipv4() raises:
+    with assert_raises(contains="Failed to parse address: missing port separator ':' in address."):
+        _ = parse_address[NetworkType.tcp4]("192.168.1.1")
+
+
+fn test_split_host_port_error_missing_port_ipv6() raises:
+    with assert_raises(contains="Failed to parse ipv6 address: missing port in address"):
+        _ = parse_address[NetworkType.tcp6]("[::1]")
+
+
+fn test_split_host_port_error_port_out_of_range() raises:
+    with assert_raises(contains="Failed to parse port: Port number out of range (0-65535). Received: 70000"):
+         _ = parse_address[NetworkType.tcp4]("192.168.1.1:70000")
+
+
+fn test_split_host_port_error_missing_bracket() raises:
+    with assert_raises(contains="Failed to parse ipv6 address: missing ']'"):
+        _ = parse_address[NetworkType.tcp6]("[::1:8080")
 
 
 def test_join_host_port():
@@ -114,5 +168,5 @@ def test_join_host_port():
 
     # TODO: IPv6 long form - Not supported yet.
 
-def main():
-    TestSuite.discover_tests[__functions_in_module()]().run()
+fn main() raises:
+        TestSuite.discover_tests[__functions_in_module()]().run()

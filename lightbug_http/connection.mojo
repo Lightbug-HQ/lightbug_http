@@ -2,7 +2,7 @@ from sys.info import CompilationTarget
 from time import sleep
 
 from lightbug_http._logger import logger
-from lightbug_http.address import NetworkType, TCPAddr, UDPAddr, parse_address
+from lightbug_http.address import HostPort, NetworkType, TCPAddr, UDPAddr, parse_address
 from lightbug_http.c.address import AddressFamily
 from lightbug_http.io.bytes import Bytes
 from lightbug_http.io.sync import Duration
@@ -72,7 +72,7 @@ struct ListenConfig:
         self._keep_alive = keep_alive
 
     fn listen[network: NetworkType = NetworkType.tcp4](self, address: StringSlice) raises -> NoTLSListener:
-        var local: Tuple[String, UInt16]
+        var local: HostPort
         try:
             local = parse_address[network](address)
         except ParseError:
@@ -94,7 +94,7 @@ struct ListenConfig:
             except e:
                 logger.warn("ListenConfig.listen: Failed to set socket as reusable", e)
 
-        var addr = TCPAddr(ip=String(local[0]), port=local[1])
+        var addr = TCPAddr(ip=local.host^, port=local.port)
         var bind_success = False
         var bind_fail_logged = False
         while not bind_success:
@@ -321,7 +321,7 @@ fn listen_udp[network: NetworkType = NetworkType.udp4](local_address: String) ra
         Error: If the address is invalid or failed to bind the socket.
     """
     var address = parse_address[network](local_address)
-    return listen_udp[network](UDPAddr[network](String(address[0]), address[1]))
+    return listen_udp[network](UDPAddr[network](address.host^, address.port))
 
 
 fn listen_udp[network: NetworkType = NetworkType.udp4](host: String, port: UInt16) raises -> UDPConnection[network]:
@@ -368,7 +368,7 @@ fn dial_udp[network: NetworkType = NetworkType.udp4](local_address: String) rais
         Error: If the network type is not supported or failed to connect to the address.
     """
     var address = parse_address[network](local_address)
-    return dial_udp[network](UDPAddr[network](String(address[0]), address[1]))
+    return dial_udp[network](UDPAddr[network](address.host^, address.port))
 
 
 fn dial_udp[network: NetworkType = NetworkType.udp4](host: String, port: UInt16) raises -> UDPConnection[network]:

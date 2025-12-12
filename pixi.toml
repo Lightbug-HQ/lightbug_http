@@ -19,7 +19,7 @@ integration_tests_external = { cmd = "bash scripts/mojo_tests.sh tests/integrati
 integration_tests_udp = { cmd = "bash scripts/udp_test.sh" }
 
 [feature.bench.tasks]
-bench = { cmd = "mojo 3-I . benchmark/bench.mojo" }
+bench = { cmd = "mojo -I . benchmark/bench.mojo" }
 bench_server = { cmd = "bash scripts/bench_server.sh" }
 
 [feature.util.tasks]
