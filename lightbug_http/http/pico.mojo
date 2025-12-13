@@ -477,6 +477,8 @@ fn phr_parse_response[
 
     # Parse 3-digit status code
     status = 0
+
+    @parameter
     for _ in range(3):
         if current[] < BytesConstant.ZERO or current[] > BytesConstant.NINE:
             return -1
