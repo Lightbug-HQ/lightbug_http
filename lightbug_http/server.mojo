@@ -3,7 +3,6 @@ from io.write import _WriteBufferStack
 from lightbug_http._logger import logger
 from lightbug_http.address import NetworkType
 from lightbug_http.connection import ListenConfig, NoTLSListener, TCPConnection, default_buffer_size
-from lightbug_http.error import ErrorHandler
 from lightbug_http.header import Headers
 from lightbug_http.http.common_response import BadRequest, InternalError, URITooLong
 from lightbug_http.io.bytes import Bytes, BytesConstant, ByteView
@@ -44,9 +43,6 @@ fn read_request(
 
 struct Server(Movable):
     """A Mojo-based server that accept incoming requests and delivers HTTP services."""
-
-    var error_handler: ErrorHandler
-
     var name: String
     var _address: String
     var max_concurrent_connections: Int
@@ -58,7 +54,6 @@ struct Server(Movable):
 
     fn __init__(
         out self,
-        var error_handler: ErrorHandler = ErrorHandler(),
         var name: String = "lightbug_http",
         var address: String = "127.0.0.1",
         max_concurrent_connections: Int = 1000,
