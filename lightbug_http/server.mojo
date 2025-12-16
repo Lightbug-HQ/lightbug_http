@@ -22,7 +22,18 @@ comptime default_header_read_timeout_ms = 30_000
 
 
 struct ConnectionState(Equatable):
-    """Connection lifecycle state for request processing flow control."""
+    """Connection lifecycle state for request processing flow control.
+
+    States:
+        Init: Initial state when connection is first accepted.
+        ReadingHeaders: Currently reading HTTP headers from the client.
+        ReadingBody: Currently reading HTTP body (if present).
+        ProcessingRequest: Parsing request and calling handler.
+        WritingResponse: Sending response back to client.
+        KeepAlive: Request completed, ready for next request on same connection.
+        Closing: Connection is being closed gracefully.
+        Closed: Connection has been closed.
+    """
     var value: UInt8
 
     comptime Init = Self(0)
