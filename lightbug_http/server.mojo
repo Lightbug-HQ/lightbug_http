@@ -21,36 +21,23 @@ comptime default_max_request_uri_length = 8192
 
 struct Server(Movable):
     """A Mojo-based server that accept incoming requests and delivers HTTP services."""
-    var name: String
     var tcp_keep_alive: Bool
-    var max_concurrent_connections: Int
-    var max_requests_per_connection: Int
-
     var _address: String
     var _max_request_body_size: Int
     var _max_request_uri_length: Int
 
     fn __init__(
         out self,
-        var name: String = "lightbug_http",
         var address: String = "127.0.0.1",
-        max_concurrent_connections: Int = 1000,
-        max_requests_per_connection: Int = 0,
         max_request_body_size: Int = default_max_request_body_size,
         max_request_uri_length: Int = default_max_request_uri_length,
         tcp_keep_alive: Bool = False,
     ):
         self.error_handler = error_handler^
-        self.name = name^
         self._address = address^
-        self.max_requests_per_connection = max_requests_per_connection
         self._max_request_body_size = max_request_body_size
         self._max_request_uri_length = max_request_uri_length
         self.tcp_keep_alive = tcp_keep_alive
-        if max_concurrent_connections == 0:
-            self.max_concurrent_connections = DefaultConcurrency
-        else:
-            self.max_concurrent_connections = max_concurrent_connections
 
     fn address(self) -> ref [self._address] String:
         return self._address
@@ -69,15 +56,6 @@ struct Server(Movable):
 
     fn set_max_request_uri_length(mut self, length: Int) -> None:
         self._max_request_uri_length = length
-
-    fn get_concurrency(self) -> Int:
-        """Retrieve the concurrency level which is either
-        the configured `max_concurrent_connections` or the `DefaultConcurrency`.
-
-        Returns:
-            Concurrency level for the server.
-        """
-        return self.max_concurrent_connections
 
     fn listen_and_serve[T: HTTPService](mut self, address: StringSlice, mut handler: T) raises:
         """Listen for incoming connections and serve HTTP requests.
