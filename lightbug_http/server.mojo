@@ -19,38 +19,16 @@ comptime default_max_request_body_size = 4 * 1024 * 1024  # 4MB
 comptime default_max_request_uri_length = 8192
 
 
-fn read_request(
-    mut request_buffer: Bytes, conn: TCPConnection, max_request_body_size: Int, max_request_uri_length: Int
-) raises -> Bool:
-    var buffer = Bytes(capacity=default_buffer_size)
-    var bytes_read: UInt
-    try:
-        bytes_read = conn.read(buffer)
-    except e:
-        # If EOF, 0 bytes were read from the peer, which indicates their side of the connection was closed.
-        if String(e) != "EOF":
-            logger.error("Server.serve_connection: Failed to read request. Expected EOF, got:", e)
-        return False
-
-    logger.debug("Bytes read:", bytes_read)
-    if bytes_read == 0:
-        return False
-
-    request_buffer.extend(buffer^)
-    logger.debug("Total buffer size:", len(request_buffer))
-    return True
-
-
 struct Server(Movable):
     """A Mojo-based server that accept incoming requests and delivers HTTP services."""
     var name: String
-    var _address: String
+    var tcp_keep_alive: Bool
     var max_concurrent_connections: Int
     var max_requests_per_connection: Int
 
+    var _address: String
     var _max_request_body_size: Int
     var _max_request_uri_length: Int
-    var tcp_keep_alive: Bool
 
     fn __init__(
         out self,
@@ -217,3 +195,24 @@ struct Server(Movable):
                 except e:
                     logger.error("Failed to write BadRequest response to the connection:", e)
                     break
+
+fn read_request(
+    mut request_buffer: Bytes, conn: TCPConnection, max_request_body_size: Int, max_request_uri_length: Int
+) raises -> Bool:
+    var buffer = Bytes(capacity=default_buffer_size)
+    var bytes_read: UInt
+    try:
+        bytes_read = conn.read(buffer)
+    except e:
+        # If EOF, 0 bytes were read from the peer, which indicates their side of the connection was closed.
+        if String(e) != "EOF":
+            logger.error("Server.serve_connection: Failed to read request. Expected EOF, got:", e)
+        return False
+
+    logger.debug("Bytes read:", bytes_read)
+    if bytes_read == 0:
+        return False
+
+    request_buffer.extend(buffer^)
+    logger.debug("Total buffer size:", len(request_buffer))
+    return True
