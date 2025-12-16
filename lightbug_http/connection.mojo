@@ -1,7 +1,6 @@
 from sys.info import CompilationTarget
 from time import sleep
 
-from lightbug_http._logger import logger
 from lightbug_http.address import HostPort, NetworkType, TCPAddr, UDPAddr, parse_address
 from lightbug_http.c.address import AddressFamily
 from lightbug_http.io.bytes import Bytes
@@ -76,14 +75,12 @@ struct ListenConfig:
         try:
             local = parse_address[network](address)
         except ParseError:
-            logger.error(ParseError)
             raise Error("ListenConfig.listen: Failed to create listener due to invalid address.")
 
         var socket: Socket[TCPAddr]
         try:
             socket = Socket[TCPAddr]()
         except e:
-            logger.error(e)
             raise Error("ListenConfig.listen: Failed to create listener due to socket creation failure.")
 
         @parameter
@@ -92,7 +89,7 @@ struct ListenConfig:
             try:
                 socket.set_socket_option(SocketOption.SO_REUSEADDR, 1)
             except e:
-                logger.warn("ListenConfig.listen: Failed to set socket as reusable", e)
+                pass
 
         var addr = TCPAddr(ip=local.host^, port=local.port)
         var bind_success = False
@@ -111,14 +108,13 @@ struct ListenConfig:
                 try:
                     socket.shutdown()
                 except e:
-                    logger.error("ListenConfig.listen: Failed to shutdown socket:", e)
+                    pass
                     # TODO: Should shutdown failure be a hard failure? We can still ungracefully close the socket.
                 sleep(UInt(1))
 
         try:
             socket.listen(128)
         except e:
-            logger.error(e)
             raise Error("ListenConfig.listen: Listen failed on sockfd: ", socket.fd.value)
 
         var listener = NoTLSListener(socket^)
@@ -142,14 +138,12 @@ struct TCPConnection(Connection):
             if String(e) == "EOF":
                 raise e
             else:
-                logger.error(e)
                 raise Error("TCPConnection.read: Failed to read data from connection.")
 
     fn write(self, buf: Span[Byte]) raises -> UInt:
         try:
             return self.socket.send(buf)
         except e:
-            logger.error("TCPConnection.write: Failed to write data to connection.")
             raise e
 
     fn close(mut self) raises:
@@ -279,11 +273,10 @@ fn create_connection(mut host: String, port: UInt16) raises -> TCPConnection:
     try:
         socket.connect(host, port)
     except e:
-        logger.error(e)
         try:
             socket.shutdown()
         except e:
-            logger.error("Failed to shutdown socket: ", e)
+            pass
         raise Error("Failed to establish a connection to the server.")
 
     return TCPConnection(socket^)

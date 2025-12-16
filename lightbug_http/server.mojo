@@ -1,6 +1,5 @@
 from io.write import _WriteBufferStack
 
-from lightbug_http._logger import logger
 from lightbug_http.address import NetworkType
 from lightbug_http.connection import ListenConfig, NoTLSListener, TCPConnection, default_buffer_size
 from lightbug_http.header import Headers
@@ -65,7 +64,7 @@ struct ReadResult:
 
 
 struct Server(Movable):
-    """HTTP/1.1 server with state tracking, buffered I/O, and security limits."""
+    """HTTP/1.1 server implementation"""
     var tcp_keep_alive: Bool
     var _address: String
     var _max_request_body_size: Int
@@ -154,10 +153,6 @@ struct Server(Movable):
             conn: A connection object that represents a client connection.
             handler: An object that handles incoming HTTP requests.
         """
-        logger.debug(
-            "Connection accepted! IP:", conn.socket.remote_address.ip, "Port:", conn.socket.remote_address.port
-        )
-
         var max_request_body_size = self.max_request_body_size()
         if max_request_body_size <= 0:
             max_request_body_size = default_max_request_body_size
@@ -182,11 +177,9 @@ struct Server(Movable):
 
             if not read_result.success:
                 if read_result.eof:
-                    logger.debug("Client closed connection (EOF)")
                     state = ConnectionState.Closed
                     break
                 else:
-                    logger.error("Error reading headers:", read_result.error_msg)
                     state = ConnectionState.Closing
                     break
 
@@ -209,48 +202,31 @@ struct Server(Movable):
                     if close_connection:
                         response.set_connection_close()
 
-                    logger.debug(
-                        "Request #" + String(req_number),
-                        conn.socket.remote_address.ip,
-                        conn.socket.remote_address.port,
-                        request.method,
-                        request.uri.path,
-                        "->",
-                        response.status_code,
-                    )
-
                     try:
                         _ = conn.write(encode(response^))
                         response_sent = True
                     except write_error:
-                        logger.error("Failed to write response:", write_error)
                         state = ConnectionState.Closing
                         break
 
                     if close_connection:
-                        logger.debug("Closing connection after request (close_connection=true)")
                         state = ConnectionState.Closing
                         break
                     else:
                         state = ConnectionState.KeepAlive
-                        logger.debug("Connection kept alive, ready for next request")
 
                 except handler_error:
-                    logger.error("Handler error:", handler_error)
-
                     if not response_sent and not conn.is_closed():
                         try:
                             _ = conn.write(encode(InternalError()))
                             response_sent = True
                         except write_error:
-                            logger.error("Failed to send InternalError response:", write_error)
+                            pass
 
                     state = ConnectionState.Closing
                     break
 
             except parse_error:
-                logger.error("Failed to parse HTTPRequest:", parse_error)
-
                 if not response_sent and not conn.is_closed():
                     try:
                         var error_str = String(parse_error)
@@ -260,14 +236,10 @@ struct Server(Movable):
                             _ = conn.write(encode(BadRequest()))
                         response_sent = True
                     except write_error:
-                        logger.error("Failed to write error response:", write_error)
+                        pass
 
                 state = ConnectionState.Closing
                 break
-
-        logger.debug(
-            "Connection closed. Total requests served:", req_number, "Final state:", state
-        )
 
 
     fn _read_headers(
@@ -303,16 +275,12 @@ struct Server(Movable):
                     # 2. Incomplete request: client closed mid-request (buffer has partial data)
 
                     if len(request_buffer) == 0:
-                        logger.debug("Clean EOF on idle connection")
                         return ReadResult(success=False, eof=True)
                     else:
-                        logger.error("Unexpected EOF with", len(request_buffer), "bytes buffered")
                         return ReadResult(success=False, error_msg="Unexpected EOF mid-request")
                 else:
-                    logger.error("Read error:", e)
                     return ReadResult(success=False, error_msg=error_str)
 
-            logger.debug("Bytes read:", bytes_read)
 
             if bytes_read == 0:
                 return ReadResult(success=False, eof=True)
@@ -322,13 +290,9 @@ struct Server(Movable):
 
             # Security check: prevent excessive header size (slowloris protection)
             if total_header_bytes > max_header_size:
-                logger.error(
-                    "Header size", total_header_bytes, "exceeded maximum", max_header_size
-                )
                 return ReadResult(success=False, error_msg="Headers too large")
 
             if BytesConstant.DOUBLE_CRLF in ByteView(request_buffer):
-                logger.debug("Found end of headers, total bytes:", len(request_buffer))
                 return ReadResult(success=True)
 
             read_buffer = Bytes(capacity=default_buffer_size)

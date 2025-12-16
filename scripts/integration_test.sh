@@ -8,7 +8,7 @@ kill_server() {
 }
 
 test_server() {
-    (pixi run mojo build -D LB_LOG_LEVEL=DEBUG -I . --debug-level full tests/integration/integration_test_server.mojo) || exit 1
+    (pixi run mojo build -I . --debug-level full tests/integration/integration_test_server.mojo) || exit 1
 
     echo "[INFO] Starting Mojo server..."
     ./integration_test_server &

@@ -1,6 +1,5 @@
 from sys.ffi import CompilationTarget, c_char, c_int, c_uchar, external_call
 
-from lightbug_http._logger import logger
 from lightbug_http.c.address import AddressFamily, AddressLength
 from lightbug_http.c.aliases import ExternalImmutUnsafePointer, ExternalMutUnsafePointer, c_void
 from lightbug_http.c.network import in_addr_t, inet_ntop, ntohs, sockaddr, sockaddr_in, socklen_t
@@ -334,7 +333,6 @@ fn get_ip_address(mut host: String, address_family: AddressFamily, sock_type: So
         try:
             result = getaddrinfo(host, service, hints)
         except e:
-            logger.error("Failed to get IP address.")
             raise e
 
         if not result.unsafe_ptr()[].ai_addr:
@@ -356,7 +354,6 @@ fn get_ip_address(mut host: String, address_family: AddressFamily, sock_type: So
         try:
             result = getaddrinfo(host, service, hints)
         except e:
-            logger.error("Failed to get IP address.")
             raise e
 
         if not result.unsafe_ptr()[].ai_addr:
@@ -452,7 +449,6 @@ fn parse_port[origin: ImmutOrigin](port_str: StringSlice[origin]) raises ParseEr
     try:
         port = Int(String(port_str))
     except e:
-        logger.error(e)
         raise ParseError(String("Failed to parse port: invalid integer value. Received: ", port_str))
 
     if port < MIN_PORT or port > MAX_PORT:

@@ -51,7 +51,6 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
                 status_text=properties.msg^,
             )
         except e:
-            logger.error(e)
             raise Error("Failed to read request body")
 
     @staticmethod
@@ -107,14 +106,12 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
                 response._decode_chunks_pico(decoder, b^)
                 return response^
             except e:
-                logger.error(e)
                 raise Error("Failed to read chunked response.")
 
         try:
             response.read_body(reader)
             return response^
         except e:
-            logger.error(e)
             raise Error("Failed to read request body: ")
 
     fn _decode_chunks_pico(mut self, mut decoder: PhrChunkedDecoder, var chunks: Bytes) raises:
@@ -175,7 +172,7 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
                 var current_time = String(now(utc=True))
                 self.headers[HeaderKey.DATE] = current_time
             except:
-                logger.debug("DATE header not set, unable to get current time and it was instead omitted.")
+                pass
 
     fn __init__(
         out self,

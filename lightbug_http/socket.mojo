@@ -1,7 +1,6 @@
 from sys.ffi import c_uint
 from sys.info import CompilationTarget
 
-from lightbug_http._logger import logger
 from lightbug_http.address import (
     Addr,
     NetworkType,
@@ -120,7 +119,7 @@ struct Socket[
             try:
                 self.shutdown()
             except e:
-                logger.debug("Socket.teardown: Failed to shutdown socket: " + String(e))
+                pass
 
         if not self._closed:
             self.close()
@@ -133,7 +132,7 @@ struct Socket[
         try:
             self^.teardown()
         except e:
-            logger.debug("Socket.__del__: Failed to close socket during deletion:", e)
+            pass
 
     fn __str__(self) -> String:
         return String.write(self)
@@ -177,7 +176,6 @@ struct Socket[
         try:
             new_socket_fd = accept(self.fd)
         except e:
-            logger.error(e)
             raise Error("Socket.accept: Failed to accept connection, system `accept()` returned an error.")
 
         var new_socket = Self(
@@ -200,7 +198,6 @@ struct Socket[
         try:
             listen(self.fd, backlog)
         except e:
-            logger.error(e)
             raise Error("Socket.listen: Failed to listen for connections.")
 
     fn bind(mut self, ip_address: String, port: UInt16) raises:
@@ -225,7 +222,6 @@ struct Socket[
         try:
             binary_ip = inet_pton[Self.address_family](ip_address)
         except e:
-            logger.error(e)
             raise Error("ListenConfig.listen: Failed to convert IP address to binary form.")
 
         var local_address = SocketAddress(
@@ -236,7 +232,6 @@ struct Socket[
         try:
             bind(self.fd, local_address)
         except e:
-            logger.error(e)
             raise Error("Socket.bind: Binding socket failed.")
 
         var local = self.get_sock_name()
@@ -259,7 +254,6 @@ struct Socket[
         try:
             getsockname(self.fd, local_address)
         except e:
-            logger.error(e)
             raise Error("get_sock_name: Failed to get address of local socket.")
 
         ref local_sockaddr_in = local_address.as_sockaddr_in()
@@ -285,7 +279,6 @@ struct Socket[
         try:
             peer_address = getpeername(self.fd)
         except e:
-            logger.error(e)
             raise Error("get_peer_name: Failed to get address of remote socket.")
 
         ref peer_sockaddr_in = peer_address.as_sockaddr_in()
@@ -310,7 +303,6 @@ struct Socket[
             return getsockopt(self.fd, SOL_SOCKET, option_name.value)
         except e:
             # TODO: Should this be a warning or an error?
-            logger.warn("Socket.get_socket_option: Failed to get socket option.")
             raise e
 
     fn set_socket_option(self, option_name: SocketOption, var option_value: Int = 1) raises:
@@ -326,8 +318,6 @@ struct Socket[
         try:
             setsockopt(self.fd, SOL_SOCKET, option_name.value, option_value)
         except e:
-            # TODO: Should this be a warning or an error?
-            logger.warn("Socket.set_socket_option: Failed to set socket option.")
             raise e
 
     fn connect(mut self, mut ip_address: String, port: UInt16) raises -> None:
@@ -345,7 +335,6 @@ struct Socket[
         try:
             connect(self.fd, remote_address)
         except e:
-            logger.error("Socket.connect: Failed to establish a connection to the server.")
             raise e
 
         var remote = self.get_peer_name()
@@ -355,7 +344,6 @@ struct Socket[
         try:
             return send(self.fd, buffer, UInt(len(buffer)), 0)
         except e:
-            logger.error("Socket.send: Failed to write data to connection.")
             raise e
 
     fn send_to(self, src: Span[Byte], mut host: String, port: UInt16) raises -> UInt:
@@ -401,7 +389,6 @@ struct Socket[
             )
             buffer._len += Int(bytes_received)
         except e:
-            logger.error(e)
             raise Error("Socket.receive: Failed to read data from connection.")
 
         if bytes_received == 0:
@@ -459,7 +446,6 @@ struct Socket[
             )
             buffer._len += Int(bytes_received)
         except e:
-            logger.error(e)
             raise Error("Socket._receive_from: Failed to read data from connection.")
 
         if bytes_received == 0:
@@ -510,9 +496,7 @@ struct Socket[
             # For the other errors, either the socket is already closed or the descriptor is invalid.
             # At that point we can feasibly say that the socket is already shut down.
             if String(e) == ShutdownInvalidArgumentError:
-                logger.error("Socket.shutdown: Failed to shutdown socket.")
                 raise e
-            logger.debug(e)
 
         self._connected = False
 
@@ -530,9 +514,7 @@ struct Socket[
             # If the file descriptor is invalid, then it was most likely already closed.
             # Other errors indicate a failure while attempting to close the socket.
             if String(e) != CloseInvalidDescriptorError:
-                logger.error("Socket.close: Failed to close socket.")
                 raise e
-            logger.debug(e)
 
         self._closed = True
 

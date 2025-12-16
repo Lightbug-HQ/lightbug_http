@@ -1,6 +1,5 @@
 from hashlib.hash import Hasher
 
-from lightbug_http._logger import logger
 from lightbug_http.io.bytes import ByteReader, Bytes, ByteView
 from lightbug_http.strings import http, https, strHttp10, strHttp11
 
@@ -167,7 +166,6 @@ struct URI(Copyable, Representable, Stringable, Writable):
             try:
                 scheme_delimiter = reader.read_bytes(3)
             except EndOfReaderError:
-                logger.error(EndOfReaderError)
                 raise URIParseError(
                     "URI.parse: Incomplete URI, expected scheme delimiter after scheme but reached the end of the URI."
                 )
@@ -204,7 +202,6 @@ struct URI(Copyable, Representable, Stringable, Writable):
             try:
                 port = UInt16(atol(String(host_and_port[colon + 1 : port_end])))
             except e:
-                logger.error(e)
                 raise URIParseError(
                     String("URI.parse: Failed to convert port number from a String to Integer, received: ", uri)
                 )

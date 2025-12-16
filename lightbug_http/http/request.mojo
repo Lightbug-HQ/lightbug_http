@@ -1,4 +1,3 @@
-from lightbug_http._logger import logger
 from lightbug_http.header import Header, HeaderKey, Headers, ParsedRequestResult, write_header
 from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter
 from lightbug_http.io.sync import Duration
@@ -65,7 +64,6 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
         try:
             parsed_uri = URI.parse(String(addr, rest.path))
         except URIParseError:
-            logger.error(URIParseError)
             raise Error("HTTPRequest.from_bytes: Failed to parse request URI.")
 
         var request = HTTPRequest(
@@ -145,7 +143,6 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
 
         # TODO: Handle content length mismatches?
         elif r.remaining() == 0:
-            logger.debug("No body bytes available. Setting content-length to 0.")
             self.body_raw = Bytes()
             self.set_content_length(0)
             return

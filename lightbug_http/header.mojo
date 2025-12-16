@@ -1,4 +1,3 @@
-from lightbug_http._logger import logger
 from lightbug_http.http.pico import PhrHeader, phr_parse_headers, phr_parse_request, phr_parse_response
 from lightbug_http.io.bytes import ByteReader, Bytes, byte, is_newline, is_space
 from lightbug_http.strings import CR, LF, BytesConstant, lineBreak
