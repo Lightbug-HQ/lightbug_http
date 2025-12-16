@@ -33,7 +33,6 @@ struct Server(Movable):
         max_request_uri_length: Int = default_max_request_uri_length,
         tcp_keep_alive: Bool = False,
     ):
-        self.error_handler = error_handler^
         self._address = address^
         self._max_request_body_size = max_request_body_size
         self._max_request_uri_length = max_request_uri_length
