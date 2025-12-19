@@ -20,7 +20,7 @@ comptime default_max_header_size = 8192
 comptime default_header_read_timeout_ms = 30_000
 
 
-struct ConnectionState(Equatable):
+struct ConnectionState(Equatable, ImplicitlyCopyable):
     """Connection lifecycle state for request processing flow control.
 
     States:
@@ -34,6 +34,15 @@ struct ConnectionState(Equatable):
         Closed: Connection has been closed.
     """
     var value: UInt8
+
+    fn __init__(out self, value: UInt8):
+        self.value = value
+
+    fn __eq__(self, other: Self) -> Bool:
+        return self.value == other.value
+
+    fn __ne__(self, other: Self) -> Bool:
+        return self.value != other.value
 
     comptime Init = Self(0)
     comptime ReadingHeaders = Self(1)
@@ -286,7 +295,7 @@ struct Server(Movable):
                 return ReadResult(success=False, eof=True)
 
             request_buffer.extend(read_buffer^)
-            total_header_bytes += int(bytes_read)
+            total_header_bytes += Int(bytes_read)
 
             # Security check: prevent excessive header size (slowloris protection)
             if total_header_bytes > max_header_size:
