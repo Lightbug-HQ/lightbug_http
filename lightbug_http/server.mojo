@@ -20,41 +20,6 @@ comptime default_max_header_size = 8192
 comptime default_header_read_timeout_ms = 30_000
 
 
-struct ConnectionState(Equatable, ImplicitlyCopyable):
-    """Connection lifecycle state for request processing flow control.
-
-    States:
-        Init: Initial state when connection is first accepted.
-        ReadingHeaders: Currently reading HTTP headers from the client.
-        ReadingBody: Currently reading HTTP body (if present).
-        ProcessingRequest: Parsing request and calling handler.
-        WritingResponse: Sending response back to client.
-        KeepAlive: Request completed, ready for next request on same connection.
-        Closing: Connection is being closed gracefully.
-        Closed: Connection has been closed.
-    """
-
-    var value: UInt8
-
-    fn __init__(out self, value: UInt8):
-        self.value = value
-
-    fn __eq__(self, other: Self) -> Bool:
-        return self.value == other.value
-
-    fn __ne__(self, other: Self) -> Bool:
-        return self.value != other.value
-
-    comptime Init = Self(0)
-    comptime ReadingHeaders = Self(1)
-    comptime ReadingBody = Self(2)
-    comptime ProcessingRequest = Self(3)
-    comptime WritingResponse = Self(4)
-    comptime KeepAlive = Self(5)
-    comptime Closing = Self(6)
-    comptime Closed = Self(7)
-
-
 struct ReadResult:
     """Result of a read operation with error context.
 
@@ -156,7 +121,7 @@ struct Server(Movable):
                 conn^.teardown()
 
     fn serve_connection[T: HTTPService](self, mut conn: TCPConnection, mut handler: T) raises -> None:
-        """Serve a single connection with state management and error recovery.
+        """Serve a single connection with keep-alive support.
 
         Parameters:
             T: The type of HTTPService that handles incoming requests.
@@ -177,35 +142,24 @@ struct Server(Movable):
         if max_header_size <= 0:
             max_header_size = default_max_header_size
 
-        var state = ConnectionState.Init
-        var req_number = 0
         var request_buffer = Bytes()
-        while state != ConnectionState.Closed:
-            req_number += 1
-            state = ConnectionState.ReadingHeaders
+
+        while True:
             request_buffer.clear()
 
+            # Read headers from connection
             var read_result = self._read_headers(request_buffer, conn, max_header_size)
-
             if not read_result.success:
-                if read_result.eof:
-                    state = ConnectionState.Closed
-                    break
-                else:
-                    state = ConnectionState.Closing
-                    break
+                break
 
-            state = ConnectionState.ProcessingRequest
+            # Parse and handle request
             var response_sent = False
-
             try:
                 var request = HTTPRequest.from_bytes(
                     self.address(), max_request_body_size, max_request_uri_length, request_buffer
                 )
 
                 var close_connection = (not self.tcp_keep_alive) or request.connection_close()
-
-                state = ConnectionState.WritingResponse
                 var response: HTTPResponse
 
                 try:
@@ -214,28 +168,18 @@ struct Server(Movable):
                     if close_connection:
                         response.set_connection_close()
 
-                    try:
-                        _ = conn.write(encode(response^))
-                        response_sent = True
-                    except write_error:
-                        state = ConnectionState.Closing
-                        break
+                    _ = conn.write(encode(response^))
+                    response_sent = True
 
                     if close_connection:
-                        state = ConnectionState.Closing
                         break
-                    else:
-                        state = ConnectionState.KeepAlive
 
                 except handler_error:
                     if not response_sent and not conn.is_closed():
                         try:
                             _ = conn.write(encode(InternalError()))
-                            response_sent = True
-                        except write_error:
+                        except:
                             pass
-
-                    state = ConnectionState.Closing
                     break
 
             except parse_error:
@@ -246,11 +190,8 @@ struct Server(Movable):
                             _ = conn.write(encode(URITooLong()))
                         else:
                             _ = conn.write(encode(BadRequest()))
-                        response_sent = True
-                    except write_error:
+                    except:
                         pass
-
-                state = ConnectionState.Closing
                 break
 
     fn _read_headers(
