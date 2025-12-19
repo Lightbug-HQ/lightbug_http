@@ -299,11 +299,7 @@ struct Socket[
         Raises:
             Error: If getting the socket option fails.
         """
-        try:
-            return getsockopt(self.fd, SOL_SOCKET, option_name.value)
-        except e:
-            # TODO: Should this be a warning or an error?
-            raise e
+        return getsockopt(self.fd, SOL_SOCKET, option_name.value)
 
     fn set_socket_option(self, option_name: SocketOption, var option_value: Int = 1) raises:
         """Return the value of the given socket option.
@@ -315,10 +311,7 @@ struct Socket[
         Raises:
             Error: If setting the socket option fails.
         """
-        try:
-            setsockopt(self.fd, SOL_SOCKET, option_name.value, option_value)
-        except e:
-            raise e
+        setsockopt(self.fd, SOL_SOCKET, option_name.value, option_value)
 
     fn connect(mut self, mut ip_address: String, port: UInt16) raises -> None:
         """Connect to a remote socket at address.
@@ -332,19 +325,13 @@ struct Socket[
         """
         var ip = get_ip_address(ip_address, Self.address_family, Self.sock_type)
         var remote_address = SocketAddress(address_family=Self.address_family, port=port, binary_ip=ip)
-        try:
-            connect(self.fd, remote_address)
-        except e:
-            raise e
+        connect(self.fd, remote_address)
 
         var remote = self.get_peer_name()
         self.remote_address = Self.address(remote[0], remote[1])
 
     fn send(self, buffer: Span[Byte]) raises -> UInt:
-        try:
-            return send(self.fd, buffer, UInt(len(buffer)), 0)
-        except e:
-            raise e
+        return send(self.fd, buffer, UInt(len(buffer)), 0)
 
     fn send_to(self, src: Span[Byte], mut host: String, port: UInt16) raises -> UInt:
         """Send data to the a remote address by connecting to the remote socket before sending.
@@ -496,7 +483,7 @@ struct Socket[
             # For the other errors, either the socket is already closed or the descriptor is invalid.
             # At that point we can feasibly say that the socket is already shut down.
             if String(e) == ShutdownInvalidArgumentError:
-                raise e
+                raise e^
 
         self._connected = False
 
@@ -514,7 +501,7 @@ struct Socket[
             # If the file descriptor is invalid, then it was most likely already closed.
             # Other errors indicate a failure while attempting to close the socket.
             if String(e) != CloseInvalidDescriptorError:
-                raise e
+                raise e^
 
         self._closed = True
 

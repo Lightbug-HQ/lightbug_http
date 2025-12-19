@@ -464,7 +464,8 @@ struct HostPort(Movable):
 
 
 fn parse_address[
-    origin: ImmutOrigin, //,
+    origin: ImmutOrigin,
+    //,
     network: NetworkType,
 ](address: StringSlice[origin]) raises ParseError -> HostPort:
     """Parse an address string into a host and port.
@@ -574,7 +575,8 @@ fn freeaddrinfo[T: AnAddrInfo, //](ptr: ExternalMutUnsafePointer[T]):
 
 @fieldwise_init
 struct _CAddrInfoIterator[
-    mut: Bool, //,
+    mut: Bool,
+    //,
     T: AnAddrInfo,
     origin: Origin[mut],
 ](ImplicitlyCopyable, Iterable, Iterator):
@@ -690,7 +692,8 @@ fn _getaddrinfo[
     node_origin: ImmutOrigin,
     serv_origin: ImmutOrigin,
     hints_origin: ImmutOrigin,
-    result_origin: MutOrigin, //,
+    result_origin: MutOrigin,
+    //,
 ](
     nodename: ImmutUnsafePointer[c_char, node_origin],
     servname: ImmutUnsafePointer[c_char, serv_origin],

@@ -33,6 +33,7 @@ struct ConnectionState(Equatable, ImplicitlyCopyable):
         Closing: Connection is being closed gracefully.
         Closed: Connection has been closed.
     """
+
     var value: UInt8
 
     fn __init__(out self, value: UInt8):
@@ -62,6 +63,7 @@ struct ReadResult:
         eof: Whether EOF was reached (client closed connection cleanly).
         error_msg: Error message if operation failed.
     """
+
     var success: Bool
     var eof: Bool
     var error_msg: String
@@ -74,6 +76,7 @@ struct ReadResult:
 
 struct Server(Movable):
     """HTTP/1.1 server implementation"""
+
     var tcp_keep_alive: Bool
     var _address: String
     var _max_request_body_size: Int
@@ -250,7 +253,6 @@ struct Server(Movable):
                 state = ConnectionState.Closing
                 break
 
-
     fn _read_headers(
         self,
         mut request_buffer: Bytes,
@@ -289,7 +291,6 @@ struct Server(Movable):
                         return ReadResult(success=False, error_msg="Unexpected EOF mid-request")
                 else:
                     return ReadResult(success=False, error_msg=error_str)
-
 
             if bytes_read == 0:
                 return ReadResult(success=False, eof=True)

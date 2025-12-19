@@ -136,15 +136,12 @@ struct TCPConnection(Connection):
             return self.socket.receive(buf)
         except e:
             if String(e) == "EOF":
-                raise e
+                raise e^
             else:
                 raise Error("TCPConnection.read: Failed to read data from connection.")
 
     fn write(self, buf: Span[Byte]) raises -> UInt:
-        try:
-            return self.socket.send(buf)
-        except e:
-            raise e
+        return self.socket.send(buf)
 
     fn close(mut self) raises:
         self.socket.close()
