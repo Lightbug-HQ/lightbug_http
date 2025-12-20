@@ -47,12 +47,35 @@ fn BadRequest() -> HTTPResponse:
     )
 
 
+fn BadRequest(message: String) -> HTTPResponse:
+    """Bad Request with a specific error message.
+
+    Args:
+        message: Specific explanation of what went wrong with the request.
+    """
+    return HTTPResponse(
+        String("Bad Request: ", message).as_bytes(),
+        headers=Headers(Header(HeaderKey.CONTENT_TYPE, "text/plain")),
+        status_code=400,
+        status_text="Bad Request",
+    )
+
+
 fn NotFound(path: String) -> HTTPResponse:
     return HTTPResponse(
         body_bytes=String("path ", path, " not found").as_bytes(),
         headers=Headers(Header(HeaderKey.CONTENT_TYPE, "text/plain")),
         status_code=404,
         status_text="Not Found",
+    )
+
+
+fn PayloadTooLarge() -> HTTPResponse:
+    return HTTPResponse(
+        "Payload Too Large".as_bytes(),
+        headers=Headers(Header(HeaderKey.CONTENT_TYPE, "text/plain")),
+        status_code=413,
+        status_text="Payload Too Large",
     )
 
 

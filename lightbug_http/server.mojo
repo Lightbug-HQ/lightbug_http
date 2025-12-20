@@ -1,9 +1,10 @@
 from io.write import _WriteBufferStack
+from utils import Variant
 
 from lightbug_http.address import NetworkType
 from lightbug_http.connection import ListenConfig, NoTLSListener, TCPConnection, default_buffer_size
 from lightbug_http.header import Headers
-from lightbug_http.http.common_response import BadRequest, InternalError, URITooLong
+from lightbug_http.http.common_response import BadRequest, InternalError, PayloadTooLarge, URITooLong
 from lightbug_http.io.bytes import Bytes, BytesConstant, ByteView
 from lightbug_http.io.sync import Duration
 from lightbug_http.service import HTTPService
@@ -11,6 +12,15 @@ from lightbug_http.socket import Socket
 from lightbug_http.uri import URI
 
 from lightbug_http.http import HTTPRequest, encode
+from lightbug_http.http.request import (
+    URITooLongError,
+    RequestBodyTooLargeError,
+    URIParseError,
+    HeaderParseError,
+    CookieParseError,
+    BodyReadError,
+    RequestParseError,
+)
 
 
 comptime DefaultConcurrency: Int = 256 * 1024
@@ -20,23 +30,46 @@ comptime default_max_header_size = 8192
 comptime default_header_read_timeout_ms = 30_000
 
 
-struct ReadResult:
-    """Result of a read operation with error context.
+@fieldwise_init
+struct EOFError(ImplicitlyCopyable):
+    """Client closed connection cleanly."""
+    pass
 
-    Attributes:
-        success: Whether the read operation completed successfully.
-        eof: Whether EOF was reached (client closed connection cleanly).
-        error_msg: Error message if operation failed.
-    """
 
-    var success: Bool
-    var eof: Bool
-    var error_msg: String
+struct UnexpectedEOFError(ImplicitlyCopyable):
+    """Client closed connection mid-request."""
+    var message: String
 
-    fn __init__(out self, success: Bool, eof: Bool = False, error_msg: String = ""):
-        self.success = success
-        self.eof = eof
-        self.error_msg = error_msg
+    fn __init__(out self, message: String = "Unexpected EOF mid-request"):
+        self.message = message
+
+
+struct HeadersTooLargeError(ImplicitlyCopyable):
+    """Request headers exceeded maximum size."""
+    var message: String
+
+    fn __init__(out self, message: String = "Headers too large"):
+        self.message = message
+
+
+@fieldwise_init
+struct ReadError(ImplicitlyCopyable):
+    """Generic read error from connection."""
+    var message: String
+
+
+@fieldwise_init
+struct HandlerError(ImplicitlyCopyable):
+    """Error from request handler."""
+    var message: String
+
+
+comptime ConnectionError = Variant[
+    EOFError,
+    UnexpectedEOFError,
+    HeadersTooLargeError,
+    ReadError,
+]
 
 
 struct Server(Movable):
@@ -147,12 +180,23 @@ struct Server(Movable):
         while True:
             request_buffer.clear()
 
-            # Read headers from connection
-            var read_result = self._read_headers(request_buffer, conn, max_header_size)
-            if not read_result.success:
-                break
+            try:
+                self._read_headers(request_buffer, conn, max_header_size)
+            except err:
+                if err.isa[EOFError]():
+                    break
+                elif err.isa[UnexpectedEOFError]():
+                    break
+                elif err.isa[HeadersTooLargeError]():
+                    if not conn.is_closed():
+                        try:
+                            _ = conn.write(encode(BadRequest()))
+                        except:
+                            pass
+                    break
+                elif err.isa[ReadError]():
+                    break
 
-            # Parse and handle request
             var response_sent = False
             try:
                 var request = HTTPRequest.from_bytes(
@@ -185,11 +229,18 @@ struct Server(Movable):
             except parse_error:
                 if not response_sent and not conn.is_closed():
                     try:
-                        var error_str = String(parse_error)
-                        if error_str == "HTTPRequest.from_bytes: Request URI too long":
+                        if parse_error.isa[URITooLongError]():
                             _ = conn.write(encode(URITooLong()))
-                        else:
-                            _ = conn.write(encode(BadRequest()))
+                        elif parse_error.isa[RequestBodyTooLargeError]():
+                            _ = conn.write(encode(PayloadTooLarge()))
+                        elif parse_error.isa[URIParseError]():
+                            _ = conn.write(encode(BadRequest(parse_error[URIParseError].message())))
+                        elif parse_error.isa[HeaderParseError]():
+                            _ = conn.write(encode(BadRequest(parse_error[HeaderParseError].message())))
+                        elif parse_error.isa[CookieParseError]():
+                            _ = conn.write(encode(BadRequest(parse_error[CookieParseError].message())))
+                        elif parse_error.isa[BodyReadError]():
+                            _ = conn.write(encode(BadRequest(parse_error[BodyReadError].message())))
                     except:
                         pass
                 break
@@ -199,7 +250,7 @@ struct Server(Movable):
         mut request_buffer: Bytes,
         conn: TCPConnection,
         max_header_size: Int,
-    ) raises -> ReadResult:
+    ) raises ConnectionError:
         """Read HTTP headers.
 
         Args:
@@ -207,8 +258,9 @@ struct Server(Movable):
             conn: TCP connection to read from
             max_header_size: Maximum allowed header size (security limit)
 
-        Returns:
-            ReadResult indicating success/failure, EOF status, and error message
+        Raises:
+            ConnectionError: A variant containing specific error types (EOFError, UnexpectedEOFError,
+                        HeadersTooLargeError, or ReadError).
         """
         var read_buffer = Bytes(capacity=default_buffer_size)
         var total_header_bytes = 0
@@ -227,23 +279,22 @@ struct Server(Movable):
                     # 2. Incomplete request: client closed mid-request (buffer has partial data)
 
                     if len(request_buffer) == 0:
-                        return ReadResult(success=False, eof=True)
+                        raise ConnectionError(EOFError())
                     else:
-                        return ReadResult(success=False, error_msg="Unexpected EOF mid-request")
+                        raise ConnectionError(UnexpectedEOFError())
                 else:
-                    return ReadResult(success=False, error_msg=error_str)
+                    raise ConnectionError(ReadError(error_str))
 
             if bytes_read == 0:
-                return ReadResult(success=False, eof=True)
+                raise ConnectionError(EOFError())
 
             request_buffer.extend(read_buffer^)
             total_header_bytes += Int(bytes_read)
 
-            # Security check: prevent excessive header size (slowloris protection)
             if total_header_bytes > max_header_size:
-                return ReadResult(success=False, error_msg="Headers too large")
+                raise ConnectionError(HeadersTooLargeError())
 
             if BytesConstant.DOUBLE_CRLF in ByteView(request_buffer):
-                return ReadResult(success=True)
+                return
 
             read_buffer = Bytes(capacity=default_buffer_size)

@@ -4,8 +4,71 @@ from lightbug_http.io.sync import Duration
 from lightbug_http.strings import CR, LF, http, lineBreak, strHttp11, whitespace
 from lightbug_http.uri import URI
 from memory import Span
+from utils import Variant
 
 from lightbug_http.cookie import RequestCookieJar
+
+
+# Request parsing error types
+@fieldwise_init
+struct URITooLongError(ImplicitlyCopyable):
+    """Request URI exceeded maximum length."""
+
+    fn message(self) -> String:
+        return "Request URI exceeds maximum allowed length"
+
+
+@fieldwise_init
+struct RequestBodyTooLargeError(ImplicitlyCopyable):
+    """Request body exceeded maximum size."""
+
+    fn message(self) -> String:
+        return "Request body exceeds maximum allowed size"
+
+
+@fieldwise_init
+struct URIParseError(ImplicitlyCopyable):
+    """Failed to parse request URI."""
+
+    fn message(self) -> String:
+        return "Malformed request URI"
+
+
+@fieldwise_init
+struct HeaderParseError(ImplicitlyCopyable):
+    """Failed to parse request headers."""
+    var detail: String
+
+    fn message(self) -> String:
+        return String("Invalid HTTP headers: ", self.detail)
+
+
+@fieldwise_init
+struct CookieParseError(ImplicitlyCopyable):
+    """Failed to parse cookies."""
+    var detail: String
+
+    fn message(self) -> String:
+        return String("Invalid cookies: ", self.detail)
+
+
+@fieldwise_init
+struct BodyReadError(ImplicitlyCopyable):
+    """Failed to read request body."""
+    var detail: String
+
+    fn message(self) -> String:
+        return String("Invalid request body: ", self.detail)
+
+
+comptime RequestParseError = Variant[
+    URITooLongError,
+    RequestBodyTooLargeError,
+    URIParseError,
+    HeaderParseError,
+    CookieParseError,
+    BodyReadError,
+]
 
 
 @fieldwise_init
@@ -38,33 +101,33 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
     var timeout: Duration
 
     @staticmethod
-    fn from_bytes(addr: String, max_body_size: Int, max_uri_length: Int, b: Span[Byte]) raises -> HTTPRequest:
+    fn from_bytes(addr: String, max_body_size: Int, max_uri_length: Int, b: Span[Byte]) raises RequestParseError -> HTTPRequest:
         var reader = ByteReader(b)
         var headers = Headers()
         var rest: ParsedRequestResult
         try:
             rest = headers.parse_raw_request(reader)
         except e:
-            raise Error("HTTPRequest.from_bytes: Failed to parse request headers: ", e)
+            raise RequestParseError(HeaderParseError(String(e)))
 
         if len(rest.path.as_bytes()) > max_uri_length:
-            raise Error("HTTPRequest.from_bytes: Request URI too long")
+            raise RequestParseError(URITooLongError())
 
         var cookies = RequestCookieJar()
         try:
             cookies.parse_cookies(headers)
         except e:
-            raise Error("HTTPRequest.from_bytes: Failed to parse cookies: ", e)
+            raise RequestParseError(CookieParseError(String(e)))
 
         var content_length = headers.content_length()
         if content_length > 0 and max_body_size > 0 and content_length > max_body_size:
-            raise Error("HTTPRequest.from_bytes: Request body too large.")
+            raise RequestParseError(RequestBodyTooLargeError())
 
         var parsed_uri: URI
         try:
             parsed_uri = URI.parse(String(addr, rest.path))
-        except URIParseError:
-            raise Error("HTTPRequest.from_bytes: Failed to parse request URI.")
+        except uri_error:
+            raise RequestParseError(URIParseError())
 
         var request = HTTPRequest(
             uri=parsed_uri^, headers=headers^, method=rest.method, protocol=rest.protocol, cookies=cookies^
@@ -75,7 +138,7 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
                 reader.skip_carriage_return()
                 request.read_body(reader, content_length, max_body_size)
             except e:
-                raise Error("HTTPRequest.from_bytes: Failed to read request body: ", e)
+                raise RequestParseError(BodyReadError(String(e)))
 
         return request^
 
