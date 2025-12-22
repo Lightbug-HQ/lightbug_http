@@ -1,10 +1,11 @@
-from lightbug_http import Welcome, Server
+from lightbug_http import Welcome
+from lightbug_http.server_new import ServerNew
 from os.env import getenv
 
 fn main() raises:
-    var server = Server()
+    var server = ServerNew()
     var handler = Welcome()
-    
+
     var host = getenv("DEFAULT_SERVER_HOST", "localhost")
     var port = getenv("DEFAULT_SERVER_PORT", "8080")
 

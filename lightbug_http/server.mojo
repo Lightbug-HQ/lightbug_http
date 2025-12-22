@@ -1,10 +1,9 @@
 from io.write import _WriteBufferStack
-from utils import Variant
 
 from lightbug_http.address import NetworkType
 from lightbug_http.connection import ListenConfig, NoTLSListener, TCPConnection, default_buffer_size
 from lightbug_http.header import Headers
-from lightbug_http.http.common_response import BadRequest, InternalError, PayloadTooLarge, URITooLong
+from lightbug_http.http.common_response import BadRequest, InternalError, URITooLong
 from lightbug_http.io.bytes import Bytes, BytesConstant, ByteView
 from lightbug_http.io.sync import Duration
 from lightbug_http.service import HTTPService
@@ -12,87 +11,30 @@ from lightbug_http.socket import Socket
 from lightbug_http.uri import URI
 
 from lightbug_http.http import HTTPRequest, encode
-from lightbug_http.http.request import (
-    URITooLongError,
-    RequestBodyTooLargeError,
-    URIParseError,
-    HeaderParseError,
-    CookieParseError,
-    BodyReadError,
-    RequestParseError,
-)
 
 
 comptime DefaultConcurrency: Int = 256 * 1024
-comptime default_max_request_body_size = 4 * 1024 * 1024
+comptime default_max_request_body_size = 4 * 1024 * 1024  # 4MB
 comptime default_max_request_uri_length = 8192
-comptime default_max_header_size = 8192
-comptime default_header_read_timeout_ms = 30_000
-
-
-@fieldwise_init
-struct EOFError(ImplicitlyCopyable):
-    """Client closed connection cleanly."""
-    pass
-
-
-struct UnexpectedEOFError(ImplicitlyCopyable):
-    """Client closed connection mid-request."""
-    var message: String
-
-    fn __init__(out self, message: String = "Unexpected EOF mid-request"):
-        self.message = message
-
-
-struct HeadersTooLargeError(ImplicitlyCopyable):
-    """Request headers exceeded maximum size."""
-    var message: String
-
-    fn __init__(out self, message: String = "Headers too large"):
-        self.message = message
-
-
-@fieldwise_init
-struct ReadError(ImplicitlyCopyable):
-    """Generic read error from connection."""
-    var message: String
-
-
-@fieldwise_init
-struct HandlerError(ImplicitlyCopyable):
-    """Error from request handler."""
-    var message: String
-
-
-comptime ConnectionError = Variant[
-    EOFError,
-    UnexpectedEOFError,
-    HeadersTooLargeError,
-    ReadError,
-]
 
 
 struct Server(Movable):
-    """HTTP/1.1 server implementation"""
-
+    """A Mojo-based server that accept incoming requests and delivers HTTP services."""
     var tcp_keep_alive: Bool
     var _address: String
     var _max_request_body_size: Int
     var _max_request_uri_length: Int
-    var _max_header_size: Int
 
     fn __init__(
         out self,
         var address: String = "127.0.0.1",
         max_request_body_size: Int = default_max_request_body_size,
         max_request_uri_length: Int = default_max_request_uri_length,
-        max_header_size: Int = default_max_header_size,
         tcp_keep_alive: Bool = False,
     ):
         self._address = address^
         self._max_request_body_size = max_request_body_size
         self._max_request_uri_length = max_request_uri_length
-        self._max_header_size = max_header_size
         self.tcp_keep_alive = tcp_keep_alive
 
     fn address(self) -> ref [self._address] String:
@@ -112,12 +54,6 @@ struct Server(Movable):
 
     fn set_max_request_uri_length(mut self, length: Int) -> None:
         self._max_request_uri_length = length
-
-    fn max_header_size(self) -> Int:
-        return self._max_header_size
-
-    fn set_max_header_size(mut self, size: Int) -> None:
-        self._max_header_size = size
 
     fn listen_and_serve[T: HTTPService](mut self, address: StringSlice, mut handler: T) raises:
         """Listen for incoming connections and serve HTTP requests.
@@ -154,7 +90,7 @@ struct Server(Movable):
                 conn^.teardown()
 
     fn serve_connection[T: HTTPService](self, mut conn: TCPConnection, mut handler: T) raises -> None:
-        """Serve a single connection with keep-alive support.
+        """Serve a single connection.
 
         Parameters:
             T: The type of HTTPService that handles incoming requests.
@@ -162,6 +98,9 @@ struct Server(Movable):
         Args:
             conn: A connection object that represents a client connection.
             handler: An object that handles incoming HTTP requests.
+
+        Raises:
+            If there is an error while serving the connection.
         """
         var max_request_body_size = self.max_request_body_size()
         if max_request_body_size <= 0:
@@ -171,130 +110,67 @@ struct Server(Movable):
         if max_request_uri_length <= 0:
             max_request_uri_length = default_max_request_uri_length
 
-        var max_header_size = self.max_header_size()
-        if max_header_size <= 0:
-            max_header_size = default_max_header_size
-
-        var request_buffer = Bytes()
-
+        var req_number = 0
         while True:
-            request_buffer.clear()
+            req_number += 1
 
-            try:
-                self._read_headers(request_buffer, conn, max_header_size)
-            except err:
-                if err.isa[EOFError]():
-                    break
-                elif err.isa[UnexpectedEOFError]():
-                    break
-                elif err.isa[HeadersTooLargeError]():
-                    if not conn.is_closed():
-                        try:
-                            _ = conn.write(encode(BadRequest()))
-                        except:
-                            pass
-                    break
-                elif err.isa[ReadError]():
+            var request_buffer = Bytes()
+            while True:
+                # If the read_request returns False, it means the connection was closed, an error occurred, or no bytes were read.
+                if not read_request(request_buffer, conn, max_request_body_size, max_request_uri_length):
+                    return
+
+                if BytesConstant.DOUBLE_CRLF in ByteView(request_buffer):
                     break
 
-            var response_sent = False
             try:
                 var request = HTTPRequest.from_bytes(
                     self.address(), max_request_body_size, max_request_uri_length, request_buffer
                 )
-
-                var close_connection = (not self.tcp_keep_alive) or request.connection_close()
                 var response: HTTPResponse
-
+                var close_connection = (not self.tcp_keep_alive) or request.connection_close()
                 try:
                     response = handler.func(request)
-
                     if close_connection:
                         response.set_connection_close()
-
-                    _ = conn.write(encode(response^))
-                    response_sent = True
+                    try:
+                        _ = conn.write(encode(response^))
+                    except e:
+                        break
 
                     if close_connection:
                         break
-
-                except handler_error:
-                    if not response_sent and not conn.is_closed():
+                except e:
+                    if not conn.is_closed():
                         try:
                             _ = conn.write(encode(InternalError()))
-                        except:
-                            pass
+                        except e:
+                            raise Error("Failed to send InternalError response")
+                        return
+            except e:
+                try:
+                    # if String(e) == "HTTPRequest.from_bytes: Request URI too long":
+                    #     _ = conn.write(encode(URITooLong()))
+                    # else:
+                    _ = conn.write(encode(BadRequest()))
+                except e:
                     break
 
-            except parse_error:
-                if not response_sent and not conn.is_closed():
-                    try:
-                        if parse_error.isa[URITooLongError]():
-                            _ = conn.write(encode(URITooLong()))
-                        elif parse_error.isa[RequestBodyTooLargeError]():
-                            _ = conn.write(encode(PayloadTooLarge()))
-                        elif parse_error.isa[URIParseError]():
-                            _ = conn.write(encode(BadRequest(parse_error[URIParseError].message())))
-                        elif parse_error.isa[HeaderParseError]():
-                            _ = conn.write(encode(BadRequest(parse_error[HeaderParseError].message())))
-                        elif parse_error.isa[CookieParseError]():
-                            _ = conn.write(encode(BadRequest(parse_error[CookieParseError].message())))
-                        elif parse_error.isa[BodyReadError]():
-                            _ = conn.write(encode(BadRequest(parse_error[BodyReadError].message())))
-                    except:
-                        pass
-                break
+fn read_request(
+    mut request_buffer: Bytes, conn: TCPConnection, max_request_body_size: Int, max_request_uri_length: Int
+) raises -> Bool:
+    var buffer = Bytes(capacity=default_buffer_size)
+    var bytes_read: UInt
+    try:
+        bytes_read = conn.read(buffer)
+    except e:
+        # If EOF, 0 bytes were read from the peer, which indicates their side of the connection was closed.
+        if String(e) != "EOF":
+            pass
+        return False
 
-    fn _read_headers(
-        self,
-        mut request_buffer: Bytes,
-        conn: TCPConnection,
-        max_header_size: Int,
-    ) raises ConnectionError:
-        """Read HTTP headers.
+    if bytes_read == 0:
+        return False
 
-        Args:
-            request_buffer: Buffer to accumulate request data (cleared by caller)
-            conn: TCP connection to read from
-            max_header_size: Maximum allowed header size (security limit)
-
-        Raises:
-            ConnectionError: A variant containing specific error types (EOFError, UnexpectedEOFError,
-                        HeadersTooLargeError, or ReadError).
-        """
-        var read_buffer = Bytes(capacity=default_buffer_size)
-        var total_header_bytes = 0
-
-        while True:
-            var bytes_read: UInt
-
-            try:
-                bytes_read = conn.read(read_buffer)
-            except e:
-                var error_str = String(e)
-
-                if error_str == "EOF":
-                    # EOF can mean two things:
-                    # 1. Clean close: client closed before sending anything (buffer empty)
-                    # 2. Incomplete request: client closed mid-request (buffer has partial data)
-
-                    if len(request_buffer) == 0:
-                        raise ConnectionError(EOFError())
-                    else:
-                        raise ConnectionError(UnexpectedEOFError())
-                else:
-                    raise ConnectionError(ReadError(error_str))
-
-            if bytes_read == 0:
-                raise ConnectionError(EOFError())
-
-            request_buffer.extend(read_buffer^)
-            total_header_bytes += Int(bytes_read)
-
-            if total_header_bytes > max_header_size:
-                raise ConnectionError(HeadersTooLargeError())
-
-            if BytesConstant.DOUBLE_CRLF in ByteView(request_buffer):
-                return
-
-            read_buffer = Bytes(capacity=default_buffer_size)
+    request_buffer.extend(buffer^)
+    return True
