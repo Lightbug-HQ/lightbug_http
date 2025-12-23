@@ -1,3 +1,11 @@
+import sys
+from sys import size_of
+
+from lightbug_http.io.bytes import Bytes, memmove
+from lightbug_http.strings import BytesConstant
+from memory import memcpy
+
+
 # Chunked decoder states
 comptime CHUNKED_IN_CHUNK_SIZE = 0
 comptime CHUNKED_IN_CHUNK_EXT = 1
@@ -9,7 +17,7 @@ comptime CHUNKED_IN_TRAILERS_LINE_HEAD = 6
 comptime CHUNKED_IN_TRAILERS_LINE_MIDDLE = 7
 
 
-struct PhrChunkedDecoder:
+struct HTTPChunkedDecoder:
     var bytes_left_in_chunk: Int
     var consume_trailer: Bool
     var _hex_count: Int
@@ -37,9 +45,9 @@ fn decode_hex(ch: UInt8) -> Int:
         return -1
 
 
-fn phr_decode_chunked[
+fn http_decode_chunked[
     buf_origin: MutOrigin
-](mut decoder: PhrChunkedDecoder, buf: Span[UInt8, buf_origin]) -> Tuple[Int, Int]:
+](mut decoder: HTTPChunkedDecoder, buf: Span[UInt8, buf_origin]) -> Tuple[Int, Int]:
     """Decode chunked transfer encoding.
 
     Returns (ret, new_bufsz) where:
@@ -202,7 +210,7 @@ fn phr_decode_chunked[
     return (ret, new_bufsz)
 
 
-fn phr_decode_chunked_is_in_data(decoder: PhrChunkedDecoder) -> Bool:
+fn http_decode_chunked_is_in_data(decoder: HTTPChunkedDecoder) -> Bool:
     """Check if decoder is currently in chunk data state."""
     return decoder._state == CHUNKED_IN_CHUNK_DATA
 

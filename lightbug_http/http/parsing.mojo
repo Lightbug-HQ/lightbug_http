@@ -1,6 +1,8 @@
+from lightbug_http.io.bytes import Bytes, create_string_from_ptr
+from lightbug_http.strings import BytesConstant, is_printable_ascii, is_token_char
 
 
-struct PhrHeader(Copyable):
+struct HTTPHeader(Copyable):
     var name: String
     var name_len: Int
     var value: String
@@ -158,7 +160,7 @@ fn parse_headers[
 ](
     buf: UnsafePointer[UInt8, buf_origin],
     buf_end: UnsafePointer[UInt8, buf_origin],
-    headers: Span[PhrHeader, header_origin],
+    headers: Span[HTTPHeader, header_origin],
     mut num_headers: Int,
     max_headers: Int,
     mut ret: Int,
@@ -230,7 +232,7 @@ fn parse_headers[
     return current
 
 
-fn phr_parse_request[
+fn http_parse_request[
     buf_origin: ImmutOrigin, header_origin: MutOrigin
 ](
     buf_start: UnsafePointer[UInt8, buf_origin],
@@ -238,7 +240,7 @@ fn phr_parse_request[
     mut method: String,
     mut path: String,
     mut minor_version: Int,
-    headers: Span[PhrHeader, header_origin],
+    headers: Span[HTTPHeader, header_origin],
     mut num_headers: Int,
     last_len: Int,
 ) -> Int:
@@ -345,7 +347,7 @@ fn phr_parse_request[
     return Int(current) - Int(buf_start)
 
 
-fn phr_parse_response[
+fn http_parse_response[
     buf_origin: ImmutOrigin, header_origin: MutOrigin
 ](
     buf_start: UnsafePointer[UInt8, buf_origin],
@@ -353,7 +355,7 @@ fn phr_parse_response[
     mut minor_version: Int,
     mut status: Int,
     mut msg: String,
-    headers: Span[PhrHeader, header_origin],
+    headers: Span[HTTPHeader, header_origin],
     mut num_headers: Int,
     last_len: Int,
 ) -> Int:
@@ -427,12 +429,12 @@ fn phr_parse_response[
     return Int(current) - Int(buf_start)
 
 
-fn phr_parse_headers[
+fn http_parse_headers[
     buf_origin: ImmutOrigin, header_origin: MutOrigin
 ](
     buf_start: UnsafePointer[UInt8, buf_origin],
     len: Int,
-    headers: Span[PhrHeader, header_origin],
+    headers: Span[HTTPHeader, header_origin],
     mut num_headers: Int,
     last_len: Int,
 ) -> Int:

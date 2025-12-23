@@ -1,6 +1,6 @@
 from lightbug_http.connection import TCPConnection, default_buffer_size
 from lightbug_http.header import ParsedResponseResult
-from lightbug_http.http.pico import PhrChunkedDecoder, phr_decode_chunked
+from lightbug_http.http.chunked import HTTPChunkedDecoder, http_decode_chunked
 from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter, byte
 from lightbug_http.strings import CR, LF, http, lineBreak, strHttp11, whitespace
 from lightbug_http.uri import URI
@@ -79,7 +79,7 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
         var transfer_encoding = response.headers.get(HeaderKey.TRANSFER_ENCODING)
         if transfer_encoding and transfer_encoding.value() == "chunked":
             # Use pico's chunked decoder for proper RFC-compliant parsing
-            var decoder = PhrChunkedDecoder()
+            var decoder = HTTPChunkedDecoder()
             decoder.consume_trailer = True  # Consume trailing headers
 
             var b = Bytes(reader.read_bytes().as_bytes())
@@ -114,7 +114,7 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
         except e:
             raise Error("Failed to read request body: ")
 
-    fn _decode_chunks_pico(mut self, mut decoder: PhrChunkedDecoder, var chunks: Bytes) raises:
+    fn _decode_chunks_pico(mut self, mut decoder: HTTPChunkedDecoder, var chunks: Bytes) raises:
         """Decode chunked transfer encoding using picohttpparser.
         Args:
             decoder: The chunked decoder state machine.
@@ -127,7 +127,7 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
         #     buf_ptr[i] = chunks[i]
 
         # var bufsz = len(chunks)
-        var result = phr_decode_chunked(decoder, Span(chunks))
+        var result = http_decode_chunked(decoder, Span(chunks))
         var ret = result[0]
         var decoded_size = result[1]
 

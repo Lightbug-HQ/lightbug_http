@@ -1,4 +1,4 @@
-from lightbug_http.http.pico import PhrHeader, phr_parse_headers, phr_parse_request, phr_parse_response
+from lightbug_http.http.parsing import HTTPHeader, http_parse_headers, http_parse_request, http_parse_response
 from lightbug_http.io.bytes import ByteReader, Bytes, byte, is_newline, is_space
 from lightbug_http.strings import CR, LF, BytesConstant, lineBreak
 
@@ -108,10 +108,10 @@ struct Headers(Copyable, Stringable, Writable):
 
         # Allocate headers array (max 100 headers)
         var max_headers = 100
-        var headers = InlineArray[PhrHeader, 100](fill=PhrHeader())
+        var headers = InlineArray[HTTPHeader, 100](fill=HTTPHeader())
 
         var num_headers = max_headers
-        var ret = phr_parse_request(
+        var ret = http_parse_request(
             reader.as_bytes().unsafe_ptr(),
             len(reader),
             method,
@@ -154,9 +154,9 @@ struct Headers(Copyable, Stringable, Writable):
 
         # Allocate headers array (max 100 headers)
         var max_headers = 100
-        var headers = InlineArray[PhrHeader, 100](fill=PhrHeader())
+        var headers = InlineArray[HTTPHeader, 100](fill=HTTPHeader())
         var num_headers = max_headers
-        var ret = phr_parse_response(
+        var ret = http_parse_response(
             reader.as_bytes().unsafe_ptr(),
             len(reader),
             minor_version,
