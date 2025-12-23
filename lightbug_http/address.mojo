@@ -5,7 +5,6 @@ from lightbug_http.c.aliases import ExternalImmutUnsafePointer, ExternalMutUnsaf
 from lightbug_http.c.network import in_addr_t, inet_ntop, ntohs, sockaddr, sockaddr_in, socklen_t
 from lightbug_http.c.socket import SocketType, socket
 from lightbug_http.socket import Socket
-from utils import Variant
 
 
 comptime MAX_PORT = 65535
@@ -333,7 +332,7 @@ fn get_ip_address(mut host: String, address_family: AddressFamily, sock_type: So
         try:
             result = getaddrinfo(host, service, hints)
         except e:
-            raise e
+            raise e^
 
         if not result.unsafe_ptr()[].ai_addr:
             raise Error("Failed to get IP address because the response's `ai_addr` was null.")
@@ -354,7 +353,7 @@ fn get_ip_address(mut host: String, address_family: AddressFamily, sock_type: So
         try:
             result = getaddrinfo(host, service, hints)
         except e:
-            raise e
+            raise e^
 
         if not result.unsafe_ptr()[].ai_addr:
             raise Error("Failed to get IP address because the response's `ai_addr` was null.")

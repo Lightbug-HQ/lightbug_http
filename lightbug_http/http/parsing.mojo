@@ -14,6 +14,7 @@ struct HTTPHeader(Copyable):
         self.value = String()
         self.value_len = 0
 
+
 fn get_token_to_eol[
     origin: ImmutOrigin
 ](

@@ -55,12 +55,13 @@ struct BytesConstant:
     comptime TILDE = byte["~"]()
 
 
-
 # Constants
 comptime IS_PRINTABLE_ASCII_MASK = 0o137
 
+
 fn is_printable_ascii(c: UInt8) -> Bool:
     return (c - 0x20) < IS_PRINTABLE_ASCII_MASK
+
 
 # Token character map - represents which characters are valid in tokens
 # According to RFC 7230: token = 1*tchar

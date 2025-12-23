@@ -1,8 +1,10 @@
 from lightbug_http.connection import ListenConfig, NoTLSListener, TCPConnection, default_buffer_size
-from lightbug_http.http import HTTPRequest, HTTPResponse, encode
 from lightbug_http.http.common_response import BadRequest, InternalError, URITooLong
-from lightbug_http.io.bytes import Bytes, BytesConstant, ByteView, ByteReader
+from lightbug_http.io.bytes import ByteReader, Bytes, BytesConstant, ByteView
 from lightbug_http.service import HTTPService
+from lightbug_http.socket import EOF, SocketError
+
+from lightbug_http.http import HTTPRequest, HTTPResponse, encode
 
 
 @fieldwise_init
@@ -11,6 +13,7 @@ struct ServerConfig(Copyable, Movable):
     Configuration for HTTP server.
     Provides explicit control over resource limits and buffer sizes.
     """
+
     var max_connections: Int
     var max_keepalive_requests: Int
 
@@ -38,6 +41,7 @@ struct ZeroCopyBuffer(Movable):
     Growable buffer that retains capacity when cleared.
     Reduces allocations in long-lived connections.
     """
+
     var data: Bytes
     var written: Int
     var retain_size: Int
@@ -51,7 +55,7 @@ struct ZeroCopyBuffer(Movable):
         self.data.extend(byte_data^)
         self.written = len(self.data)
 
-    fn as_bytes(self) -> ref [self.data] Bytes:
+    fn as_bytes(self) -> Span[Byte, origin_of(self.data)]:
         return self.data
 
     fn clear_retaining_capacity(mut self):
@@ -69,6 +73,7 @@ struct ZeroCopyBuffer(Movable):
 @fieldwise_init
 struct RequestBodyState(Copyable, Movable):
     """State for reading request body."""
+
     var content_length: Int
     var bytes_read: Int
 
@@ -85,6 +90,7 @@ struct ConnectionState(Copyable, Movable):
     - responding: Sending response to client
     - closed: Connection finished
     """
+
     comptime READING_HEADERS = 0
     comptime READING_BODY = 1
     comptime PROCESSING = 2
@@ -120,6 +126,7 @@ struct ConnectionProvision(Movable):
     All resources needed to handle a connection.
     Pre-allocated and reused (pooled) across connections.
     """
+
     var recv_buffer: ZeroCopyBuffer
     var request: Optional[HTTPRequest]
     var response: Optional[HTTPResponse]
@@ -128,10 +135,7 @@ struct ConnectionProvision(Movable):
     var should_close: Bool
 
     fn __init__(out self, config: ServerConfig):
-        self.recv_buffer = ZeroCopyBuffer(
-            config.socket_buffer_size,
-            config.recv_buffer_retain
-        )
+        self.recv_buffer = ZeroCopyBuffer(config.socket_buffer_size, config.recv_buffer_retain)
         self.request = None
         self.response = None
         self.state = ConnectionState.reading_headers()
@@ -147,14 +151,16 @@ struct ConnectionProvision(Movable):
         self.should_close = False
 
 
-fn handle_connection[T: HTTPService](
+fn handle_connection[
+    T: HTTPService
+](
     mut conn: TCPConnection,
     mut provision: ConnectionProvision,
     mut handler: T,
     config: ServerConfig,
     server_address: String,
     tcp_keep_alive: Bool,
-) raises:
+) raises SocketError:
     while True:
         if provision.state.kind == ConnectionState.READING_HEADERS:
             var buffer = Bytes(capacity=config.socket_buffer_size)
@@ -163,7 +169,7 @@ fn handle_connection[T: HTTPService](
             try:
                 bytes_read = conn.read(buffer)
             except e:
-                if String(e) != "EOF":
+                if e.isa[EOF]():
                     print("Error reading from connection:", e)
                 provision.state = ConnectionState.closed()
                 break
@@ -180,7 +186,7 @@ fn handle_connection[T: HTTPService](
                         server_address,
                         config.max_request_body_size,
                         config.max_request_uri_length,
-                        provision.recv_buffer.as_bytes()
+                        provision.recv_buffer.as_bytes(),
                     )
 
                     var content_length = request.headers.content_length()
@@ -195,7 +201,7 @@ fn handle_connection[T: HTTPService](
                 except e:
                     var error_response: HTTPResponse
                     # if "URI too long" in String(e):
-                        # error_response = URITooLong()
+                    # error_response = URITooLong()
                     # else:
                     error_response = BadRequest()
 
@@ -268,9 +274,7 @@ fn handle_connection[T: HTTPService](
                 break
 
             # Enforce keep-alive request cap only when explicitly configured.
-            if (config.max_keepalive_requests > 0) and (
-                provision.keepalive_count >= config.max_keepalive_requests
-            ):
+            if (config.max_keepalive_requests > 0) and (provision.keepalive_count >= config.max_keepalive_requests):
                 provision.state = ConnectionState.closed()
                 break
 
@@ -285,6 +289,7 @@ struct ServerNew(Movable):
     """
     HTTP/1.1 Server with explicit resource management.
     """
+
     var config: ServerConfig
     var _address: String
     var tcp_keep_alive: Bool
@@ -326,11 +331,7 @@ struct ServerNew(Movable):
     fn set_max_request_uri_length(mut self, length: Int):
         self.config.max_request_uri_length = length
 
-    fn listen_and_serve[T: HTTPService](
-        mut self,
-        address: StringSlice,
-        mut handler: T
-    ) raises:
+    fn listen_and_serve[T: HTTPService](mut self, address: StringSlice, mut handler: T) raises:
         """Listen for incoming connections and serve HTTP requests.
 
         Parameters:
@@ -342,13 +343,13 @@ struct ServerNew(Movable):
         """
         var listener = ListenConfig().listen(address)
         self.set_address(String(address))
-        self.serve(listener, handler)
 
-    fn serve[T: HTTPService](
-        self,
-        ln: NoTLSListener,
-        mut handler: T
-    ) raises:
+        try:
+            self.serve(listener, handler)
+        except e:
+            raise Error("Error while serving HTTP requests: ", e)
+
+    fn serve[T: HTTPService](self, ln: NoTLSListener, mut handler: T) raises SocketError:
         """Serve HTTP requests.
 
         Parameters:

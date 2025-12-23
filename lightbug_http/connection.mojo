@@ -5,7 +5,7 @@ from lightbug_http.address import HostPort, NetworkType, TCPAddr, UDPAddr, parse
 from lightbug_http.c.address import AddressFamily
 from lightbug_http.io.bytes import Bytes
 from lightbug_http.io.sync import Duration
-from lightbug_http.socket import Socket, SocketOption, SocketType, TCPSocket, UDPSocket
+from lightbug_http.socket import EOF, Socket, SocketError, SocketOption, SocketType, TCPSocket, UDPSocket
 
 
 comptime default_buffer_size = 4096
@@ -48,16 +48,16 @@ struct NoTLSListener(Movable):
     fn __init__(out self) raises:
         self.socket = Socket[TCPAddr]()
 
-    fn accept(self) raises -> TCPConnection:
+    fn accept(self) raises SocketError -> TCPConnection:
         return TCPConnection(self.socket.accept())
 
-    fn close(mut self) raises -> None:
+    fn close(mut self) raises SocketError -> None:
         return self.socket.close()
 
-    fn shutdown(mut self) raises -> None:
+    fn shutdown(mut self) raises SocketError -> None:
         return self.socket.shutdown()
 
-    fn teardown(deinit self) raises:
+    fn teardown(deinit self) raises SocketError:
         self.socket^.teardown()
 
     fn addr(self) -> TCPAddr:
@@ -100,7 +100,8 @@ struct ListenConfig:
                 bind_success = True
             except e:
                 if not bind_fail_logged:
-                    print("Bind attempt failed: ", e)
+                    # print("Bind attempt failed: ", e)
+                    print("Bind attempt failed: ")
                     print("Retrying. Might take 10-15 seconds.")
                     bind_fail_logged = True
                 print(".", end="", flush=True)
@@ -125,31 +126,31 @@ struct ListenConfig:
         return listener^
 
 
-struct TCPConnection(Connection):
+struct TCPConnection:
     var socket: TCPSocket[TCPAddr]
 
     fn __init__(out self, var socket: TCPSocket[TCPAddr]):
         self.socket = socket^
 
-    fn read(self, mut buf: Bytes) raises -> UInt:
+    fn read(self, mut buf: Bytes) raises SocketError -> UInt:
         try:
             return self.socket.receive(buf)
         except e:
-            if String(e) == "EOF":
+            if e.isa[EOF]():
                 raise e^
             else:
                 raise Error("TCPConnection.read: Failed to read data from connection.")
 
-    fn write(self, buf: Span[Byte]) raises -> UInt:
+    fn write(self, buf: Span[Byte]) raises SocketError -> UInt:
         return self.socket.send(buf)
 
-    fn close(mut self) raises:
+    fn close(mut self) raises SocketError:
         self.socket.close()
 
-    fn shutdown(mut self) raises:
+    fn shutdown(mut self) raises SocketError:
         self.socket.shutdown()
 
-    fn teardown(deinit self) raises:
+    fn teardown(deinit self) raises SocketError:
         self.socket^.teardown()
 
     fn is_closed(self) -> Bool:
@@ -174,7 +175,7 @@ struct UDPConnection[network: NetworkType = NetworkType.udp4, address_family: Ad
     fn __init__(out self, var socket: Self._sock_type):
         self.socket = socket^
 
-    fn read_from(mut self, size: Int = default_buffer_size) raises -> Tuple[Bytes, String, UInt16]:
+    fn read_from(mut self, size: Int = default_buffer_size) raises SocketError -> Tuple[Bytes, String, UInt16]:
         """Reads data from the underlying file descriptor.
 
         Args:
@@ -189,7 +190,7 @@ struct UDPConnection[network: NetworkType = NetworkType.udp4, address_family: Ad
 
         return self.socket.receive_from(size)
 
-    fn read_from(mut self, mut dest: Bytes) raises -> Tuple[UInt, String, UInt16]:
+    fn read_from(mut self, mut dest: Bytes) raises SocketError -> Tuple[UInt, String, UInt16]:
         """Reads data from the underlying file descriptor.
 
         Args:
@@ -204,7 +205,7 @@ struct UDPConnection[network: NetworkType = NetworkType.udp4, address_family: Ad
 
         return self.socket.receive_from(dest)
 
-    fn write_to(mut self, src: Span[Byte], mut address: UDPAddr) raises -> UInt:
+    fn write_to(mut self, src: Span[Byte], mut address: UDPAddr) raises SocketError -> UInt:
         """Writes data to the underlying file descriptor.
 
         Args:
@@ -220,7 +221,7 @@ struct UDPConnection[network: NetworkType = NetworkType.udp4, address_family: Ad
 
         return self.socket.send_to(src, address.ip, address.port)
 
-    fn write_to(mut self, src: Span[Byte], mut host: String, port: UInt16) raises -> UInt:
+    fn write_to(mut self, src: Span[Byte], mut host: String, port: UInt16) raises SocketError -> UInt:
         """Writes data to the underlying file descriptor.
 
         Args:
@@ -237,13 +238,13 @@ struct UDPConnection[network: NetworkType = NetworkType.udp4, address_family: Ad
 
         return self.socket.send_to(src, host, port)
 
-    fn close(mut self) raises:
+    fn close(mut self) raises SocketError:
         self.socket.close()
 
-    fn shutdown(mut self) raises:
+    fn shutdown(mut self) raises SocketError:
         self.socket.shutdown()
 
-    fn teardown(deinit self) raises:
+    fn teardown(deinit self) raises SocketError:
         self.socket^.teardown()
 
     fn is_closed(self) -> Bool:
@@ -256,7 +257,7 @@ struct UDPConnection[network: NetworkType = NetworkType.udp4, address_family: Ad
     #     return self.socket.remote_address
 
 
-fn create_connection(mut host: String, port: UInt16) raises -> TCPConnection:
+fn create_connection(mut host: String, port: UInt16) raises SocketError -> TCPConnection:
     """Connect to a server using a socket.
 
     Args:
@@ -281,7 +282,7 @@ fn create_connection(mut host: String, port: UInt16) raises -> TCPConnection:
 
 fn listen_udp[
     network: NetworkType = NetworkType.udp4
-](local_address: UDPAddr[network]) raises -> UDPConnection[network]:
+](local_address: UDPAddr[network]) raises SocketError -> UDPConnection[network]:
     """Creates a new UDP listener.
 
     Args:
@@ -298,7 +299,9 @@ fn listen_udp[
     return UDPConnection(socket^)
 
 
-fn listen_udp[network: NetworkType = NetworkType.udp4](local_address: String) raises -> UDPConnection[network]:
+fn listen_udp[
+    network: NetworkType = NetworkType.udp4
+](local_address: String) raises SocketError -> UDPConnection[network]:
     """Creates a new UDP listener.
 
     Args:
@@ -314,7 +317,9 @@ fn listen_udp[network: NetworkType = NetworkType.udp4](local_address: String) ra
     return listen_udp[network](UDPAddr[network](address.host^, address.port))
 
 
-fn listen_udp[network: NetworkType = NetworkType.udp4](host: String, port: UInt16) raises -> UDPConnection[network]:
+fn listen_udp[
+    network: NetworkType = NetworkType.udp4
+](host: String, port: UInt16) raises SocketError -> UDPConnection[network]:
     """Creates a new UDP listener.
 
     Args:
@@ -330,7 +335,9 @@ fn listen_udp[network: NetworkType = NetworkType.udp4](host: String, port: UInt1
     return listen_udp[network](UDPAddr[network](host, port))
 
 
-fn dial_udp[network: NetworkType = NetworkType.udp4](local_address: UDPAddr[network]) raises -> UDPConnection[network]:
+fn dial_udp[
+    network: NetworkType = NetworkType.udp4
+](local_address: UDPAddr[network]) raises SocketError -> UDPConnection[network]:
     """Connects to the address on the named network. The network must be "udp", "udp4", or "udp6".
 
     Args:
@@ -345,7 +352,9 @@ fn dial_udp[network: NetworkType = NetworkType.udp4](local_address: UDPAddr[netw
     return UDPConnection(Socket[UDPAddr[network], sock_type = SocketType.SOCK_DGRAM](local_address=local_address))
 
 
-fn dial_udp[network: NetworkType = NetworkType.udp4](local_address: String) raises -> UDPConnection[network]:
+fn dial_udp[
+    network: NetworkType = NetworkType.udp4
+](local_address: String) raises SocketError -> UDPConnection[network]:
     """Connects to the address on the named network. The network must be "udp", "udp4", or "udp6".
 
     Args:
@@ -361,7 +370,9 @@ fn dial_udp[network: NetworkType = NetworkType.udp4](local_address: String) rais
     return dial_udp[network](UDPAddr[network](address.host^, address.port))
 
 
-fn dial_udp[network: NetworkType = NetworkType.udp4](host: String, port: UInt16) raises -> UDPConnection[network]:
+fn dial_udp[
+    network: NetworkType = NetworkType.udp4
+](host: String, port: UInt16) raises SocketError -> UDPConnection[network]:
     """Connects to the address on the udp network.
 
     Args:

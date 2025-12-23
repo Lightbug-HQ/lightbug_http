@@ -37,9 +37,65 @@ from lightbug_http.c.socket import (
 )
 from lightbug_http.connection import default_buffer_size
 from lightbug_http.io.bytes import Bytes
+from utils import Variant
 
 
-comptime SocketClosedError = "Socket: Socket is already closed"
+@fieldwise_init
+@register_passable("trivial")
+struct SocketClosedError(Movable):
+    pass
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct EOF(Movable):
+    pass
+
+
+@fieldwise_init
+struct SocketError(Movable, Stringable, Writable):
+    comptime type = Variant[
+        SocketClosedError,
+        EOF,
+        Error,
+    ]
+    var value: Self.type
+
+    @implicit
+    fn __init__(out self, value: SocketClosedError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: EOF):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, var value: Error):
+        self.value = value^
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        if self.value.isa[SocketClosedError]():
+            writer.write("SocketClosedError")
+        elif self.value.isa[EOF]():
+            writer.write("EOF")
+        elif self.value.isa[Error]():
+            writer.write(self.value[Error])
+
+    fn isa[T: AnyType](self) -> Bool:
+        return self.value.isa[T]()
+
+    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
+        return self.value[T]
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+
+# comptime SocketError = Variant[
+#     SocketClosedError,
+#     EOF,
+#     Error,
+# ]
 
 
 @fieldwise_init
@@ -113,7 +169,7 @@ struct Socket[
         self._closed = False
         self._connected = True
 
-    fn teardown(deinit self) raises:
+    fn teardown(deinit self) raises SocketError:
         """Close the socket and free the file descriptor."""
         if self._connected:
             try:
@@ -161,7 +217,7 @@ struct Socket[
             ")",
         )
 
-    fn accept(self) raises -> Self:
+    fn accept(self) raises SocketError -> Self:
         """Accept a connection. The socket must be bound to an address and listening for connections.
         The return value is a connection where conn is a new socket object usable to send and receive data on the connection,
         and address is the address bound to the socket on the other end of the connection.
@@ -200,7 +256,7 @@ struct Socket[
         except e:
             raise Error("Socket.listen: Failed to listen for connections.")
 
-    fn bind(mut self, ip_address: String, port: UInt16) raises:
+    fn bind(mut self, ip_address: String, port: UInt16) raises SocketError:
         """Bind the socket to address. The socket must not already be bound. (The format of address depends on the address family).
 
         When a socket is created with Socket(), it exists in a name
@@ -237,7 +293,7 @@ struct Socket[
         var local = self.get_sock_name()
         self.local_address = Self.address(local[0], local[1])
 
-    fn get_sock_name(self) raises -> Tuple[String, UInt16]:
+    fn get_sock_name(self) raises SocketError -> Tuple[String, UInt16]:
         """Return the address of the socket.
 
         Returns:
@@ -247,7 +303,7 @@ struct Socket[
             Error: If getting the address of the socket fails.
         """
         if self._closed:
-            raise SocketClosedError
+            raise SocketError(SocketClosedError())
 
         # TODO: Add check to see if the socket is bound and error if not.
         var local_address = SocketAddress()
@@ -262,7 +318,7 @@ struct Socket[
             UInt16(binary_port_to_int(local_sockaddr_in.sin_port)),
         )
 
-    fn get_peer_name(self) raises -> Tuple[String, UInt16]:
+    fn get_peer_name(self) raises SocketError -> Tuple[String, UInt16]:
         """Return the address of the peer connected to the socket.
 
         Returns:
@@ -272,7 +328,7 @@ struct Socket[
             Error: If getting the address of the peer connected to the socket fails.
         """
         if self._closed:
-            raise SocketClosedError
+            raise SocketClosedError()
 
         # TODO: Add check to see if the socket is bound and error if not.
         var peer_address: SocketAddress
@@ -287,7 +343,7 @@ struct Socket[
             UInt16(binary_port_to_int(peer_sockaddr_in.sin_port)),
         )
 
-    fn get_socket_option(self, option_name: SocketOption) raises -> Int:
+    fn get_socket_option(self, option_name: SocketOption) raises SocketError -> Int:
         """Return the value of the given socket option.
 
         Args:
@@ -313,7 +369,7 @@ struct Socket[
         """
         setsockopt(self.fd, SOL_SOCKET, option_name.value, option_value)
 
-    fn connect(mut self, mut ip_address: String, port: UInt16) raises -> None:
+    fn connect(mut self, mut ip_address: String, port: UInt16) raises SocketError -> None:
         """Connect to a remote socket at address.
 
         Args:
@@ -330,10 +386,10 @@ struct Socket[
         var remote = self.get_peer_name()
         self.remote_address = Self.address(remote[0], remote[1])
 
-    fn send(self, buffer: Span[Byte]) raises -> UInt:
+    fn send(self, buffer: Span[Byte]) raises SocketError -> UInt:
         return send(self.fd, buffer, UInt(len(buffer)), 0)
 
-    fn send_to(self, src: Span[Byte], mut host: String, port: UInt16) raises -> UInt:
+    fn send_to(self, src: Span[Byte], mut host: String, port: UInt16) raises SocketError -> UInt:
         """Send data to the a remote address by connecting to the remote socket before sending.
         The socket must be not already be connected to a remote socket.
 
@@ -352,7 +408,7 @@ struct Socket[
         var remote_address = SocketAddress(address_family=Self.address_family, port=port, binary_ip=ip)
         return sendto(self.fd, src, UInt(len(src)), 0, remote_address)
 
-    fn _receive(self, mut buffer: Bytes) raises -> UInt:
+    fn _receive(self, mut buffer: Bytes) raises SocketError -> UInt:
         """Receive data from the socket into the buffer.
 
         Args:
@@ -379,11 +435,11 @@ struct Socket[
             raise Error("Socket.receive: Failed to read data from connection.")
 
         if bytes_received == 0:
-            raise Error("EOF")
+            raise EOF()
 
         return bytes_received
 
-    fn receive(self, size: Int = default_buffer_size) raises -> List[Byte]:
+    fn receive(self, size: Int = default_buffer_size) raises SocketError -> List[Byte]:
         """Receive data from the socket into the buffer with capacity of `size` bytes.
 
         Args:
@@ -396,7 +452,7 @@ struct Socket[
         _ = self._receive(buffer)
         return buffer^
 
-    fn receive(self, mut buffer: Bytes) raises -> UInt:
+    fn receive(self, mut buffer: Bytes) raises SocketError -> UInt:
         """Receive data from the socket into the buffer.
 
         Args:
@@ -411,7 +467,7 @@ struct Socket[
         """
         return self._receive(buffer)
 
-    fn _receive_from(self, mut buffer: Bytes) raises -> Tuple[UInt, String, UInt16]:
+    fn _receive_from(self, mut buffer: Bytes) raises SocketError -> Tuple[UInt, String, UInt16]:
         """Receive data from the socket into the buffer.
 
         Args:
@@ -436,7 +492,7 @@ struct Socket[
             raise Error("Socket._receive_from: Failed to read data from connection.")
 
         if bytes_received == 0:
-            raise Error("EOF")
+            raise EOF()
 
         ref peer_sockaddr_in = remote_address.as_sockaddr_in()
         return (
@@ -445,7 +501,7 @@ struct Socket[
             UInt16(binary_port_to_int(peer_sockaddr_in.sin_port)),
         )
 
-    fn receive_from(self, size: Int = default_buffer_size) raises -> Tuple[List[Byte], String, UInt16]:
+    fn receive_from(self, size: Int = default_buffer_size) raises SocketError -> Tuple[List[Byte], String, UInt16]:
         """Receive data from the socket into the buffer dest.
 
         Args:
@@ -461,7 +517,7 @@ struct Socket[
         _, host, port = self._receive_from(buffer)
         return buffer^, host, port
 
-    fn receive_from(self, mut dest: List[Byte]) raises -> Tuple[UInt, String, UInt16]:
+    fn receive_from(self, mut dest: List[Byte]) raises SocketError -> Tuple[UInt, String, UInt16]:
         """Receive data from the socket into the buffer dest.
 
         Args:
@@ -475,7 +531,7 @@ struct Socket[
         """
         return self._receive_from(dest)
 
-    fn shutdown(mut self) raises -> None:
+    fn shutdown(mut self) raises SocketError -> None:
         """Shut down the socket. The remote end will receive no more data (after queued data is flushed)."""
         try:
             shutdown(self.fd, ShutdownOption.SHUT_RDWR)
@@ -487,7 +543,7 @@ struct Socket[
 
         self._connected = False
 
-    fn close(mut self) raises -> None:
+    fn close(mut self) raises SocketError -> None:
         """Mark the socket closed.
         Once that happens, all future operations on the socket object will fail.
         The remote end will receive no more data (after queued data is flushed).
@@ -505,7 +561,7 @@ struct Socket[
 
         self._closed = True
 
-    fn get_timeout(self) raises -> Int:
+    fn get_timeout(self) raises SocketError -> Int:
         """Return the timeout value for the socket."""
         return self.get_socket_option(SocketOption.SO_RCVTIMEO)
 

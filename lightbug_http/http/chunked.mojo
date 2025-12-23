@@ -33,6 +33,7 @@ struct HTTPChunkedDecoder:
         self._total_read = 0
         self._total_overhead = 0
 
+
 fn decode_hex(ch: UInt8) -> Int:
     """Decode hexadecimal character."""
     if ch >= BytesConstant.ZERO and ch <= BytesConstant.NINE:
@@ -213,4 +214,3 @@ fn http_decode_chunked[
 fn http_decode_chunked_is_in_data(decoder: HTTPChunkedDecoder) -> Bool:
     """Check if decoder is currently in chunk data state."""
     return decoder._state == CHUNKED_IN_CHUNK_DATA
-

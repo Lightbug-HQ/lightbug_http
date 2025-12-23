@@ -1,10 +1,6 @@
-from lightbug_http.http.parsing import (
-    HTTPHeader,
-    http_parse_headers,
-    http_parse_request,
-    http_parse_response,
-)
+from lightbug_http.http.parsing import HTTPHeader, http_parse_headers, http_parse_request, http_parse_response
 from testing import TestSuite, assert_equal, assert_false, assert_true
+
 
 # Test helper structures
 @fieldwise_init

@@ -37,6 +37,7 @@ struct URIParseError(ImplicitlyCopyable):
 @fieldwise_init
 struct HeaderParseError(ImplicitlyCopyable):
     """Failed to parse request headers."""
+
     var detail: String
 
     fn message(self) -> String:
@@ -46,6 +47,7 @@ struct HeaderParseError(ImplicitlyCopyable):
 @fieldwise_init
 struct CookieParseError(ImplicitlyCopyable):
     """Failed to parse cookies."""
+
     var detail: String
 
     fn message(self) -> String:
@@ -55,6 +57,7 @@ struct CookieParseError(ImplicitlyCopyable):
 @fieldwise_init
 struct BodyReadError(ImplicitlyCopyable):
     """Failed to read request body."""
+
     var detail: String
 
     fn message(self) -> String:
@@ -101,7 +104,9 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
     var timeout: Duration
 
     @staticmethod
-    fn from_bytes(addr: String, max_body_size: Int, max_uri_length: Int, b: Span[Byte]) raises RequestParseError -> HTTPRequest:
+    fn from_bytes(
+        addr: String, max_body_size: Int, max_uri_length: Int, b: Span[Byte]
+    ) raises RequestParseError -> HTTPRequest:
         var reader = ByteReader(b)
         var headers = Headers()
         var rest: ParsedRequestResult

@@ -7,7 +7,7 @@ from lightbug_http.http.common_response import BadRequest, InternalError, URIToo
 from lightbug_http.io.bytes import Bytes, BytesConstant, ByteView
 from lightbug_http.io.sync import Duration
 from lightbug_http.service import HTTPService
-from lightbug_http.socket import Socket
+from lightbug_http.socket import EOF, Socket, SocketError
 from lightbug_http.uri import URI
 
 from lightbug_http.http import HTTPRequest, encode
@@ -20,6 +20,7 @@ comptime default_max_request_uri_length = 8192
 
 struct Server(Movable):
     """A Mojo-based server that accept incoming requests and delivers HTTP services."""
+
     var tcp_keep_alive: Bool
     var _address: String
     var _max_request_body_size: Int
@@ -55,7 +56,7 @@ struct Server(Movable):
     fn set_max_request_uri_length(mut self, length: Int) -> None:
         self._max_request_uri_length = length
 
-    fn listen_and_serve[T: HTTPService](mut self, address: StringSlice, mut handler: T) raises:
+    fn listen_and_serve[T: HTTPService](mut self, address: StringSlice, mut handler: T) raises SocketError:
         """Listen for incoming connections and serve HTTP requests.
 
         Parameters:
@@ -69,7 +70,7 @@ struct Server(Movable):
         self.set_address(String(address))
         self.serve(listener, handler)
 
-    fn serve[T: HTTPService](self, ln: NoTLSListener, mut handler: T) raises:
+    fn serve[T: HTTPService](self, ln: NoTLSListener, mut handler: T) raises SocketError:
         """Serve HTTP requests.
 
         Parameters:
@@ -123,10 +124,23 @@ struct Server(Movable):
                 if BytesConstant.DOUBLE_CRLF in ByteView(request_buffer):
                     break
 
+            var request: HTTPRequest
             try:
-                var request = HTTPRequest.from_bytes(
+                request = HTTPRequest.from_bytes(
                     self.address(), max_request_body_size, max_request_uri_length, request_buffer
                 )
+            except e:
+                try:
+                    # if String(e) == "HTTPRequest.from_bytes: Request URI too long":
+                    #     _ = conn.write(encode(URITooLong()))
+                    # else:
+                    _ = conn.write(encode(BadRequest()))
+                except:
+                    pass
+                finally:
+                    break
+
+            try:
                 var response: HTTPResponse
                 var close_connection = (not self.tcp_keep_alive) or request.connection_close()
                 try:
@@ -144,7 +158,7 @@ struct Server(Movable):
                     if not conn.is_closed():
                         try:
                             _ = conn.write(encode(InternalError()))
-                        except e:
+                        except:
                             raise Error("Failed to send InternalError response")
                         return
             except e:
@@ -153,19 +167,20 @@ struct Server(Movable):
                     #     _ = conn.write(encode(URITooLong()))
                     # else:
                     _ = conn.write(encode(BadRequest()))
-                except e:
+                except:
                     break
+
 
 fn read_request(
     mut request_buffer: Bytes, conn: TCPConnection, max_request_body_size: Int, max_request_uri_length: Int
-) raises -> Bool:
+) -> Bool:
     var buffer = Bytes(capacity=default_buffer_size)
     var bytes_read: UInt
     try:
         bytes_read = conn.read(buffer)
     except e:
         # If EOF, 0 bytes were read from the peer, which indicates their side of the connection was closed.
-        if String(e) != "EOF":
+        if e.isa[EOF]():
             pass
         return False
 
