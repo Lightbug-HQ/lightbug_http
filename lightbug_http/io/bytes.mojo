@@ -294,3 +294,67 @@ struct ByteReader[origin: ImmutOrigin](Copyable, Sized):
     @always_inline
     fn consume(var self, bytes_len: Int = -1) -> Bytes:
         return Bytes(self^._inner[self.read_pos : self.read_pos + len(self) + 1])
+
+
+fn memmove[
+    T: Copyable, dest_origin: MutOrigin, src_origin: MutOrigin
+](dest: UnsafePointer[T, dest_origin], src: UnsafePointer[T, src_origin], count: Int):
+    """
+    Copies count elements from src to dest, handling overlapping memory regions safely.
+    """
+    if count <= 0:
+        return
+
+    if dest == src:
+        return
+
+    # Check if memory regions overlap
+    var dest_addr = Int(dest)
+    var src_addr = Int(src)
+    var element_size = size_of[T]()
+    var total_bytes = count * element_size
+
+    var dest_end = dest_addr + total_bytes
+    var src_end = src_addr + total_bytes
+
+    # Check for overlap: regions overlap if one starts before the other ends
+    var overlaps = (dest_addr < src_end) and (src_addr < dest_end)
+
+    if not overlaps:
+        # No overlap - use fast memcpy
+        memcpy(dest=dest, src=src, count=count)
+    elif dest_addr < src_addr:
+        # Destination is before source - copy forwards (left to right)
+        for i in range(count):
+            (dest + i).init_pointee_copy((src + i)[])
+    else:
+        # Destination is after source - copy backwards (right to left)
+        var i = count - 1
+        while i >= 0:
+            (dest + i).init_pointee_copy((src + i)[])
+            i -= 1
+
+
+fn create_string_from_ptr[origin: ImmutOrigin](ptr: UnsafePointer[UInt8, origin], length: Int) -> String:
+    """Create a String from a pointer and length.
+
+    Copies raw bytes directly into the String. This may result in invalid UTF-8 for bytes >= 0x80,
+    but matches the behavior expected by the picohttpparser tests which were written for C.
+    """
+    if length <= 0:
+        return String()
+
+    # Copy raw bytes directly - this preserves the exact bytes from HTTP messages
+    var result = String()
+    # var buf = List[UInt8](capacity=length)
+    # for i in range(length):
+    #     buf.append(ptr[i])
+
+    result.write_bytes(Span(ptr=ptr, length=length))
+
+    return result^
+
+
+fn bufis(s: String, t: String) -> Bool:
+    """Check if string s equals t."""
+    return s == t
