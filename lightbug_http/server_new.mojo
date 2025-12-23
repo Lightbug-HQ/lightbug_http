@@ -23,7 +23,7 @@ struct ServerConfig(Copyable, Movable):
 
     fn __init__(out self):
         self.max_connections = 1024
-        self.max_keepalive_requests = 100
+        self.max_keepalive_requests = 0
 
         self.socket_buffer_size = default_buffer_size
         self.recv_buffer_max = 2 * 1024 * 1024  # 2MB
@@ -51,8 +51,8 @@ struct ZeroCopyBuffer(Movable):
         self.data.extend(byte_data^)
         self.written = len(self.data)
 
-    fn as_bytes(self) -> Bytes:
-        return self.data.copy()
+    fn as_bytes(self) -> ref [self.data] Bytes:
+        return self.data
 
     fn clear_retaining_capacity(mut self):
         if len(self.data) > self.retain_size:
@@ -153,6 +153,7 @@ fn handle_connection[T: HTTPService](
     mut handler: T,
     config: ServerConfig,
     server_address: String,
+    tcp_keep_alive: Bool,
 ) raises:
     while True:
         if provision.state.kind == ConnectionState.READING_HEADERS:
@@ -234,7 +235,7 @@ fn handle_connection[T: HTTPService](
 
         elif provision.state.kind == ConnectionState.PROCESSING:
             var request = provision.request.take()
-            provision.should_close = request.connection_close()
+            provision.should_close = (not tcp_keep_alive) or request.connection_close()
             var response: HTTPResponse
 
             try:
@@ -242,6 +243,10 @@ fn handle_connection[T: HTTPService](
             except e:
                 response = InternalError()
                 provision.should_close = True
+
+            if (not provision.should_close) and (config.max_keepalive_requests > 0):
+                if (provision.keepalive_count + 1) >= config.max_keepalive_requests:
+                    provision.should_close = True
 
             if provision.should_close:
                 response.set_connection_close()
@@ -262,7 +267,10 @@ fn handle_connection[T: HTTPService](
                 provision.state = ConnectionState.closed()
                 break
 
-            if provision.keepalive_count >= config.max_keepalive_requests:
+            # Enforce keep-alive request cap only when explicitly configured.
+            if (config.max_keepalive_requests > 0) and (
+                provision.keepalive_count >= config.max_keepalive_requests
+            ):
                 provision.state = ConnectionState.closed()
                 break
 
@@ -363,7 +371,8 @@ struct ServerNew(Movable):
                     provision,
                     handler,
                     self.config,
-                    self.address()
+                    self.address(),
+                    self.tcp_keep_alive,
                 )
             finally:
                 conn^.teardown()
