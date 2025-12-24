@@ -1,10 +1,10 @@
-from lightbug_http.connection import ListenConfig, NoTLSListener, TCPConnection, default_buffer_size
+from lightbug_http.connection import ListenConfig, ConnectionState, NoTLSListener, TCPConnection, default_buffer_size
 from lightbug_http.http.common_response import BadRequest, InternalError, URITooLong
+from lightbug_http.http import HTTPRequest, HTTPResponse, encode
 from lightbug_http.io.bytes import ByteReader, Bytes, BytesConstant, ByteView
 from lightbug_http.service import HTTPService
 from lightbug_http.socket import EOF, SocketError
-
-from lightbug_http.http import HTTPRequest, HTTPResponse, encode
+from lightbug_http.owning_list import OwningList
 
 
 @fieldwise_init
@@ -32,57 +32,6 @@ struct ServerConfig(Copyable, Movable):
 
         self.max_request_body_size = 4 * 1024 * 1024  # 4MB
         self.max_request_uri_length = 8192
-
-
-@fieldwise_init
-struct RequestBodyState(Copyable, Movable):
-    """State for reading request body."""
-
-    var content_length: Int
-    var bytes_read: Int
-
-
-@fieldwise_init
-struct ConnectionState(Copyable, Movable):
-    """
-    State machine for connection processing.
-
-    States:
-    - reading_headers: Accumulating request header bytes
-    - reading_body: Reading request body based on Content-Length
-    - processing: Invoking application handler
-    - responding: Sending response to client
-    - closed: Connection finished
-    """
-
-    comptime READING_HEADERS = 0
-    comptime READING_BODY = 1
-    comptime PROCESSING = 2
-    comptime RESPONDING = 3
-    comptime CLOSED = 4
-
-    var kind: Int
-    var body_state: RequestBodyState
-
-    @staticmethod
-    fn reading_headers() -> Self:
-        return ConnectionState(Self.READING_HEADERS, RequestBodyState(0, 0))
-
-    @staticmethod
-    fn reading_body(content_length: Int) -> Self:
-        return ConnectionState(Self.READING_BODY, RequestBodyState(content_length, 0))
-
-    @staticmethod
-    fn processing() -> Self:
-        return ConnectionState(Self.PROCESSING, RequestBodyState(0, 0))
-
-    @staticmethod
-    fn responding() -> Self:
-        return ConnectionState(Self.RESPONDING, RequestBodyState(0, 0))
-
-    @staticmethod
-    fn closed() -> Self:
-        return ConnectionState(Self.CLOSED, RequestBodyState(0, 0))
 
 
 struct ConnectionProvision(Movable):
@@ -114,6 +63,75 @@ struct ConnectionProvision(Movable):
         self.state = ConnectionState.reading_headers()
         self.should_close = False
 
+struct ProvisionPool(Movable):
+    """
+    Pool of ConnectionProvision objects for reuse across connections.
+    """
+
+    var provisions: OwningList[ConnectionProvision]
+    var available: OwningList[Int]
+    var capacity: Int
+    var initialized_count: Int
+
+    fn __init__(out self, capacity: Int, config: ServerConfig):
+        """Initialize the provision pool with the given capacity.
+
+        Args:
+            capacity: Maximum number of provisions in the pool.
+            config: Server configuration for initializing provisions.
+        """
+        self.provisions = OwningList[ConnectionProvision](capacity=capacity)
+        self.available = OwningList[Int](capacity=capacity)
+        self.capacity = capacity
+        self.initialized_count = 0
+
+        # Pre-allocate all provisions
+        for i in range(capacity):
+            self.provisions.append(ConnectionProvision(config))
+            self.available.append(i)
+            self.initialized_count += 1
+
+    fn borrow(mut self) raises -> Int:
+        """Borrow a provision from the pool.
+
+        Returns:
+            Index of the borrowed provision.
+
+        Raises:
+            Error if no provisions are available.
+        """
+        if len(self.available) == 0:
+            raise Error("ProvisionPool: No provisions available")
+
+        return self.available.pop()
+
+    fn release(mut self, index: Int):
+        """Return a provision to the pool.
+
+        Args:
+            index: Index of the provision to return.
+        """
+        self.available.append(index)
+
+    fn get_ptr(mut self, index: Int) -> Pointer[ConnectionProvision, origin_of(self.provisions)]:
+        """Get a mutable pointer to a provision by index.
+
+        Args:
+            index: Index of the provision.
+
+        Returns:
+            Mutable pointer to the provision.
+        """
+        return Pointer(to=self.provisions[index])
+
+    fn size(self) -> Int:
+        """Get the number of provisions currently in use.
+
+        Returns:
+            Number of provisions in use.
+        """
+        return self.initialized_count - len(self.available)
+
 
 fn handle_connection[
     T: HTTPService
@@ -133,8 +151,8 @@ fn handle_connection[
             try:
                 bytes_read = conn.read(buffer)
             except e:
-                if e.isa[EOF]():
-                    print("Error reading from connection:", e)
+                # if e.isa[EOF]():
+                    # print("Error reading from connection:", e)
                 provision.state = ConnectionState.closed()
                 break
 
@@ -326,14 +344,22 @@ struct Server(Movable):
         Raises:
             If there is an error while serving requests.
         """
+        var provision_pool = ProvisionPool(self.config.max_connections, self.config)
+
         while True:
             var conn = ln.accept()
-            var provision = ConnectionProvision(self.config)
+
+            var index: Int
+            try:
+                index = provision_pool.borrow()
+            except e:
+                conn^.teardown()
+                continue
 
             try:
                 handle_connection(
                     conn,
-                    provision,
+                    provision_pool.provisions[index],
                     handler,
                     self.config,
                     self.address(),
@@ -341,3 +367,6 @@ struct Server(Movable):
                 )
             finally:
                 conn^.teardown()
+                provision_pool.provisions[index].prepare_for_new_request()
+                provision_pool.provisions[index].keepalive_count = 0
+                provision_pool.release(index)

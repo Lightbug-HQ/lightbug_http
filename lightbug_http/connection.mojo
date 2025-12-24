@@ -126,6 +126,57 @@ struct ListenConfig:
         return listener^
 
 
+@fieldwise_init
+struct RequestBodyState(Copyable, Movable):
+    """State for reading request body."""
+
+    var content_length: Int
+    var bytes_read: Int
+
+
+@fieldwise_init
+struct ConnectionState(Copyable, Movable):
+    """
+    State machine for connection processing.
+
+    States:
+    - reading_headers: Accumulating request header bytes
+    - reading_body: Reading request body based on Content-Length
+    - processing: Invoking application handler
+    - responding: Sending response to client
+    - closed: Connection finished
+    """
+
+    comptime READING_HEADERS = 0
+    comptime READING_BODY = 1
+    comptime PROCESSING = 2
+    comptime RESPONDING = 3
+    comptime CLOSED = 4
+
+    var kind: Int
+    var body_state: RequestBodyState
+
+    @staticmethod
+    fn reading_headers() -> Self:
+        return ConnectionState(Self.READING_HEADERS, RequestBodyState(0, 0))
+
+    @staticmethod
+    fn reading_body(content_length: Int) -> Self:
+        return ConnectionState(Self.READING_BODY, RequestBodyState(content_length, 0))
+
+    @staticmethod
+    fn processing() -> Self:
+        return ConnectionState(Self.PROCESSING, RequestBodyState(0, 0))
+
+    @staticmethod
+    fn responding() -> Self:
+        return ConnectionState(Self.RESPONDING, RequestBodyState(0, 0))
+
+    @staticmethod
+    fn closed() -> Self:
+        return ConnectionState(Self.CLOSED, RequestBodyState(0, 0))
+
+
 struct TCPConnection:
     var socket: TCPSocket[TCPAddr]
 
