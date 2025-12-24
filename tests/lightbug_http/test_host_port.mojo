@@ -1,18 +1,5 @@
-from lightbug_http.address import (
-    HostPort,
-    NetworkType,
-    ParseError,
-    TCPAddr,
-    join_host_port,
-    parse_address,
-)
-from testing import (
-    TestSuite,
-    assert_equal,
-    assert_false,
-    assert_raises,
-    assert_true,
-)
+from lightbug_http.address import HostPort, NetworkType, ParseError, TCPAddr, join_host_port, parse_address
+from testing import TestSuite, assert_equal, assert_false, assert_raises, assert_true
 
 
 fn test_split_host_port_tcp4() raises:

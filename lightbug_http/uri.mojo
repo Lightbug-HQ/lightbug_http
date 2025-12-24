@@ -13,18 +13,10 @@ fn find_all(s: String, sub_str: String) -> List[Int]:
     return match_idxs^
 
 
-fn unquote[
-    expand_plus: Bool = False
-](
-    input_str: String, disallowed_escapes: List[String] = List[String]()
-) -> String:
-    var encoded_str = input_str.replace(
-        QueryDelimiters.PLUS_ESCAPED_SPACE, " "
-    ) if expand_plus else input_str
+fn unquote[expand_plus: Bool = False](input_str: String, disallowed_escapes: List[String] = List[String]()) -> String:
+    var encoded_str = input_str.replace(QueryDelimiters.PLUS_ESCAPED_SPACE, " ") if expand_plus else input_str
 
-    var percent_idxs: List[Int] = find_all(
-        encoded_str, URIDelimiters.CHAR_ESCAPE
-    )
+    var percent_idxs: List[Int] = find_all(encoded_str, URIDelimiters.CHAR_ESCAPE)
 
     if len(percent_idxs) < 1:
         return encoded_str
@@ -103,9 +95,7 @@ struct PortBounds:
 
 
 @fieldwise_init
-struct Scheme(
-    Equatable, Hashable, ImplicitlyCopyable, Representable, Stringable, Writable
-):
+struct Scheme(Equatable, Hashable, ImplicitlyCopyable, Representable, Stringable, Writable):
     var value: UInt8
     comptime HTTP = Self(0)
     comptime HTTPS = Self(1)
@@ -177,17 +167,13 @@ struct URI(Copyable, Representable, Stringable, Writable):
                 scheme_delimiter = reader.read_bytes(3)
             except EndOfReaderError:
                 raise URIParseError(
-                    "URI.parse: Incomplete URI, expected scheme delimiter after"
-                    " scheme but reached the end of the URI."
+                    "URI.parse: Incomplete URI, expected scheme delimiter after scheme but reached the end of the URI."
                 )
 
             if scheme_delimiter != "://".as_bytes():
                 raise URIParseError(
                     String(
-                        (
-                            "URI.parse: Invalid URI format, scheme should be"
-                            " followed by `://`. Received: "
-                        ),
+                        "URI.parse: Invalid URI format, scheme should be followed by `://`. Received: ",
                         uri,
                     )
                 )
@@ -221,10 +207,7 @@ struct URI(Copyable, Representable, Stringable, Writable):
             except e:
                 raise URIParseError(
                     String(
-                        (
-                            "URI.parse: Failed to convert port number from a"
-                            " String to Integer, received: "
-                        ),
+                        "URI.parse: Failed to convert port number from a String to Integer, received: ",
                         uri,
                     )
                 )
@@ -233,16 +216,12 @@ struct URI(Copyable, Representable, Stringable, Writable):
 
         # Reads until either the start of the query string, or the end of the uri.
         var unquote_reader = reader.copy()
-        var original_path_bytes = unquote_reader.read_until(
-            ord(URIDelimiters.QUERY)
-        )
+        var original_path_bytes = unquote_reader.read_until(ord(URIDelimiters.QUERY))
         var original_path: String
         if not original_path_bytes:
             original_path = "/"
         else:
-            original_path = unquote(
-                String(original_path_bytes), disallowed_escapes=["/"]
-            )
+            original_path = unquote(String(original_path_bytes), disallowed_escapes=["/"])
 
         var result = URI(
             _original_path=original_path,
@@ -305,18 +284,14 @@ struct URI(Copyable, Representable, Stringable, Writable):
                 if key:
                     queries[key] = ""
                     if len(key_val) == 2:
-                        queries[key] = unquote[expand_plus=True](
-                            String(key_val[1])
-                        )
+                        queries[key] = unquote[expand_plus=True](String(key_val[1]))
 
         result.queries = queries^
         result.query_string = query^
         return result^
 
     fn __str__(self) -> String:
-        var result = String.write(
-            self.scheme, URIDelimiters.SCHEMA, self.host, self.path
-        )
+        var result = String.write(self.scheme, URIDelimiters.SCHEMA, self.host, self.path)
         if len(self.query_string) > 0:
             result.write(QueryDelimiters.STRING_START, self.query_string)
         return result^

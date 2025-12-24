@@ -11,9 +11,7 @@ comptime Bytes = List[Byte]
 
 @always_inline
 fn byte[s: StringSlice]() -> Byte:
-    __comptime_assert (
-        len(s) == 1
-    ), "StringSlice must be of length 1 to convert to Byte."
+    __comptime_assert len(s) == 1, "StringSlice must be of length 1 to convert to Byte."
     return s.as_bytes()[0]
 
 
@@ -64,9 +62,7 @@ struct ByteWriter(Writer):
         return self._inner^
 
 
-struct ByteView[origin: ImmutOrigin](
-    Boolable, Copyable, Equatable, Sized, Stringable
-):
+struct ByteView[origin: ImmutOrigin](Boolable, Copyable, Equatable, Sized, Stringable):
     """Convenience wrapper around a Span of Bytes."""
 
     var _inner: Span[Byte, Self.origin]
@@ -239,9 +235,7 @@ struct ByteReader[origin: ImmutOrigin](Copyable, Sized):
         self.read_pos += count
         return self._inner[start : start + count]
 
-    fn read_bytes(
-        mut self, n: Int
-    ) raises OutOfBoundsError -> ByteView[Self.origin]:
+    fn read_bytes(mut self, n: Int) raises OutOfBoundsError -> ByteView[Self.origin]:
         if self.read_pos + n > len(self._inner):
             raise OutOfBoundsError()
         var count = n
@@ -302,18 +296,12 @@ struct ByteReader[origin: ImmutOrigin](Copyable, Sized):
 
     @always_inline
     fn consume(var self, bytes_len: Int = -1) -> Bytes:
-        return Bytes(
-            self^._inner[self.read_pos : self.read_pos + len(self) + 1]
-        )
+        return Bytes(self^._inner[self.read_pos : self.read_pos + len(self) + 1])
 
 
 fn memmove[
     T: Copyable, dest_origin: MutOrigin, src_origin: MutOrigin
-](
-    dest: UnsafePointer[T, dest_origin],
-    src: UnsafePointer[T, src_origin],
-    count: Int,
-):
+](dest: UnsafePointer[T, dest_origin], src: UnsafePointer[T, src_origin], count: Int,):
     """
     Copies count elements from src to dest, handling overlapping memory regions safely.
     """
@@ -350,9 +338,7 @@ fn memmove[
             i -= 1
 
 
-fn create_string_from_ptr[
-    origin: ImmutOrigin
-](ptr: UnsafePointer[UInt8, origin], length: Int) -> String:
+fn create_string_from_ptr[origin: ImmutOrigin](ptr: UnsafePointer[UInt8, origin], length: Int) -> String:
     """Create a String from a pointer and length.
 
     Copies raw bytes directly into the String. This may result in invalid UTF-8 for bytes >= 0x80,

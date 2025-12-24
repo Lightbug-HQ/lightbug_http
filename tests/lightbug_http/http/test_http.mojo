@@ -6,13 +6,7 @@ from lightbug_http.io.bytes import Bytes
 from lightbug_http.uri import URI
 from testing import assert_equal, assert_true
 
-from lightbug_http.cookie import (
-    Cookie,
-    Duration,
-    RequestCookieJar,
-    ResponseCookieJar,
-    ResponseCookieKey,
-)
+from lightbug_http.cookie import Cookie, Duration, RequestCookieJar, ResponseCookieJar, ResponseCookieKey
 from lightbug_http.http import HTTPRequest, HTTPResponse, encode
 
 

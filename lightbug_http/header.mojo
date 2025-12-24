@@ -1,9 +1,4 @@
-from lightbug_http.http.parsing import (
-    HTTPHeader,
-    http_parse_headers,
-    http_parse_request,
-    http_parse_response,
-)
+from lightbug_http.http.parsing import HTTPHeader, http_parse_headers, http_parse_request, http_parse_response
 from lightbug_http.io.bytes import ByteReader, Bytes, byte, is_newline, is_space
 from lightbug_http.strings import CR, LF, BytesConstant, lineBreak
 
@@ -102,9 +97,7 @@ struct Headers(Copyable, Stringable, Writable):
         except:
             return 0
 
-    fn parse_raw_request(
-        mut self, mut reader: ByteReader, out result: ParsedRequestResult
-    ) raises:
+    fn parse_raw_request(mut self, mut reader: ByteReader, out result: ParsedRequestResult) raises:
         """Parse HTTP request using picohttpparser."""
         if self.check_if_response(reader):
             raise Error("Headers.parse_raw: Not a valid HTTP request.")
@@ -148,13 +141,9 @@ struct Headers(Copyable, Stringable, Writable):
 
         # Build protocol string
         reader.read_pos += ret
-        result = ParsedRequestResult(
-            method^, path^, String("HTTP/1.", minor_version), cookies^
-        )
+        result = ParsedRequestResult(method^, path^, String("HTTP/1.", minor_version), cookies^)
 
-    fn parse_raw_response(
-        mut self, mut reader: ByteReader, out result: ParsedResponseResult
-    ) raises:
+    fn parse_raw_response(mut self, mut reader: ByteReader, out result: ParsedResponseResult) raises:
         """Parse HTTP response using picohttpparser."""
         if not self.check_if_response(reader):
             raise Error("Headers.parse_raw: Not a valid HTTP response.")
@@ -202,10 +191,7 @@ struct Headers(Copyable, Stringable, Writable):
 
     fn check_if_response(mut self, r: ByteReader) raises -> Bool:
         if not r.available():
-            raise Error(
-                "Headers.parse_raw: Failed to read first byte from response"
-                " header."
-            )
+            raise Error("Headers.parse_raw: Failed to read first byte from response header.")
 
         # Check if starts with "HTTP/" (response) or method name (request)
         var buf_span = r.as_bytes()
@@ -231,9 +217,6 @@ struct Headers(Copyable, Stringable, Writable):
 
         for value in self._inner.items():
             for other_value in other._inner.items():
-                if (
-                    value.key != other_value.key
-                    or value.value != other_value.value
-                ):
+                if value.key != other_value.key or value.value != other_value.value:
                     return False
         return True

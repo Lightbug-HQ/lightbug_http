@@ -46,25 +46,15 @@ struct Cookie(Copyable):
             elif part == Cookie.HTTP_ONLY:
                 cookie.http_only = True
             elif part.startswith(Cookie.SAME_SITE):
-                cookie.same_site = SameSite.from_string(
-                    String(part.removeprefix(Cookie.SAME_SITE + Cookie.EQUAL))
-                )
+                cookie.same_site = SameSite.from_string(String(part.removeprefix(Cookie.SAME_SITE + Cookie.EQUAL)))
             elif part.startswith(Cookie.DOMAIN):
-                cookie.domain = String(
-                    part.removeprefix(Cookie.DOMAIN + Cookie.EQUAL)
-                )
+                cookie.domain = String(part.removeprefix(Cookie.DOMAIN + Cookie.EQUAL))
             elif part.startswith(Cookie.PATH):
-                cookie.path = String(
-                    part.removeprefix(Cookie.PATH + Cookie.EQUAL)
-                )
+                cookie.path = String(part.removeprefix(Cookie.PATH + Cookie.EQUAL))
             elif part.startswith(Cookie.MAX_AGE):
-                cookie.max_age = Duration.from_string(
-                    String(part.removeprefix(Cookie.MAX_AGE + Cookie.EQUAL))
-                )
+                cookie.max_age = Duration.from_string(String(part.removeprefix(Cookie.MAX_AGE + Cookie.EQUAL)))
             elif part.startswith(Cookie.EXPIRES):
-                var expires = Expiration.from_string(
-                    String(part.removeprefix(Cookie.EXPIRES + Cookie.EQUAL))
-                )
+                var expires = Expiration.from_string(String(part.removeprefix(Cookie.EXPIRES + Cookie.EQUAL)))
                 if expires:
                     cookie.expires = expires.value().copy()
 
@@ -141,9 +131,7 @@ struct Cookie(Copyable):
                 pass
 
             if v:
-                header_value.write(
-                    Cookie.SEPERATOR, Cookie.EXPIRES, Cookie.EQUAL, v.value()
-                )
+                header_value.write(Cookie.SEPERATOR, Cookie.EXPIRES, Cookie.EQUAL, v.value())
         if self.max_age:
             header_value.write(
                 Cookie.SEPERATOR,
@@ -159,9 +147,7 @@ struct Cookie(Copyable):
                 self.domain.value(),
             )
         if self.path:
-            header_value.write(
-                Cookie.SEPERATOR, Cookie.PATH, Cookie.EQUAL, self.path.value()
-            )
+            header_value.write(Cookie.SEPERATOR, Cookie.PATH, Cookie.EQUAL, self.path.value())
         if self.secure:
             header_value.write(Cookie.SEPERATOR, Cookie.SECURE)
         if self.http_only:

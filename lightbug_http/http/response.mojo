@@ -1,6 +1,6 @@
 from lightbug_http.connection import TCPConnection, default_buffer_size
 from lightbug_http.header import ParsedResponseResult
-from lightbug_http.http.chunked import HTTPChunkedDecoder, http_decode_chunked
+from lightbug_http.http.chunked import HTTPChunkedDecoder, decode
 from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter, byte
 from lightbug_http.strings import CR, LF, http, lineBreak, strHttp11, whitespace
 from lightbug_http.uri import URI
@@ -76,9 +76,7 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
             status_text=properties.msg^,
         )
 
-        var transfer_encoding = response.headers.get(
-            HeaderKey.TRANSFER_ENCODING
-        )
+        var transfer_encoding = response.headers.get(HeaderKey.TRANSFER_ENCODING)
         if transfer_encoding and transfer_encoding.value() == "chunked":
             # Use pico's chunked decoder for proper RFC-compliant parsing
             var decoder = HTTPChunkedDecoder()
@@ -116,9 +114,7 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
         except e:
             raise Error("Failed to read request body: ")
 
-    fn _decode_chunks_pico(
-        mut self, mut decoder: HTTPChunkedDecoder, var chunks: Bytes
-    ) raises:
+    fn _decode_chunks_pico(mut self, mut decoder: HTTPChunkedDecoder, var chunks: Bytes) raises:
         """Decode chunked transfer encoding using picohttpparser.
         Args:
             decoder: The chunked decoder state machine.
@@ -131,15 +127,13 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
         #     buf_ptr[i] = chunks[i]
 
         # var bufsz = len(chunks)
-        var result = http_decode_chunked(decoder, Span(chunks))
+        var result = decode(decoder, Span(chunks))
         var ret = result[0]
         var decoded_size = result[1]
 
         if ret == -1:
             # buf_ptr.free()
-            raise Error(
-                "HTTPResponse._decode_chunks_pico: Invalid chunked encoding"
-            )
+            raise Error("HTTPResponse._decode_chunks_pico: Invalid chunked encoding")
         # ret == -2 means incomplete, but we'll proceed with what we have
         # ret >= 0 means complete, with ret bytes of trailing data
 

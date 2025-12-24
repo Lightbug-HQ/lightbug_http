@@ -91,13 +91,6 @@ struct SocketError(Movable, Stringable, Writable):
         return String.write(self)
 
 
-# comptime SocketError = Variant[
-#     SocketClosedError,
-#     EOF,
-#     Error,
-# ]
-
-
 @fieldwise_init
 struct Socket[
     address: Addr,
@@ -143,9 +136,7 @@ struct Socket[
         """
         # TODO: Tried unspec for both address family and protocol, and inet for both but that doesn't seem to work.
         # I guess for now, I'll leave protocol as unspec.
-        self.fd = FileDescriptor(
-            Int(socket(Self.address_family.value, Self.sock_type.value, 0))
-        )
+        self.fd = FileDescriptor(Int(socket(Self.address_family.value, Self.sock_type.value, 0)))
         self.local_address = local_address
         self.remote_address = remote_address
         self._closed = False
@@ -234,10 +225,7 @@ struct Socket[
         try:
             new_socket_fd = accept(self.fd)
         except e:
-            raise Error(
-                "Socket.accept: Failed to accept connection, system `accept()`"
-                " returned an error."
-            )
+            raise Error("Socket.accept: Failed to accept connection, system `accept()` returned an error.")
 
         var new_socket = Self(
             fd=new_socket_fd,
@@ -283,10 +271,7 @@ struct Socket[
         try:
             binary_ip = inet_pton[Self.address_family](ip_address)
         except e:
-            raise Error(
-                "ListenConfig.listen: Failed to convert IP address to binary"
-                " form."
-            )
+            raise Error("ListenConfig.listen: Failed to convert IP address to binary form.")
 
         var local_address = SocketAddress(
             address_family=Self.address_family,
@@ -322,9 +307,7 @@ struct Socket[
 
         ref local_sockaddr_in = local_address.as_sockaddr_in()
         return (
-            binary_ip_to_string[Self.address_family](
-                local_sockaddr_in.sin_addr.s_addr
-            ),
+            binary_ip_to_string[Self.address_family](local_sockaddr_in.sin_addr.s_addr),
             UInt16(binary_port_to_int(local_sockaddr_in.sin_port)),
         )
 
@@ -345,21 +328,15 @@ struct Socket[
         try:
             peer_address = getpeername(self.fd)
         except e:
-            raise Error(
-                "get_peer_name: Failed to get address of remote socket."
-            )
+            raise Error("get_peer_name: Failed to get address of remote socket.")
 
         ref peer_sockaddr_in = peer_address.as_sockaddr_in()
         return (
-            binary_ip_to_string[Self.address_family](
-                peer_sockaddr_in.sin_addr.s_addr
-            ),
+            binary_ip_to_string[Self.address_family](peer_sockaddr_in.sin_addr.s_addr),
             UInt16(binary_port_to_int(peer_sockaddr_in.sin_port)),
         )
 
-    fn get_socket_option(
-        self, option_name: SocketOption
-    ) raises SocketError -> Int:
+    fn get_socket_option(self, option_name: SocketOption) raises SocketError -> Int:
         """Return the value of the given socket option.
 
         Args:
@@ -373,9 +350,7 @@ struct Socket[
         """
         return getsockopt(self.fd, SOL_SOCKET, option_name.value)
 
-    fn set_socket_option(
-        self, option_name: SocketOption, var option_value: Int = 1
-    ) raises:
+    fn set_socket_option(self, option_name: SocketOption, var option_value: Int = 1) raises:
         """Return the value of the given socket option.
 
         Args:
@@ -387,9 +362,7 @@ struct Socket[
         """
         setsockopt(self.fd, SOL_SOCKET, option_name.value, option_value)
 
-    fn connect(
-        mut self, mut ip_address: String, port: UInt16
-    ) raises SocketError -> None:
+    fn connect(mut self, mut ip_address: String, port: UInt16) raises SocketError -> None:
         """Connect to a remote socket at address.
 
         Args:
@@ -400,9 +373,7 @@ struct Socket[
             Error: If connecting to the remote socket fails.
         """
         var ip = get_ip_address(ip_address, Self.address_family, Self.sock_type)
-        var remote_address = SocketAddress(
-            address_family=Self.address_family, port=port, binary_ip=ip
-        )
+        var remote_address = SocketAddress(address_family=Self.address_family, port=port, binary_ip=ip)
         connect(self.fd, remote_address)
 
         var remote = self.get_peer_name()
@@ -411,9 +382,7 @@ struct Socket[
     fn send(self, buffer: Span[Byte]) raises SocketError -> UInt:
         return send(self.fd, buffer, UInt(len(buffer)), 0)
 
-    fn send_to(
-        self, src: Span[Byte], mut host: String, port: UInt16
-    ) raises SocketError -> UInt:
+    fn send_to(self, src: Span[Byte], mut host: String, port: UInt16) raises SocketError -> UInt:
         """Send data to the a remote address by connecting to the remote socket before sending.
         The socket must be not already be connected to a remote socket.
 
@@ -429,9 +398,7 @@ struct Socket[
             Error: If sending the data fails.
         """
         var ip = get_ip_address(host, Self.address_family, Self.sock_type)
-        var remote_address = SocketAddress(
-            address_family=Self.address_family, port=port, binary_ip=ip
-        )
+        var remote_address = SocketAddress(address_family=Self.address_family, port=port, binary_ip=ip)
         return sendto(self.fd, src, UInt(len(src)), 0, remote_address)
 
     fn _receive(self, mut buffer: Bytes) raises SocketError -> UInt:
@@ -465,9 +432,7 @@ struct Socket[
 
         return bytes_received
 
-    fn receive(
-        self, size: Int = default_buffer_size
-    ) raises SocketError -> List[Byte]:
+    fn receive(self, size: Int = default_buffer_size) raises SocketError -> List[Byte]:
         """Receive data from the socket into the buffer with capacity of `size` bytes.
 
         Args:
@@ -495,9 +460,7 @@ struct Socket[
         """
         return self._receive(buffer)
 
-    fn _receive_from(
-        self, mut buffer: Bytes
-    ) raises SocketError -> Tuple[UInt, String, UInt16]:
+    fn _receive_from(self, mut buffer: Bytes) raises SocketError -> Tuple[UInt, String, UInt16]:
         """Receive data from the socket into the buffer.
 
         Args:
@@ -523,9 +486,7 @@ struct Socket[
             )
             buffer._len += Int(bytes_received)
         except e:
-            raise Error(
-                "Socket._receive_from: Failed to read data from connection."
-            )
+            raise Error("Socket._receive_from: Failed to read data from connection.")
 
         if bytes_received == 0:
             raise EOF()
@@ -533,15 +494,11 @@ struct Socket[
         ref peer_sockaddr_in = remote_address.as_sockaddr_in()
         return (
             bytes_received,
-            binary_ip_to_string[Self.address_family](
-                peer_sockaddr_in.sin_addr.s_addr
-            ),
+            binary_ip_to_string[Self.address_family](peer_sockaddr_in.sin_addr.s_addr),
             UInt16(binary_port_to_int(peer_sockaddr_in.sin_port)),
         )
 
-    fn receive_from(
-        self, size: Int = default_buffer_size
-    ) raises SocketError -> Tuple[List[Byte], String, UInt16]:
+    fn receive_from(self, size: Int = default_buffer_size) raises SocketError -> Tuple[List[Byte], String, UInt16]:
         """Receive data from the socket into the buffer dest.
 
         Args:
@@ -557,9 +514,7 @@ struct Socket[
         _, host, port = self._receive_from(buffer)
         return buffer^, host, port
 
-    fn receive_from(
-        self, mut dest: List[Byte]
-    ) raises SocketError -> Tuple[UInt, String, UInt16]:
+    fn receive_from(self, mut dest: List[Byte]) raises SocketError -> Tuple[UInt, String, UInt16]:
         """Receive data from the socket into the buffer dest.
 
         Args:
@@ -574,8 +529,7 @@ struct Socket[
         return self._receive_from(dest)
 
     fn shutdown(mut self) raises SocketError -> None:
-        """Shut down the socket. The remote end will receive no more data (after queued data is flushed).
-        """
+        """Shut down the socket. The remote end will receive no more data (after queued data is flushed)."""
         try:
             shutdown(self.fd, ShutdownOption.SHUT_RDWR)
         except e:

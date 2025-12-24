@@ -1,10 +1,10 @@
+from collections import Optional
+from collections._asan_annotations import __sanitizer_annotate_contiguous_container
 from os import abort
 from sys import size_of
 from sys.intrinsics import _type_is_eq
 
-from memory import Pointer, LegacyUnsafePointer, memcpy, Span
-
-from collections import Optional
+from memory import Pointer, Span, memcpy
 
 
 # ===-----------------------------------------------------------------------===#
@@ -12,57 +12,55 @@ from collections import Optional
 # ===-----------------------------------------------------------------------===#
 
 
-@fieldwise_init
-struct _OwningListIter[
-    list_mutability: Bool,
-    //,
-    T: Movable,
-    list_origin: Origin[list_mutability],
-    forward: Bool = True,
-](Copyable, Movable):
-    """Iterator for List.
+# @fieldwise_init
+# struct _OwningListIter[
+#     list_mutability: Bool,
+#     //,
+#     T: Movable,
+#     list_origin: Origin[list_mutability],
+#     forward: Bool = True,
+# ](Copyable, Movable):
+#     """Iterator for List.
 
-    Parameters:
-        list_mutability: Whether the reference to the list is mutable.
-        T: The type of the elements in the list.
-        list_origin: The origin of the List
-        forward: The iteration direction. `False` is backwards.
-    """
+#     Parameters:
+#         list_mutability: Whether the reference to the list is mutable.
+#         T: The type of the elements in the list.
+#         list_origin: The origin of the List
+#         forward: The iteration direction. `False` is backwards.
+#     """
 
-    alias list_type = OwningList[T]
+#     alias list_type = OwningList[T]
 
-    var index: Int
-    var src: Pointer[Self.list_type, list_origin]
+#     var index: Int
+#     var src: Pointer[Self.list_type, list_origin]
 
-    fn __iter__(self) -> Self:
-        return self.copy()
+#     fn __iter__(self) -> Self:
+#         return self.copy()
 
-    fn __next__(
-        mut self,
-    ) -> Pointer[T, list_origin]:
-        @parameter
-        if forward:
-            self.index += 1
-            return Pointer(to=self.src[][self.index - 1])
-        else:
-            self.index -= 1
-            return Pointer(to=self.src[][self.index])
+#     fn __next__(
+#         mut self,
+#     ) -> Pointer[T, list_origin]:
+#         @parameter
+#         if forward:
+#             self.index += 1
+#             return Pointer(to=self.src[][self.index - 1])
+#         else:
+#             self.index -= 1
+#             return Pointer(to=self.src[][self.index])
 
-    @always_inline
-    fn __has_next__(self) -> Bool:
-        return self.__len__() > 0
+#     @always_inline
+#     fn __has_next__(self) -> Bool:
+#         return self.__len__() > 0
 
-    fn __len__(self) -> Int:
-        @parameter
-        if forward:
-            return len(self.src[]) - self.index
-        else:
-            return self.index
+#     fn __len__(self) -> Int:
+#         @parameter
+#         if forward:
+#             return len(self.src[]) - self.index
+#         else:
+#             return self.index
 
 
-struct OwningList[T: Movable & ImplicitlyDestructible](
-    Boolable, Movable, Sized
-):
+struct OwningList[T: Movable & ImplicitlyDestructible](Boolable, Movable, Sized):
     """The `List` type is a dynamically-allocated list.
 
     It supports pushing and popping from the back resizing the underlying
@@ -73,12 +71,28 @@ struct OwningList[T: Movable & ImplicitlyDestructible](
     """
 
     # Fields
-    var data: LegacyUnsafePointer[Self.T]
+    var data: UnsafePointer[Self.T, MutOrigin.external]
     """The underlying storage for the list."""
     var size: Int
     """The number of elements in the list."""
     var capacity: Int
     """The amount of elements that can fit in the list without resizing it."""
+
+    fn _annotate_new(self):
+        __sanitizer_annotate_contiguous_container(
+            beg=self.data.bitcast[NoneType](),
+            end=(self.data + self.capacity).bitcast[NoneType](),
+            old_mid=(self.data + self.capacity).bitcast[NoneType](),
+            new_mid=(self.data + self.size).bitcast[NoneType](),
+        )
+
+    fn _annotate_delete(self):
+        __sanitizer_annotate_contiguous_container(
+            beg=self.data.bitcast[NoneType](),
+            end=(self.data + self.capacity).bitcast[NoneType](),
+            old_mid=(self.data + self.size).bitcast[NoneType](),
+            new_mid=(self.data + self.capacity).bitcast[NoneType](),
+        )
 
     # ===-------------------------------------------------------------------===#
     # Life cycle methods
@@ -86,7 +100,7 @@ struct OwningList[T: Movable & ImplicitlyDestructible](
 
     fn __init__(out self):
         """Constructs an empty list."""
-        self.data = LegacyUnsafePointer[Self.T]()
+        self.data = UnsafePointer[Self.T, MutOrigin.external]()
         self.size = 0
         self.capacity = 0
 
@@ -96,19 +110,9 @@ struct OwningList[T: Movable & ImplicitlyDestructible](
         Args:
             capacity: The requested capacity of the list.
         """
-        self.data = LegacyUnsafePointer[Self.T].alloc(capacity)
+        self.data = alloc[Self.T](count=capacity)
         self.size = 0
         self.capacity = capacity
-
-    fn __moveinit__(out self, deinit existing: Self):
-        """Move data of an existing list into a new one.
-
-        Args:
-            existing: The existing list.
-        """
-        self.data = existing.data
-        self.size = existing.size
-        self.capacity = existing.capacity
 
     fn __del__(deinit self):
         """Destroy all elements in the list and free its memory."""
@@ -120,9 +124,7 @@ struct OwningList[T: Movable & ImplicitlyDestructible](
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    fn __contains__[
-        U: EqualityComparable & Movable, //
-    ](self: OwningList[U, *_], value: U) -> Bool:
+    fn __contains__[U: EqualityComparable & Movable, //](self: OwningList[U, *_], value: U) -> Bool:
         """Verify if a given value is present in the list.
 
         Parameters:
@@ -140,13 +142,13 @@ struct OwningList[T: Movable & ImplicitlyDestructible](
                 return True
         return False
 
-    fn __iter__(ref self) -> _OwningListIter[T, origin_of(self)]:
-        """Iterate over elements of the list, returning immutable references.
+    # fn __iter__(ref self) -> _OwningListIter[T, origin_of(self)]:
+    #     """Iterate over elements of the list, returning immutable references.
 
-        Returns:
-            An iterator of immutable references to the list elements.
-        """
-        return _OwningListIter(0, Pointer(to=self))
+    #     Returns:
+    #         An iterator of immutable references to the list elements.
+    #     """
+    #     return _OwningListIter(0, Pointer(to=self))
 
     # ===-------------------------------------------------------------------===#
     # Trait implementations
@@ -169,9 +171,7 @@ struct OwningList[T: Movable & ImplicitlyDestructible](
         return len(self) > 0
 
     @no_inline
-    fn __str__[
-        U: Representable & Movable, //
-    ](self: OwningList[U, *_]) -> String:
+    fn __str__[U: Representable & Movable, //](self: OwningList[U, *_]) -> String:
         """Returns a string representation of a `List`.
 
         When the compiler supports conditional methods, then a simple `String(my_list)` will
@@ -191,9 +191,7 @@ struct OwningList[T: Movable & ImplicitlyDestructible](
         return output^
 
     @no_inline
-    fn write_to[
-        W: Writer, U: Representable & Movable, //
-    ](self: OwningList[U, *_], mut writer: W):
+    fn write_to[W: Writer, U: Representable & Movable, //](self: OwningList[U, *_], mut writer: W):
         """Write `my_list.__str__()` to a `Writer`.
 
         Parameters:
@@ -211,9 +209,7 @@ struct OwningList[T: Movable & ImplicitlyDestructible](
         writer.write("]")
 
     @no_inline
-    fn __repr__[
-        U: Representable & Movable, //
-    ](self: OwningList[U, *_]) -> String:
+    fn __repr__[U: Representable & Movable, //](self: OwningList[U, *_]) -> String:
         """Returns a string representation of a `List`.
 
         Note that since we can't condition methods on a trait yet,
@@ -250,19 +246,23 @@ struct OwningList[T: Movable & ImplicitlyDestructible](
         """
         return len(self) * size_of[Self.T]()
 
+    @no_inline
     fn _realloc(mut self, new_capacity: Int):
-        var new_data = LegacyUnsafePointer[Self.T].alloc(new_capacity)
+        var new_data = alloc[Self.T](new_capacity)
 
-        _move_pointee_into_many_elements(
-            dest=new_data,
-            src=self.data,
-            size=self.size,
-        )
+        @parameter
+        if Self.T.__moveinit__is_trivial:
+            memcpy(dest=new_data, src=self.data, count=len(self))
+        else:
+            for i in range(len(self)):
+                (new_data + i).init_pointee_move_from(self.data + i)
 
         if self.data:
+            self._annotate_delete()
             self.data.free()
         self.data = new_data
         self.capacity = new_capacity
+        self._annotate_new()
 
     fn append(mut self, var value: Self.T):
         """Appends a value to this list.
@@ -405,12 +405,7 @@ struct OwningList[T: Movable & ImplicitlyDestructible](
     # TODO: Remove explicit self type when issue 1876 is resolved.
     fn index[
         C: EqualityComparable & Movable, //
-    ](
-        ref self: OwningList[C, *_],
-        value: C,
-        start: Int = 0,
-        stop: Optional[Int] = None,
-    ) raises -> Int:
+    ](ref self: OwningList[C, *_], value: C, start: Int = 0, stop: Optional[Int] = None,) raises -> Int:
         """
         Returns the index of the first occurrence of a value in a list
         restricted by the range given the start and stop bounds.
@@ -465,14 +460,14 @@ struct OwningList[T: Movable & ImplicitlyDestructible](
             (self.data + i).destroy_pointee()
         self.size = 0
 
-    fn steal_data(mut self) -> LegacyUnsafePointer[Self.T]:
+    fn steal_data(mut self) -> UnsafePointer[Self.T]:
         """Take ownership of the underlying pointer from the list.
 
         Returns:
             The underlying data.
         """
         var ptr = self.data
-        self.data = LegacyUnsafePointer[Self.T]()
+        self.data = UnsafePointer[Self.T]()
         self.size = 0
         self.capacity = 0
         return ptr
@@ -502,11 +497,11 @@ struct OwningList[T: Movable & ImplicitlyDestructible](
         return (self.data + normalized_idx)[]
 
     @always_inline
-    fn unsafe_ptr(self) -> LegacyUnsafePointer[Self.T]:
+    fn unsafe_ptr(self) -> UnsafePointer[Self.T]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
-            The LegacyUnsafePointer to the underlying memory.
+            The UnsafePointer to the underlying memory.
         """
         return self.data
 
@@ -515,9 +510,7 @@ fn _clip(value: Int, start: Int, end: Int) -> Int:
     return max(start, min(value, end))
 
 
-fn _move_pointee_into_many_elements[
-    T: Movable
-](dest: LegacyUnsafePointer[T], src: LegacyUnsafePointer[T], size: Int):
+fn _move_pointee_into_many_elements[T: Movable](dest: UnsafePointer[T], src: UnsafePointer[T], size: Int):
     for i in range(size):
         (dest + i).init_pointee_move_from(src + i)
         # (src + i).move_pointee_into(dest + i)

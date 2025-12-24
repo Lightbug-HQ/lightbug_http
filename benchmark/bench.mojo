@@ -1,9 +1,6 @@
 from lightbug_http.header import Header, Headers
 from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter
-from lightbug_http.server import (
-    default_max_request_body_size,
-    default_max_request_uri_length,
-)
+from lightbug_http.server import default_max_request_body_size, default_max_request_uri_length
 from lightbug_http.uri import URI
 from memory import Span
 

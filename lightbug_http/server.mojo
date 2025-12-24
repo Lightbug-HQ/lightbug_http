@@ -1,20 +1,11 @@
-from lightbug_http.connection import (
-    ListenConfig,
-    ConnectionState,
-    NoTLSListener,
-    TCPConnection,
-    default_buffer_size,
-)
-from lightbug_http.http.common_response import (
-    BadRequest,
-    InternalError,
-    URITooLong,
-)
-from lightbug_http.http import HTTPRequest, HTTPResponse, encode
+from lightbug_http.connection import ConnectionState, ListenConfig, NoTLSListener, TCPConnection, default_buffer_size
+from lightbug_http.http.common_response import BadRequest, InternalError, URITooLong
 from lightbug_http.io.bytes import ByteReader, Bytes, BytesConstant, ByteView
+from lightbug_http.owning_list import OwningList
 from lightbug_http.service import HTTPService
 from lightbug_http.socket import EOF, SocketError
-from lightbug_http.owning_list import OwningList
+
+from lightbug_http.http import HTTPRequest, HTTPResponse, encode
 
 
 @fieldwise_init
@@ -124,9 +115,7 @@ struct ProvisionPool(Movable):
         """
         self.available.append(index)
 
-    fn get_ptr(
-        mut self, index: Int
-    ) -> Pointer[ConnectionProvision, origin_of(self.provisions)]:
+    fn get_ptr(mut self, index: Int) -> Pointer[ConnectionProvision, origin_of(self.provisions)]:
         """Get a mutable pointer to a provision by index.
 
         Args:
@@ -189,9 +178,7 @@ fn handle_connection[
                     provision.request = request^
 
                     if content_length > 0:
-                        provision.state = ConnectionState.reading_body(
-                            content_length
-                        )
+                        provision.state = ConnectionState.reading_body(content_length)
                     else:
                         provision.state = ConnectionState.processing()
 
@@ -228,10 +215,7 @@ fn handle_connection[
             provision.recv_buffer.extend(buffer^)
             provision.state.body_state.bytes_read += Int(bytes_read)
 
-            if (
-                provision.state.body_state.bytes_read
-                >= provision.state.body_state.content_length
-            ):
+            if provision.state.body_state.bytes_read >= provision.state.body_state.content_length:
                 provision.state = ConnectionState.processing()
 
             if len(provision.recv_buffer) > config.max_request_body_size:
@@ -241,9 +225,7 @@ fn handle_connection[
 
         elif provision.state.kind == ConnectionState.PROCESSING:
             var request = provision.request.take()
-            provision.should_close = (
-                not tcp_keep_alive
-            ) or request.connection_close()
+            provision.should_close = (not tcp_keep_alive) or request.connection_close()
             var response: HTTPResponse
 
             try:
@@ -252,12 +234,8 @@ fn handle_connection[
                 response = InternalError()
                 provision.should_close = True
 
-            if (not provision.should_close) and (
-                config.max_keepalive_requests > 0
-            ):
-                if (
-                    provision.keepalive_count + 1
-                ) >= config.max_keepalive_requests:
+            if (not provision.should_close) and (config.max_keepalive_requests > 0):
+                if (provision.keepalive_count + 1) >= config.max_keepalive_requests:
                     provision.should_close = True
 
             if provision.should_close:
@@ -280,9 +258,7 @@ fn handle_connection[
                 break
 
             # Enforce keep-alive request cap only when explicitly configured.
-            if (config.max_keepalive_requests > 0) and (
-                provision.keepalive_count >= config.max_keepalive_requests
-            ):
+            if (config.max_keepalive_requests > 0) and (provision.keepalive_count >= config.max_keepalive_requests):
                 provision.state = ConnectionState.closed()
                 break
 
@@ -339,9 +315,7 @@ struct Server(Movable):
     fn set_max_request_uri_length(mut self, length: Int):
         self.config.max_request_uri_length = length
 
-    fn listen_and_serve[
-        T: HTTPService
-    ](mut self, address: StringSlice, mut handler: T) raises:
+    fn listen_and_serve[T: HTTPService](mut self, address: StringSlice, mut handler: T) raises:
         """Listen for incoming connections and serve HTTP requests.
 
         Parameters:
@@ -359,9 +333,7 @@ struct Server(Movable):
         except e:
             raise Error("Error while serving HTTP requests: ", e)
 
-    fn serve[
-        T: HTTPService
-    ](self, ln: NoTLSListener, mut handler: T) raises SocketError:
+    fn serve[T: HTTPService](self, ln: NoTLSListener, mut handler: T) raises SocketError:
         """Serve HTTP requests.
 
         Parameters:
@@ -374,9 +346,7 @@ struct Server(Movable):
         Raises:
             If there is an error while serving requests.
         """
-        var provision_pool = ProvisionPool(
-            self.config.max_connections, self.config
-        )
+        var provision_pool = ProvisionPool(self.config.max_connections, self.config)
 
         while True:
             var conn = ln.accept()
