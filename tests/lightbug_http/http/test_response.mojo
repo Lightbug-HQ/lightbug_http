@@ -22,7 +22,9 @@ def test_response_from_bytes():
     testing.assert_true(response.connection_close())
     response.set_connection_keep_alive()
     testing.assert_false(response.connection_close())
-    testing.assert_equal(String(response.get_body()), String("This is the body!"))
+    testing.assert_equal(
+        String(response.get_body()), String("This is the body!")
+    )
 
 
 def test_is_redirect():

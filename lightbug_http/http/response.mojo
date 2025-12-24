@@ -76,7 +76,9 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
             status_text=properties.msg^,
         )
 
-        var transfer_encoding = response.headers.get(HeaderKey.TRANSFER_ENCODING)
+        var transfer_encoding = response.headers.get(
+            HeaderKey.TRANSFER_ENCODING
+        )
         if transfer_encoding and transfer_encoding.value() == "chunked":
             # Use pico's chunked decoder for proper RFC-compliant parsing
             var decoder = HTTPChunkedDecoder()
@@ -114,7 +116,9 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
         except e:
             raise Error("Failed to read request body: ")
 
-    fn _decode_chunks_pico(mut self, mut decoder: HTTPChunkedDecoder, var chunks: Bytes) raises:
+    fn _decode_chunks_pico(
+        mut self, mut decoder: HTTPChunkedDecoder, var chunks: Bytes
+    ) raises:
         """Decode chunked transfer encoding using picohttpparser.
         Args:
             decoder: The chunked decoder state machine.
@@ -133,7 +137,9 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
 
         if ret == -1:
             # buf_ptr.free()
-            raise Error("HTTPResponse._decode_chunks_pico: Invalid chunked encoding")
+            raise Error(
+                "HTTPResponse._decode_chunks_pico: Invalid chunked encoding"
+            )
         # ret == -2 means incomplete, but we'll proceed with what we have
         # ret >= 0 means complete, with ret bytes of trailing data
 
@@ -260,12 +266,24 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
             self.body_raw.extend(data)
 
     fn write_to[T: Writer](self, mut writer: T):
-        writer.write(self.protocol, whitespace, self.status_code, whitespace, self.status_text, lineBreak)
+        writer.write(
+            self.protocol,
+            whitespace,
+            self.status_code,
+            whitespace,
+            self.status_text,
+            lineBreak,
+        )
 
         if HeaderKey.SERVER not in self.headers:
             writer.write("server: lightbug_http", lineBreak)
 
-        writer.write(self.headers, self.cookies, lineBreak, StringSlice(unsafe_from_utf8=self.body_raw))
+        writer.write(
+            self.headers,
+            self.cookies,
+            lineBreak,
+            StringSlice(unsafe_from_utf8=self.body_raw),
+        )
 
     fn encode(deinit self) -> Bytes:
         """Encodes response as bytes.

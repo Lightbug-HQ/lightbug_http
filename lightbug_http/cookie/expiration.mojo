@@ -22,7 +22,9 @@ struct Expiration(Copyable):
     @staticmethod
     fn from_string(str: String) -> Optional[Expiration]:
         try:
-            return Self.from_datetime(parse_time_with_format(str, HTTP_DATE_FORMAT, TimeZone.GMT))
+            return Self.from_datetime(
+                parse_time_with_format(str, HTTP_DATE_FORMAT, TimeZone.GMT)
+            )
         except:
             return None
 
@@ -53,6 +55,9 @@ struct Expiration(Copyable):
                 return False
             elif not Bool(self.datetime) and not Bool(other.datetime):
                 return True
-            return self.datetime.value().isoformat() == other.datetime.value().isoformat()
+            return (
+                self.datetime.value().isoformat()
+                == other.datetime.value().isoformat()
+            )
 
         return True

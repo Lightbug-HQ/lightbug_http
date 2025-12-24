@@ -14,7 +14,10 @@ fn main() raises:
         _ = udp.write_to(test_string[i].as_bytes(), host, port)
 
         try:
-            print("Response received:", StringSlice(unsafe_from_utf8=udp.read_from(16)[0]))
+            print(
+                "Response received:",
+                StringSlice(unsafe_from_utf8=udp.read_from(16)[0]),
+            )
         except e:
             if String(e) != String("EOF"):
                 raise e

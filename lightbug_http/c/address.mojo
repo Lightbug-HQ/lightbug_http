@@ -1,6 +1,10 @@
 from sys.ffi import c_int
 
-from lightbug_http.c.aliases import ExternalImmutUnsafePointer, ExternalMutUnsafePointer, c_void
+from lightbug_http.c.aliases import (
+    ExternalImmutUnsafePointer,
+    ExternalMutUnsafePointer,
+    c_void,
+)
 
 
 @fieldwise_init
@@ -66,7 +70,8 @@ struct AddressInformation(Copyable, Equatable, Stringable, Writable):
 @fieldwise_init
 @register_passable("trivial")
 struct AddressFamily(Copyable, Equatable, Stringable, Writable):
-    """Address families, used to specify the type of addresses that your socket can communicate with."""
+    """Address families, used to specify the type of addresses that your socket can communicate with.
+    """
 
     var value: c_int
     """Address family value."""

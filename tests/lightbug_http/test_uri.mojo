@@ -1,5 +1,11 @@
 from lightbug_http.uri import URI
-from testing import TestSuite, assert_equal, assert_false, assert_raises, assert_true
+from testing import (
+    TestSuite,
+    assert_equal,
+    assert_false,
+    assert_raises,
+    assert_true,
+)
 
 
 fn test_uri_no_parse_defaults() raises:
@@ -82,6 +88,7 @@ fn test_uri_parse_https_with_path() raises:
     assert_equal(uri.is_https(), True)
     assert_equal(uri.is_http(), False)
     assert_equal(uri.query_string, "")
+
 
 # TODO: Index OOB Error
 # fn test_uri_parse_path_with_encoding() raises:
@@ -185,14 +192,19 @@ fn test_uri_parse_empty_query_values() raises:
 fn test_uri_parse_complex_query() raises:
     var uri: URI
     try:
-        uri = URI.parse("https://example.com/search?q=test&filter[category]=books&filter[price]=10-20&sort=desc&page=1")
+        uri = URI.parse(
+            "https://example.com/search?q=test&filter[category]=books&filter[price]=10-20&sort=desc&page=1"
+        )
     except e:
         raise Error("Error in URI.parse:", e)
 
     assert_equal(uri.scheme, "https")
     assert_equal(uri.host, "example.com")
     assert_equal(uri.path, "/search")
-    assert_equal(uri.query_string, "q=test&filter[category]=books&filter[price]=10-20&sort=desc&page=1")
+    assert_equal(
+        uri.query_string,
+        "q=test&filter[category]=books&filter[price]=10-20&sort=desc&page=1",
+    )
     assert_equal(uri.queries["q"], "test")
     assert_equal(uri.queries["filter[category]"], "books")
     assert_equal(uri.queries["filter[price]"], "10-20")
@@ -253,6 +265,7 @@ fn test_uri_ip_address() raises:
 
 # fn test_uri_parse_http_with_hash() raises:
 #     ...
+
 
 fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

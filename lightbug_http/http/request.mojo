@@ -1,4 +1,10 @@
-from lightbug_http.header import Header, HeaderKey, Headers, ParsedRequestResult, write_header
+from lightbug_http.header import (
+    Header,
+    HeaderKey,
+    Headers,
+    ParsedRequestResult,
+    write_header,
+)
 from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter
 from lightbug_http.io.sync import Duration
 from lightbug_http.strings import CR, LF, http, lineBreak, strHttp11, whitespace
@@ -125,7 +131,11 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
             raise RequestParseError(CookieParseError(String(e)))
 
         var content_length = headers.content_length()
-        if content_length > 0 and max_body_size > 0 and content_length > max_body_size:
+        if (
+            content_length > 0
+            and max_body_size > 0
+            and content_length > max_body_size
+        ):
             raise RequestParseError(RequestBodyTooLargeError())
 
         var parsed_uri: URI
@@ -135,7 +145,11 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
             raise RequestParseError(URIParseError())
 
         var request = HTTPRequest(
-            uri=parsed_uri^, headers=headers^, method=rest.method, protocol=rest.protocol, cookies=cookies^
+            uri=parsed_uri^,
+            headers=headers^,
+            method=rest.method,
+            protocol=rest.protocol,
+            cookies=cookies^,
         )
 
         if content_length > 0:
@@ -171,7 +185,9 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
             self.headers[HeaderKey.CONNECTION] = "keep-alive"
         if HeaderKey.HOST not in self.headers:
             if self.uri.port:
-                self.headers[HeaderKey.HOST] = String(self.uri.host, ":", self.uri.port.value())
+                self.headers[HeaderKey.HOST] = String(
+                    self.uri.host, ":", self.uri.port.value()
+                )
             else:
                 self.headers[HeaderKey.HOST] = self.uri.host
 
@@ -191,7 +207,9 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
         return result.value() == "close"
 
     @always_inline
-    fn read_body(mut self, mut r: ByteReader, content_length: Int, max_body_size: Int) raises -> None:
+    fn read_body(
+        mut self, mut r: ByteReader, content_length: Int, max_body_size: Int
+    ) raises -> None:
         if content_length > max_body_size:
             raise Error("Request body too large")
 
@@ -200,11 +218,17 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
                 self.body_raw = Bytes(r.read_bytes(content_length).as_bytes())
             except OutOfBoundsError:
                 raise Error(
-                    "Failed to read request body: reached the end of the reader before reaching content length."
+                    "Failed to read request body: reached the end of the reader"
+                    " before reaching content length."
                 )
 
             if len(self.body_raw) != content_length:
-                raise Error("Content length mismatch, expected ", content_length, " but got ", len(self.body_raw))
+                raise Error(
+                    "Content length mismatch, expected ",
+                    content_length,
+                    " but got ",
+                    len(self.body_raw),
+                )
 
             self.set_content_length(len(self.body_raw))
             return

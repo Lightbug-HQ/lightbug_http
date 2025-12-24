@@ -1,5 +1,18 @@
-from lightbug_http.address import HostPort, NetworkType, ParseError, TCPAddr, join_host_port, parse_address
-from testing import TestSuite, assert_equal, assert_false, assert_raises, assert_true
+from lightbug_http.address import (
+    HostPort,
+    NetworkType,
+    ParseError,
+    TCPAddr,
+    join_host_port,
+    parse_address,
+)
+from testing import (
+    TestSuite,
+    assert_equal,
+    assert_false,
+    assert_raises,
+    assert_true,
+)
 
 
 fn test_split_host_port_tcp4() raises:
@@ -135,23 +148,36 @@ fn test_split_host_port_ip6_localhost() raises:
 
 
 fn test_split_host_port_error_ip_with_port() raises:
-    with assert_raises(contains="IP protocol addresses should not include ports"):
+    with assert_raises(
+        contains="IP protocol addresses should not include ports"
+    ):
         _ = parse_address[NetworkType.ip4]("192.168.1.1:80")
 
 
 fn test_split_host_port_error_missing_port_ipv4() raises:
-    with assert_raises(contains="Failed to parse address: missing port separator ':' in address."):
+    with assert_raises(
+        contains=(
+            "Failed to parse address: missing port separator ':' in address."
+        )
+    ):
         _ = parse_address[NetworkType.tcp4]("192.168.1.1")
 
 
 fn test_split_host_port_error_missing_port_ipv6() raises:
-    with assert_raises(contains="Failed to parse ipv6 address: missing port in address"):
+    with assert_raises(
+        contains="Failed to parse ipv6 address: missing port in address"
+    ):
         _ = parse_address[NetworkType.tcp6]("[::1]")
 
 
 fn test_split_host_port_error_port_out_of_range() raises:
-    with assert_raises(contains="Failed to parse port: Port number out of range (0-65535). Received: 70000"):
-         _ = parse_address[NetworkType.tcp4]("192.168.1.1:70000")
+    with assert_raises(
+        contains=(
+            "Failed to parse port: Port number out of range (0-65535)."
+            " Received: 70000"
+        )
+    ):
+        _ = parse_address[NetworkType.tcp4]("192.168.1.1:70000")
 
 
 fn test_split_host_port_error_missing_bracket() raises:
@@ -168,5 +194,6 @@ def test_join_host_port():
 
     # TODO: IPv6 long form - Not supported yet.
 
+
 fn main() raises:
-        TestSuite.discover_tests[__functions_in_module()]().run()
+    TestSuite.discover_tests[__functions_in_module()]().run()

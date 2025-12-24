@@ -46,15 +46,25 @@ struct Cookie(Copyable):
             elif part == Cookie.HTTP_ONLY:
                 cookie.http_only = True
             elif part.startswith(Cookie.SAME_SITE):
-                cookie.same_site = SameSite.from_string(String(part.removeprefix(Cookie.SAME_SITE + Cookie.EQUAL)))
+                cookie.same_site = SameSite.from_string(
+                    String(part.removeprefix(Cookie.SAME_SITE + Cookie.EQUAL))
+                )
             elif part.startswith(Cookie.DOMAIN):
-                cookie.domain = String(part.removeprefix(Cookie.DOMAIN + Cookie.EQUAL))
+                cookie.domain = String(
+                    part.removeprefix(Cookie.DOMAIN + Cookie.EQUAL)
+                )
             elif part.startswith(Cookie.PATH):
-                cookie.path = String(part.removeprefix(Cookie.PATH + Cookie.EQUAL))
+                cookie.path = String(
+                    part.removeprefix(Cookie.PATH + Cookie.EQUAL)
+                )
             elif part.startswith(Cookie.MAX_AGE):
-                cookie.max_age = Duration.from_string(String(part.removeprefix(Cookie.MAX_AGE + Cookie.EQUAL)))
+                cookie.max_age = Duration.from_string(
+                    String(part.removeprefix(Cookie.MAX_AGE + Cookie.EQUAL))
+                )
             elif part.startswith(Cookie.EXPIRES):
-                var expires = Expiration.from_string(String(part.removeprefix(Cookie.EXPIRES + Cookie.EQUAL)))
+                var expires = Expiration.from_string(
+                    String(part.removeprefix(Cookie.EXPIRES + Cookie.EQUAL))
+                )
                 if expires:
                     cookie.expires = expires.value().copy()
 
@@ -131,21 +141,38 @@ struct Cookie(Copyable):
                 pass
 
             if v:
-                header_value.write(Cookie.SEPERATOR, Cookie.EXPIRES, Cookie.EQUAL, v.value())
+                header_value.write(
+                    Cookie.SEPERATOR, Cookie.EXPIRES, Cookie.EQUAL, v.value()
+                )
         if self.max_age:
             header_value.write(
-                Cookie.SEPERATOR, Cookie.MAX_AGE, Cookie.EQUAL, String(self.max_age.value().total_seconds)
+                Cookie.SEPERATOR,
+                Cookie.MAX_AGE,
+                Cookie.EQUAL,
+                String(self.max_age.value().total_seconds),
             )
         if self.domain:
-            header_value.write(Cookie.SEPERATOR, Cookie.DOMAIN, Cookie.EQUAL, self.domain.value())
+            header_value.write(
+                Cookie.SEPERATOR,
+                Cookie.DOMAIN,
+                Cookie.EQUAL,
+                self.domain.value(),
+            )
         if self.path:
-            header_value.write(Cookie.SEPERATOR, Cookie.PATH, Cookie.EQUAL, self.path.value())
+            header_value.write(
+                Cookie.SEPERATOR, Cookie.PATH, Cookie.EQUAL, self.path.value()
+            )
         if self.secure:
             header_value.write(Cookie.SEPERATOR, Cookie.SECURE)
         if self.http_only:
             header_value.write(Cookie.SEPERATOR, Cookie.HTTP_ONLY)
         if self.same_site:
-            header_value.write(Cookie.SEPERATOR, Cookie.SAME_SITE, Cookie.EQUAL, String(self.same_site.value()))
+            header_value.write(
+                Cookie.SEPERATOR,
+                Cookie.SAME_SITE,
+                Cookie.EQUAL,
+                String(self.same_site.value()),
+            )
         if self.partitioned:
             header_value.write(Cookie.SEPERATOR, Cookie.PARTITIONED)
         return header_value

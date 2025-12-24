@@ -1,16 +1,32 @@
 from sys.info import CompilationTarget
 from time import sleep
 
-from lightbug_http.address import HostPort, NetworkType, TCPAddr, UDPAddr, parse_address
+from lightbug_http.address import (
+    HostPort,
+    NetworkType,
+    TCPAddr,
+    UDPAddr,
+    parse_address,
+)
 from lightbug_http.c.address import AddressFamily
 from lightbug_http.io.bytes import Bytes
 from lightbug_http.io.sync import Duration
-from lightbug_http.socket import EOF, Socket, SocketError, SocketOption, SocketType, TCPSocket, UDPSocket
+from lightbug_http.socket import (
+    EOF,
+    Socket,
+    SocketError,
+    SocketOption,
+    SocketType,
+    TCPSocket,
+    UDPSocket,
+)
 
 
 comptime default_buffer_size = 4096
 """The default buffer size for reading and writing data."""
-comptime default_tcp_keep_alive = Duration(15 * 1000 * 1000 * 1000)  # 15 seconds
+comptime default_tcp_keep_alive = Duration(
+    15 * 1000 * 1000 * 1000
+)  # 15 seconds
 """The default TCP keep-alive duration."""
 
 
@@ -38,7 +54,8 @@ trait Connection(Movable):
 
 
 struct NoTLSListener(Movable):
-    """A TCP listener that listens for incoming connections and can accept them."""
+    """A TCP listener that listens for incoming connections and can accept them.
+    """
 
     var socket: TCPSocket[TCPAddr]
 
@@ -70,18 +87,26 @@ struct ListenConfig:
     fn __init__(out self, keep_alive: Duration = default_tcp_keep_alive):
         self._keep_alive = keep_alive
 
-    fn listen[network: NetworkType = NetworkType.tcp4](self, address: StringSlice) raises -> NoTLSListener:
+    fn listen[
+        network: NetworkType = NetworkType.tcp4
+    ](self, address: StringSlice) raises -> NoTLSListener:
         var local: HostPort
         try:
             local = parse_address[network](address)
         except ParseError:
-            raise Error("ListenConfig.listen: Failed to create listener due to invalid address.")
+            raise Error(
+                "ListenConfig.listen: Failed to create listener due to invalid"
+                " address."
+            )
 
         var socket: Socket[TCPAddr]
         try:
             socket = Socket[TCPAddr]()
         except e:
-            raise Error("ListenConfig.listen: Failed to create listener due to socket creation failure.")
+            raise Error(
+                "ListenConfig.listen: Failed to create listener due to socket"
+                " creation failure."
+            )
 
         @parameter
         # TODO: do we want to add SO_REUSEPORT on linux? Doesn't work on some systems
@@ -116,10 +141,19 @@ struct ListenConfig:
         try:
             socket.listen(128)
         except e:
-            raise Error("ListenConfig.listen: Listen failed on sockfd: ", socket.fd.value)
+            raise Error(
+                "ListenConfig.listen: Listen failed on sockfd: ",
+                socket.fd.value,
+            )
 
         var listener = NoTLSListener(socket^)
-        var msg = String("\n🔥🐝 Lightbug is listening on ", "http://", addr.ip, ":", String(addr.port))
+        var msg = String(
+            "\n🔥🐝 Lightbug is listening on ",
+            "http://",
+            addr.ip,
+            ":",
+            String(addr.port),
+        )
         print(msg)
         print("Ready to accept connections...")
 
@@ -162,7 +196,9 @@ struct ConnectionState(Copyable, Movable):
 
     @staticmethod
     fn reading_body(content_length: Int) -> Self:
-        return ConnectionState(Self.READING_BODY, RequestBodyState(content_length, 0))
+        return ConnectionState(
+            Self.READING_BODY, RequestBodyState(content_length, 0)
+        )
 
     @staticmethod
     fn processing() -> Self:
@@ -190,7 +226,9 @@ struct TCPConnection:
             if e.isa[EOF]():
                 raise e^
             else:
-                raise Error("TCPConnection.read: Failed to read data from connection.")
+                raise Error(
+                    "TCPConnection.read: Failed to read data from connection."
+                )
 
     fn write(self, buf: Span[Byte]) raises SocketError -> UInt:
         return self.socket.send(buf)
@@ -215,18 +253,23 @@ struct TCPConnection:
         return self.socket.remote_address
 
 
-struct UDPConnection[network: NetworkType = NetworkType.udp4, address_family: AddressFamily = AddressFamily.AF_INET](
-    Movable
-):
+struct UDPConnection[
+    network: NetworkType = NetworkType.udp4,
+    address_family: AddressFamily = AddressFamily.AF_INET,
+](Movable):
     comptime _sock_type = Socket[
-        sock_type = SocketType.SOCK_DGRAM, address = UDPAddr[Self.network], address_family = Self.address_family
+        sock_type = SocketType.SOCK_DGRAM,
+        address = UDPAddr[Self.network],
+        address_family = Self.address_family,
     ]
     var socket: Self._sock_type
 
     fn __init__(out self, var socket: Self._sock_type):
         self.socket = socket^
 
-    fn read_from(mut self, size: Int = default_buffer_size) raises SocketError -> Tuple[Bytes, String, UInt16]:
+    fn read_from(
+        mut self, size: Int = default_buffer_size
+    ) raises SocketError -> Tuple[Bytes, String, UInt16]:
         """Reads data from the underlying file descriptor.
 
         Args:
@@ -241,7 +284,9 @@ struct UDPConnection[network: NetworkType = NetworkType.udp4, address_family: Ad
 
         return self.socket.receive_from(size)
 
-    fn read_from(mut self, mut dest: Bytes) raises SocketError -> Tuple[UInt, String, UInt16]:
+    fn read_from(
+        mut self, mut dest: Bytes
+    ) raises SocketError -> Tuple[UInt, String, UInt16]:
         """Reads data from the underlying file descriptor.
 
         Args:
@@ -256,7 +301,9 @@ struct UDPConnection[network: NetworkType = NetworkType.udp4, address_family: Ad
 
         return self.socket.receive_from(dest)
 
-    fn write_to(mut self, src: Span[Byte], mut address: UDPAddr) raises SocketError -> UInt:
+    fn write_to(
+        mut self, src: Span[Byte], mut address: UDPAddr
+    ) raises SocketError -> UInt:
         """Writes data to the underlying file descriptor.
 
         Args:
@@ -272,7 +319,9 @@ struct UDPConnection[network: NetworkType = NetworkType.udp4, address_family: Ad
 
         return self.socket.send_to(src, address.ip, address.port)
 
-    fn write_to(mut self, src: Span[Byte], mut host: String, port: UInt16) raises SocketError -> UInt:
+    fn write_to(
+        mut self, src: Span[Byte], mut host: String, port: UInt16
+    ) raises SocketError -> UInt:
         """Writes data to the underlying file descriptor.
 
         Args:
@@ -308,7 +357,9 @@ struct UDPConnection[network: NetworkType = NetworkType.udp4, address_family: Ad
     #     return self.socket.remote_address
 
 
-fn create_connection(mut host: String, port: UInt16) raises SocketError -> TCPConnection:
+fn create_connection(
+    mut host: String, port: UInt16
+) raises SocketError -> TCPConnection:
     """Connect to a server using a socket.
 
     Args:
@@ -400,7 +451,11 @@ fn dial_udp[
     Raises:
         Error: If the network type is not supported or failed to connect to the address.
     """
-    return UDPConnection(Socket[UDPAddr[network], sock_type = SocketType.SOCK_DGRAM](local_address=local_address))
+    return UDPConnection(
+        Socket[UDPAddr[network], sock_type = SocketType.SOCK_DGRAM](
+            local_address=local_address
+        )
+    )
 
 
 fn dial_udp[

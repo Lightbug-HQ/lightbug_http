@@ -26,10 +26,23 @@ def test_write():
     var w = ByteWriter()
     w.write("Hello", ", ")
     w.write_bytes("World!".as_bytes())
-    var result: List[Byte] = [72, 101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 33]
-    testing.assert_equal(
-        String(bytes=w^.consume()), String(bytes=Span(result))
-    )
+    var result: List[Byte] = [
+        72,
+        101,
+        108,
+        108,
+        111,
+        44,
+        32,
+        87,
+        111,
+        114,
+        108,
+        100,
+        33,
+    ]
+    testing.assert_equal(String(bytes=w^.consume()), String(bytes=Span(result)))
+
 
 def main():
     testing.TestSuite.discover_tests[__functions_in_module()]().run()

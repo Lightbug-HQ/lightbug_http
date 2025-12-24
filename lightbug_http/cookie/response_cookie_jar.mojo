@@ -25,7 +25,11 @@ struct ResponseCookieKey(ImplicitlyCopyable, KeyElement):
         return not (self == other)
 
     fn __eq__(self: Self, other: Self) -> Bool:
-        return self.name == other.name and self.domain == other.domain and self.path == other.path
+        return (
+            self.name == other.name
+            and self.domain == other.domain
+            and self.path == other.path
+        )
 
     fn __moveinit__(out self: Self, deinit existing: Self):
         self.name = existing.name
@@ -87,7 +91,9 @@ struct ResponseCookieJar(Copyable, Sized, Stringable, Writable):
 
     @always_inline
     fn set_cookie(mut self, cookie: Cookie):
-        self[ResponseCookieKey(cookie.name, cookie.domain, cookie.path)] = cookie
+        self[
+            ResponseCookieKey(cookie.name, cookie.domain, cookie.path)
+        ] = cookie
 
     @always_inline
     fn empty(self) -> Bool:

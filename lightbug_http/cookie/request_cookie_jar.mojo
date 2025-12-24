@@ -85,6 +85,9 @@ struct RequestCookieJar(Copyable, Stringable, Writable):
 
         for value in self._inner.items():
             for other_value in other._inner.items():
-                if value.key != other_value.key or value.value != other_value.value:
+                if (
+                    value.key != other_value.key
+                    or value.value != other_value.value
+                ):
                     return False
         return True

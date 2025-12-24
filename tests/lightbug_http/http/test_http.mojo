@@ -6,7 +6,13 @@ from lightbug_http.io.bytes import Bytes
 from lightbug_http.uri import URI
 from testing import assert_equal, assert_true
 
-from lightbug_http.cookie import Cookie, Duration, RequestCookieJar, ResponseCookieJar, ResponseCookieKey
+from lightbug_http.cookie import (
+    Cookie,
+    Duration,
+    RequestCookieJar,
+    ResponseCookieJar,
+    ResponseCookieKey,
+)
 from lightbug_http.http import HTTPRequest, HTTPResponse, encode
 
 
@@ -24,8 +30,20 @@ def test_encode_http_request():
         uri=uri^,
         body=Bytes(String("Hello world!").as_bytes()),
         cookies=RequestCookieJar(
-            Cookie(name="session_id", value="123", path=String("/"), secure=True, max_age=Duration(minutes=10)),
-            Cookie(name="token", value="abc", domain=String("localhost"), path=String("/api"), http_only=True),
+            Cookie(
+                name="session_id",
+                value="123",
+                path=String("/"),
+                secure=True,
+                max_age=Duration(minutes=10),
+            ),
+            Cookie(
+                name="token",
+                value="abc",
+                domain=String("localhost"),
+                path=String("/api"),
+                http_only=True,
+            ),
         ),
         headers=Headers(Header("Connection", "keep-alive")),
     )
@@ -44,9 +62,23 @@ def test_encode_http_response():
     res.headers[HeaderKey.DATE] = "2024-06-02T13:41:50.766880+00:00"
 
     res.cookies = ResponseCookieJar(
-        Cookie(name="session_id", value="123", path=String("/api"), secure=True),
-        Cookie(name="session_id", value="abc", path=String("/"), secure=True, max_age=Duration(minutes=10)),
-        Cookie(name="token", value="123", domain=String("localhost"), path=String("/api"), http_only=True),
+        Cookie(
+            name="session_id", value="123", path=String("/api"), secure=True
+        ),
+        Cookie(
+            name="session_id",
+            value="abc",
+            path=String("/"),
+            secure=True,
+            max_age=Duration(minutes=10),
+        ),
+        Cookie(
+            name="token",
+            value="123",
+            domain=String("localhost"),
+            path=String("/api"),
+            http_only=True,
+        ),
     )
     var as_str = String(res)
     var res_encoded = String(bytes=encode(res^))
@@ -72,7 +104,10 @@ def test_decoding_http_response():
     var expected_cookie_key = ResponseCookieKey("session_id", "", "/")
 
     assert_equal(1, len(response.cookies))
-    assert_true(expected_cookie_key in response.cookies, msg="request should contain a session_id header")
+    assert_true(
+        expected_cookie_key in response.cookies,
+        msg="request should contain a session_id header",
+    )
     var session_id = response.cookies.get(expected_cookie_key)
     assert_true(session_id is not None)
     assert_equal(session_id.value().path.value(), "/")

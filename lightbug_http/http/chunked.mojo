@@ -48,7 +48,9 @@ fn decode_hex(ch: UInt8) -> Int:
 
 fn http_decode_chunked[
     buf_origin: MutOrigin
-](mut decoder: HTTPChunkedDecoder, buf: Span[UInt8, buf_origin]) -> Tuple[Int, Int]:
+](mut decoder: HTTPChunkedDecoder, buf: Span[UInt8, buf_origin]) -> Tuple[
+    Int, Int
+]:
     """Decode chunked transfer encoding.
 
     Returns (ret, new_bufsz) where:
@@ -84,7 +86,9 @@ fn http_decode_chunked[
                 if decoder._hex_count == 16:  # size_of(size_t) * 2
                     return (-1, dst)
 
-                decoder.bytes_left_in_chunk = decoder.bytes_left_in_chunk * 16 + v
+                decoder.bytes_left_in_chunk = (
+                    decoder.bytes_left_in_chunk * 16 + v
+                )
                 decoder._hex_count += 1
                 src += 1
 
@@ -131,14 +135,20 @@ fn http_decode_chunked[
             var avail = buffer_len - src
             if avail < decoder.bytes_left_in_chunk:
                 if dst != src:
-                    memmove(buf.unsafe_ptr() + dst, buf.unsafe_ptr() + src, avail)
+                    memmove(
+                        buf.unsafe_ptr() + dst, buf.unsafe_ptr() + src, avail
+                    )
                 src += avail
                 dst += avail
                 decoder.bytes_left_in_chunk -= avail
                 break
 
             if dst != src:
-                memmove(buf.unsafe_ptr() + dst, buf.unsafe_ptr() + src, decoder.bytes_left_in_chunk)
+                memmove(
+                    buf.unsafe_ptr() + dst,
+                    buf.unsafe_ptr() + src,
+                    decoder.bytes_left_in_chunk,
+                )
 
             src += decoder.bytes_left_in_chunk
             dst += decoder.bytes_left_in_chunk
@@ -195,7 +205,9 @@ fn http_decode_chunked[
 
     # Move remaining data to beginning of buffer
     if dst != src and src < buffer_len:
-        memmove(buf.unsafe_ptr() + dst, buf.unsafe_ptr() + src, buffer_len - src)
+        memmove(
+            buf.unsafe_ptr() + dst, buf.unsafe_ptr() + src, buffer_len - src
+        )
 
     var new_bufsz = dst
 
@@ -204,7 +216,8 @@ fn http_decode_chunked[
         decoder._total_overhead += buffer_len - dst
         if (
             decoder._total_overhead >= 100 * 1024
-            and decoder._total_read - decoder._total_overhead < decoder._total_read // 4
+            and decoder._total_read - decoder._total_overhead
+            < decoder._total_read // 4
         ):
             ret = -1
 

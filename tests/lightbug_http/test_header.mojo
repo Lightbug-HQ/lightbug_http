@@ -42,5 +42,6 @@ def test_parse_response_header():
     assert_equal(header["Connection"], "close")
     assert_equal(header["Trailer"], "end-of-message")
 
+
 def main():
     TestSuite.discover_tests[__functions_in_module()]().run()

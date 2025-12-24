@@ -1,5 +1,9 @@
 from lightbug_http.io.bytes import Bytes, create_string_from_ptr
-from lightbug_http.strings import BytesConstant, is_printable_ascii, is_token_char
+from lightbug_http.strings import (
+    BytesConstant,
+    is_printable_ascii,
+    is_token_char,
+)
 
 
 struct HTTPHeader(Copyable):
@@ -61,7 +65,10 @@ fn get_token_to_eol[
 fn is_complete[
     origin: ImmutOrigin
 ](
-    buf: UnsafePointer[UInt8, origin], buf_end: UnsafePointer[UInt8, origin], last_len: Int, mut ret: Int
+    buf: UnsafePointer[UInt8, origin],
+    buf_end: UnsafePointer[UInt8, origin],
+    last_len: Int,
+    mut ret: Int,
 ) -> UnsafePointer[UInt8, origin]:
     """Check if request/response is complete."""
     var ret_cnt = 0
@@ -123,7 +130,10 @@ fn parse_token[
 fn parse_http_version[
     origin: ImmutOrigin
 ](
-    buf: UnsafePointer[UInt8, origin], buf_end: UnsafePointer[UInt8, origin], mut minor_version: Int, mut ret: Int
+    buf: UnsafePointer[UInt8, origin],
+    buf_end: UnsafePointer[UInt8, origin],
+    mut minor_version: Int,
+    mut ret: Int,
 ) -> UnsafePointer[UInt8, origin]:
     """Parse HTTP version."""
     if Int(buf_end) - Int(buf) < 9:
@@ -191,10 +201,15 @@ fn parse_headers[
             return UnsafePointer[UInt8, buf_origin]()
 
         # Parse header name
-        if num_headers == 0 or (current[] != BytesConstant.whitespace and current[] != BytesConstant.TAB):
+        if num_headers == 0 or (
+            current[] != BytesConstant.whitespace
+            and current[] != BytesConstant.TAB
+        ):
             var name = String()
             var name_len = Int()
-            current = parse_token(current, buf_end, name, name_len, BytesConstant.COLON, ret)
+            current = parse_token(
+                current, buf_end, name, name_len, BytesConstant.COLON, ret
+            )
             if current == UnsafePointer[UInt8, buf_origin]() or name_len == 0:
                 ret = -1
                 return UnsafePointer[UInt8, buf_origin]()
@@ -204,7 +219,10 @@ fn parse_headers[
             current += 1  # Skip ':'
 
             # Skip whitespace
-            while current < buf_end and (current[] == BytesConstant.whitespace or current[] == BytesConstant.TAB):
+            while current < buf_end and (
+                current[] == BytesConstant.whitespace
+                or current[] == BytesConstant.TAB
+            ):
                 current += 1
         else:
             headers[num_headers].name = String()
@@ -221,12 +239,17 @@ fn parse_headers[
         while value_len > 0:
             var c = value[value_len - 1]
             ref c_byte = c.as_bytes()[0]
-            if c_byte != BytesConstant.whitespace and c_byte != BytesConstant.TAB:
+            if (
+                c_byte != BytesConstant.whitespace
+                and c_byte != BytesConstant.TAB
+            ):
                 break
             value_len -= 1
 
         # Truncate the string to the trimmed length
-        headers[num_headers].value = String(value[:value_len]) if value_len < len(value) else value
+        headers[num_headers].value = (
+            String(value[:value_len]) if value_len < len(value) else value
+        )
         headers[num_headers].value_len = value_len
         num_headers += 1
 
@@ -279,7 +302,9 @@ fn http_parse_request[
             break  # Start of actual request
 
     # Parse method
-    current = parse_token(current, buf_end, method, method_len, BytesConstant.whitespace, ret)
+    current = parse_token(
+        current, buf_end, method, method_len, BytesConstant.whitespace, ret
+    )
     if current == UnsafePointer[UInt8, buf_origin]():
         return ret
 
@@ -341,7 +366,9 @@ fn http_parse_request[
         return -1
 
     # Parse headers
-    current = parse_headers(current, buf_end, headers, num_headers, max_headers, ret)
+    current = parse_headers(
+        current, buf_end, headers, num_headers, max_headers, ret
+    )
     if current == UnsafePointer[UInt8, buf_origin]():
         return ret
 
@@ -423,7 +450,9 @@ fn http_parse_response[
         return -1
 
     # Parse headers
-    current = parse_headers(current, buf_end, headers, num_headers, max_headers, ret)
+    current = parse_headers(
+        current, buf_end, headers, num_headers, max_headers, ret
+    )
     if current == UnsafePointer[UInt8, buf_origin]():
         return ret
 
@@ -453,7 +482,9 @@ fn http_parse_headers[
             return ret
 
     # Parse headers
-    var current = parse_headers(buf_start, buf_end, headers, num_headers, max_headers, ret)
+    var current = parse_headers(
+        buf_start, buf_end, headers, num_headers, max_headers, ret
+    )
     if current == UnsafePointer[UInt8, buf_origin]():
         return ret
 

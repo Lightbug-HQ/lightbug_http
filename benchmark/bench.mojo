@@ -1,6 +1,9 @@
 from lightbug_http.header import Header, Headers
 from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter
-from lightbug_http.server import default_max_request_body_size, default_max_request_uri_length
+from lightbug_http.server import (
+    default_max_request_body_size,
+    default_max_request_uri_length,
+)
 from lightbug_http.uri import URI
 from memory import Span
 
@@ -25,12 +28,24 @@ fn run_benchmark():
         var config = BenchConfig()
         config.verbose_timing = True
         var m = Bench(config^)
-        m.bench_function[lightbug_benchmark_header_encode](BenchId("HeaderEncode"))
-        m.bench_function[lightbug_benchmark_header_parse](BenchId("HeaderParse"))
-        m.bench_function[lightbug_benchmark_request_encode](BenchId("RequestEncode"))
-        m.bench_function[lightbug_benchmark_request_parse](BenchId("RequestParse"))
-        m.bench_function[lightbug_benchmark_response_encode](BenchId("ResponseEncode"))
-        m.bench_function[lightbug_benchmark_response_parse](BenchId("ResponseParse"))
+        m.bench_function[lightbug_benchmark_header_encode](
+            BenchId("HeaderEncode")
+        )
+        m.bench_function[lightbug_benchmark_header_parse](
+            BenchId("HeaderParse")
+        )
+        m.bench_function[lightbug_benchmark_request_encode](
+            BenchId("RequestEncode")
+        )
+        m.bench_function[lightbug_benchmark_request_parse](
+            BenchId("RequestParse")
+        )
+        m.bench_function[lightbug_benchmark_response_encode](
+            BenchId("ResponseEncode")
+        )
+        m.bench_function[lightbug_benchmark_response_parse](
+            BenchId("ResponseParse")
+        )
         m.dump_report()
     except:
         print("failed to start benchmark")
@@ -50,7 +65,9 @@ fn lightbug_benchmark_response_encode(mut b: Bencher):
     @always_inline
     @parameter
     fn response_encode():
-        var res = HTTPResponse(body.as_bytes(), headers=materialize[headers_struct]())
+        var res = HTTPResponse(
+            body.as_bytes(), headers=materialize[headers_struct]()
+        )
         _ = encode(res^)
 
     b.iter[response_encode]()
@@ -75,7 +92,12 @@ fn lightbug_benchmark_request_parse(mut b: Bencher):
     @parameter
     fn request_parse():
         try:
-            _ = HTTPRequest.from_bytes("127.0.0.1/path", default_max_request_body_size, default_max_request_uri_length, Request.as_bytes())
+            _ = HTTPRequest.from_bytes(
+                "127.0.0.1/path",
+                default_max_request_body_size,
+                default_max_request_uri_length,
+                Request.as_bytes(),
+            )
         except:
             pass
 

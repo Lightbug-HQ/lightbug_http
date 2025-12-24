@@ -15,7 +15,9 @@ fn OK(body: Bytes, content_type: String = "text/plain") -> HTTPResponse:
     )
 
 
-fn OK(body: Bytes, content_type: String, content_encoding: String) -> HTTPResponse:
+fn OK(
+    body: Bytes, content_type: String, content_encoding: String
+) -> HTTPResponse:
     return HTTPResponse(
         headers=Headers(
             Header(HeaderKey.CONTENT_TYPE, content_type),
@@ -25,7 +27,9 @@ fn OK(body: Bytes, content_type: String, content_encoding: String) -> HTTPRespon
     )
 
 
-fn SeeOther(location: String, content_type: String, var cookies: List[Cookie] = []) -> HTTPResponse:
+fn SeeOther(
+    location: String, content_type: String, var cookies: List[Cookie] = []
+) -> HTTPResponse:
     return HTTPResponse(
         "See Other".as_bytes(),
         cookies=ResponseCookieJar(cookies^),

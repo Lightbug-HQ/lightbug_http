@@ -2,7 +2,11 @@ from sys.ffi import c_char, c_int, c_uint, c_ushort, external_call, get_errno
 from sys.info import size_of
 
 from lightbug_http.c.address import AddressFamily, AddressLength
-from lightbug_http.c.aliases import ExternalImmutUnsafePointer, ExternalMutUnsafePointer, c_void
+from lightbug_http.c.aliases import (
+    ExternalImmutUnsafePointer,
+    ExternalMutUnsafePointer,
+    c_void,
+)
 from memory import stack_allocation
 from utils import StaticTuple
 
@@ -115,7 +119,11 @@ struct sockaddr:
     var sa_family: sa_family_t
     var sa_data: StaticTuple[c_char, 14]
 
-    fn __init__(out self, family: sa_family_t = 0, data: StaticTuple[c_char, 14] = StaticTuple[c_char, 14]()):
+    fn __init__(
+        out self,
+        family: sa_family_t = 0,
+        data: StaticTuple[c_char, 14] = StaticTuple[c_char, 14](),
+    ):
         self.sa_family = family
         self.sa_data = data
 
@@ -164,7 +172,9 @@ struct SocketAddress(Movable):
     fn __init__(out self):
         self.addr = alloc[sockaddr](count=1)
 
-    fn __init__(out self, address_family: AddressFamily, port: UInt16, binary_ip: UInt32):
+    fn __init__(
+        out self, address_family: AddressFamily, port: UInt16, binary_ip: UInt32
+    ):
         """Construct a SocketAddress from address family, port and binary IP.
 
         This constructor creates a `sockaddr_in` struct owned by a pointer, then casts it to `sockaddr` and
@@ -177,7 +187,11 @@ struct SocketAddress(Movable):
         """
         var sockaddr_in_ptr = alloc[sockaddr_in](count=1)
         sockaddr_in_ptr.init_pointee_move(
-            sockaddr_in(address_family=Int(address_family.value), port=port, binary_ip=binary_ip)
+            sockaddr_in(
+                address_family=Int(address_family.value),
+                port=port,
+                binary_ip=binary_ip,
+            )
         )
         self.addr = sockaddr_in_ptr.bitcast[sockaddr]()
 
@@ -187,7 +201,9 @@ struct SocketAddress(Movable):
 
     fn unsafe_ptr[
         origin: Origin, address_space: AddressSpace, //
-    ](ref [origin, address_space]self) -> UnsafePointer[sockaddr, origin, address_space=address_space]:
+    ](ref [origin, address_space]self) -> UnsafePointer[
+        sockaddr, origin, address_space=address_space
+    ]:
         """Retrieves a pointer to the underlying memory.
 
         Parameters:
@@ -197,10 +213,15 @@ struct SocketAddress(Movable):
         Returns:
             The pointer to the underlying memory.
         """
-        return self.addr.unsafe_mut_cast[origin.mut]().unsafe_origin_cast[origin]().address_space_cast[address_space]()
+        return (
+            self.addr.unsafe_mut_cast[origin.mut]()
+            .unsafe_origin_cast[origin]()
+            .address_space_cast[address_space]()
+        )
 
     fn as_sockaddr_in(mut self) -> ref [origin_of(self)] sockaddr_in:
-        """Cast the underlying sockaddr pointer to sockaddr_in and return a reference to it."""
+        """Cast the underlying sockaddr pointer to sockaddr_in and return a reference to it.
+        """
         return self.unsafe_ptr().bitcast[sockaddr_in]()[]
 
 
@@ -262,7 +283,9 @@ fn _inet_ntop(
     ](af, src, dst, size)
 
 
-fn inet_ntop[address_family: AddressFamily, address_length: AddressLength](ip_address: UInt32) raises -> String:
+fn inet_ntop[
+    address_family: AddressFamily, address_length: AddressLength
+](ip_address: UInt32) raises -> String:
     """Libc POSIX `inet_ntop` function.
 
     Parameters:
@@ -300,20 +323,31 @@ fn inet_ntop[address_family: AddressFamily, address_length: AddressLength](ip_ad
     if not result:
         var errno = get_errno()
         if errno == errno.EAFNOSUPPORT:
-            raise Error("inet_ntop Error: `*src` was not an `AF_INET` or `AF_INET6` family address.")
+            raise Error(
+                "inet_ntop Error: `*src` was not an `AF_INET` or `AF_INET6`"
+                " family address."
+            )
         elif errno == errno.ENOSPC:
             raise Error(
-                "inet_ntop Error: The buffer size, `size`, was not large enough to store the presentation form of the"
-                " address."
+                "inet_ntop Error: The buffer size, `size`, was not large enough"
+                " to store the presentation form of the address."
             )
         else:
-            raise Error("inet_ntop Error: An error occurred while converting the address. Error code: ", errno)
+            raise Error(
+                (
+                    "inet_ntop Error: An error occurred while converting the"
+                    " address. Error code: "
+                ),
+                errno,
+            )
 
     # Copy the dst contents into a new String.
     return String(unsafe_from_utf8_ptr=dst.unsafe_ptr())
 
 
-fn _inet_pton(af: c_int, src: ImmutUnsafePointer[c_char], dst: MutUnsafePointer[c_void]) -> c_int:
+fn _inet_pton(
+    af: c_int, src: ImmutUnsafePointer[c_char], dst: MutUnsafePointer[c_void]
+) -> c_int:
     """Libc POSIX `inet_pton` function. Converts a presentation format address (that is, printable form as held in a character string)
     to network format (usually a struct in_addr or some other internal binary representation, in network byte order).
     It returns 1 if the address was valid for the specified address family, or 0 if the address was not parseable in the specified address family,
@@ -377,11 +411,19 @@ fn inet_pton[address_family: AddressFamily](var src: String) raises -> c_uint:
     else:
         ip_buffer = stack_allocation[4, c_void]()
 
-    var result = _inet_pton(address_family.value, src.as_c_string_slice().unsafe_ptr(), ip_buffer)
+    var result = _inet_pton(
+        address_family.value, src.as_c_string_slice().unsafe_ptr(), ip_buffer
+    )
     if result == 0:
         raise Error("inet_pton Error: The input is not a valid address.")
     elif result == -1:
         var errno = get_errno()
-        raise Error("inet_pton Error: An error occurred while converting the address. Error code: ", errno)
+        raise Error(
+            (
+                "inet_pton Error: An error occurred while converting the"
+                " address. Error code: "
+            ),
+            errno,
+        )
 
     return ip_buffer.bitcast[c_uint]().take_pointee()
