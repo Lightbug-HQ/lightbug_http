@@ -1,9 +1,9 @@
 from lightbug_http import Welcome
-from lightbug_http.server_new import ServerNew
+from lightbug_http.server_new import Server
 from os.env import getenv
 
 fn main() raises:
-    var server = ServerNew()
+    var server = Server()
     var handler = Welcome()
 
     var host = getenv("DEFAULT_SERVER_HOST", "localhost")
