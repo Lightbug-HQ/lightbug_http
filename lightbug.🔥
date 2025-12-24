@@ -1,5 +1,5 @@
 from lightbug_http import Welcome
-from lightbug_http.server_new import Server
+from lightbug_http.server import Server
 from os.env import getenv
 
 fn main() raises:

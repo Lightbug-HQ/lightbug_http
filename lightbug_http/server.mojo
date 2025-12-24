@@ -19,7 +19,6 @@ struct ServerConfig(Copyable, Movable):
 
     var socket_buffer_size: Int
     var recv_buffer_max: Int
-    var recv_buffer_retain: Int  # Retained capacity after clear
 
     var max_request_body_size: Int
     var max_request_uri_length: Int
@@ -30,44 +29,9 @@ struct ServerConfig(Copyable, Movable):
 
         self.socket_buffer_size = default_buffer_size
         self.recv_buffer_max = 2 * 1024 * 1024  # 2MB
-        self.recv_buffer_retain = 4096
 
         self.max_request_body_size = 4 * 1024 * 1024  # 4MB
         self.max_request_uri_length = 8192
-
-
-struct ZeroCopyBuffer(Movable):
-    """
-    Growable buffer that retains capacity when cleared.
-    Reduces allocations in long-lived connections.
-    """
-
-    var data: Bytes
-    var written: Int
-    var retain_size: Int
-
-    fn __init__(out self, initial_capacity: Int, retain: Int):
-        self.data = Bytes(capacity=initial_capacity)
-        self.written = 0
-        self.retain_size = retain
-
-    fn append(mut self, var byte_data: Bytes):
-        self.data.extend(byte_data^)
-        self.written = len(self.data)
-
-    fn as_bytes(self) -> Span[Byte, origin_of(self.data)]:
-        return self.data
-
-    fn clear_retaining_capacity(mut self):
-        if len(self.data) > self.retain_size:
-            # Shrink to retain size
-            self.data = Bytes(capacity=self.retain_size)
-        else:
-            self.data.clear()
-        self.written = 0
-
-    fn len(self) -> Int:
-        return len(self.data)
 
 
 @fieldwise_init
@@ -127,7 +91,7 @@ struct ConnectionProvision(Movable):
     Pre-allocated and reused (pooled) across connections.
     """
 
-    var recv_buffer: ZeroCopyBuffer
+    var recv_buffer: Bytes
     var request: Optional[HTTPRequest]
     var response: Optional[HTTPResponse]
     var state: ConnectionState
@@ -135,7 +99,7 @@ struct ConnectionProvision(Movable):
     var should_close: Bool
 
     fn __init__(out self, config: ServerConfig):
-        self.recv_buffer = ZeroCopyBuffer(config.socket_buffer_size, config.recv_buffer_retain)
+        self.recv_buffer = Bytes(capacity=config.socket_buffer_size)
         self.request = None
         self.response = None
         self.state = ConnectionState.reading_headers()
@@ -146,7 +110,7 @@ struct ConnectionProvision(Movable):
         """Reset provision for next request in keepalive connection."""
         self.request = None
         self.response = None
-        self.recv_buffer.clear_retaining_capacity()
+        self.recv_buffer.clear()
         self.state = ConnectionState.reading_headers()
         self.should_close = False
 
@@ -178,15 +142,15 @@ fn handle_connection[
                 provision.state = ConnectionState.closed()
                 break
 
-            provision.recv_buffer.append(buffer^)
+            provision.recv_buffer.extend(buffer^)
 
-            if BytesConstant.DOUBLE_CRLF in ByteView(provision.recv_buffer.as_bytes()):
+            if BytesConstant.DOUBLE_CRLF in ByteView(provision.recv_buffer):
                 try:
                     var request = HTTPRequest.from_bytes(
                         server_address,
                         config.max_request_body_size,
                         config.max_request_uri_length,
-                        provision.recv_buffer.as_bytes(),
+                        provision.recv_buffer,
                     )
 
                     var content_length = request.headers.content_length()
@@ -209,7 +173,7 @@ fn handle_connection[
                     provision.state = ConnectionState.closed()
                     break
 
-            if provision.recv_buffer.len() > config.recv_buffer_max:
+            if len(provision.recv_buffer) > config.recv_buffer_max:
                 _ = conn.write(encode(BadRequest()))
                 provision.state = ConnectionState.closed()
                 break
@@ -228,13 +192,13 @@ fn handle_connection[
                 provision.state = ConnectionState.closed()
                 break
 
-            provision.recv_buffer.append(buffer^)
+            provision.recv_buffer.extend(buffer^)
             provision.state.body_state.bytes_read += Int(bytes_read)
 
             if provision.state.body_state.bytes_read >= provision.state.body_state.content_length:
                 provision.state = ConnectionState.processing()
 
-            if provision.recv_buffer.len() > config.max_request_body_size:
+            if len(provision.recv_buffer) > config.max_request_body_size:
                 _ = conn.write(encode(BadRequest()))
                 provision.state = ConnectionState.closed()
                 break
