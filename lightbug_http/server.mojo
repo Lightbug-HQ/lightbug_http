@@ -1,7 +1,7 @@
 from lightbug_http.connection import ConnectionState, ListenConfig, NoTLSListener, TCPConnection, default_buffer_size
 from lightbug_http.http.common_response import BadRequest, InternalError, URITooLong
 from lightbug_http.io.bytes import ByteReader, Bytes, BytesConstant, ByteView
-from lightbug_http.owning_list import OwningList
+from lightbug_http.utils.owning_list import OwningList
 from lightbug_http.service import HTTPService
 from lightbug_http.socket import EOF, SocketError
 
