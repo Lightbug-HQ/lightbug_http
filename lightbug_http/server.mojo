@@ -10,11 +10,6 @@ from lightbug_http.http import HTTPRequest, HTTPResponse, encode
 
 @fieldwise_init
 struct ServerConfig(Copyable, Movable):
-    """
-    Configuration for HTTP server.
-    Provides explicit control over resource limits and buffer sizes.
-    """
-
     var max_connections: Int
     var max_keepalive_requests: Int
 
