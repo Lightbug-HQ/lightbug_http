@@ -1,17 +1,7 @@
 from hashlib.hash import Hasher
 
 from lightbug_http.io.bytes import ByteReader, Bytes, ByteView
-from lightbug_http.strings import http, https, strHttp10, strHttp11
-
-
-fn find_all(s: String, sub_str: String) -> List[Int]:
-    match_idxs = List[Int]()
-    var current_idx: Int = s.find(sub_str)
-    while current_idx > -1:
-        match_idxs.append(current_idx)
-        current_idx = s.find(sub_str, start=current_idx + 1)
-    return match_idxs^
-
+from lightbug_http.strings import http, https, strHttp10, strHttp11, find_all
 
 fn unquote[expand_plus: Bool = False](input_str: String, disallowed_escapes: List[String] = List[String]()) -> String:
     var encoded_str = input_str.replace(QueryDelimiters.PLUS_ESCAPED_SPACE, " ") if expand_plus else input_str
@@ -89,7 +79,6 @@ struct URIDelimiters:
 
 
 struct PortBounds:
-    # For port parsing
     comptime NINE: UInt8 = ord("9")
     comptime ZERO: UInt8 = ord("0")
 
