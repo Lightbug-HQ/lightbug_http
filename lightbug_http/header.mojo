@@ -97,8 +97,10 @@ struct Headers(Copyable, Stringable, Writable):
         except:
             return 0
 
-    fn parse_raw_request(mut self, mut reader: ByteReader, out result: ParsedRequestResult) raises:
-        """Parse HTTP request using picohttpparser."""
+    fn parse_raw_request(
+        mut self, mut reader: ByteReader, out result: ParsedRequestResult
+    ) raises:
+        """Parse HTTP request."""
         if self.check_if_response(reader):
             raise Error("Headers.parse_raw: Not a valid HTTP request.")
 
@@ -143,8 +145,10 @@ struct Headers(Copyable, Stringable, Writable):
         reader.read_pos += ret
         result = ParsedRequestResult(method^, path^, String("HTTP/1.", minor_version), cookies^)
 
-    fn parse_raw_response(mut self, mut reader: ByteReader, out result: ParsedResponseResult) raises:
-        """Parse HTTP response using picohttpparser."""
+    fn parse_raw_response(
+        mut self, mut reader: ByteReader, out result: ParsedResponseResult
+    ) raises:
+        """Parse HTTP response."""
         if not self.check_if_response(reader):
             raise Error("Headers.parse_raw: Not a valid HTTP response.")
 

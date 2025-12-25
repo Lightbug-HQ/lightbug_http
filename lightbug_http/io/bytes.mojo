@@ -341,8 +341,7 @@ fn memmove[
 fn create_string_from_ptr[origin: ImmutOrigin](ptr: UnsafePointer[UInt8, origin], length: Int) -> String:
     """Create a String from a pointer and length.
 
-    Copies raw bytes directly into the String. This may result in invalid UTF-8 for bytes >= 0x80,
-    but matches the behavior expected by the picohttpparser tests which were written for C.
+    Copies raw bytes directly into the String. NOTE: may result in invalid UTF-8 for bytes >= 0x80.
     """
     if length <= 0:
         return String()

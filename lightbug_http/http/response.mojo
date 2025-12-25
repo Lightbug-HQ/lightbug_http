@@ -78,18 +78,15 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
 
         var transfer_encoding = response.headers.get(HeaderKey.TRANSFER_ENCODING)
         if transfer_encoding and transfer_encoding.value() == "chunked":
-            # Use pico's chunked decoder for proper RFC-compliant parsing
             var decoder = HTTPChunkedDecoder()
-            decoder.consume_trailer = True  # Consume trailing headers
+            decoder.consume_trailer = True
 
             var b = Bytes(reader.read_bytes().as_bytes())
             var buff = Bytes(capacity=default_buffer_size)
             try:
-                # Read chunks from connection
                 while conn.read(buff) > 0:
                     b.extend(buff.copy())
 
-                    # Check if we've reached the end of chunked data (0\r\n\r\n)
                     if (
                         len(buff) >= 5
                         and buff[-5] == byte["0"]()
@@ -102,8 +99,8 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
 
                     # buff.clear()  # TODO: Should this be cleared? This was commented out before.
                 # response.read_chunks(b)
-                # Decode chunks using pico
-                response._decode_chunks_pico(decoder, b^)
+                # Decode chunks
+                response._decode_chunks(decoder, b^)
                 return response^
             except e:
                 raise Error("Failed to read chunked response.")
@@ -114,13 +111,15 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
         except e:
             raise Error("Failed to read request body: ")
 
-    fn _decode_chunks_pico(mut self, mut decoder: HTTPChunkedDecoder, var chunks: Bytes) raises:
-        """Decode chunked transfer encoding using picohttpparser.
+    fn _decode_chunks(
+        mut self, mut decoder: HTTPChunkedDecoder, var chunks: Bytes
+    ) raises:
+        """Decode chunked transfer encoding.
         Args:
             decoder: The chunked decoder state machine.
             chunks: The raw chunked data to decode.
         """
-        # Convert Bytes to UnsafePointer for pico API
+        # Convert Bytes to UnsafePointer
         # var buf_ptr = Span(chunks)
         # var buf_ptr = alloc[Byte](count=len(chunks))
         # for i in range(len(chunks)):
@@ -133,7 +132,9 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
 
         if ret == -1:
             # buf_ptr.free()
-            raise Error("HTTPResponse._decode_chunks_pico: Invalid chunked encoding")
+            raise Error(
+                "HTTPResponse._decode_chunks: Invalid chunked encoding"
+            )
         # ret == -2 means incomplete, but we'll proceed with what we have
         # ret >= 0 means complete, with ret bytes of trailing data
 
