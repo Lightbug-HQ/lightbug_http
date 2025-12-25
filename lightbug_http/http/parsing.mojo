@@ -40,14 +40,14 @@ fn get_token_to_eol[
         ret = -2
         return UnsafePointer[UInt8, origin]()
 
-    if current[] == BytesConstant.CR:  # '\r'
+    if current[] == BytesConstant.CR:
         current += 1
-        if current >= buf_end or current[] != BytesConstant.LF:  # '\n'
+        if current >= buf_end or current[] != BytesConstant.LF:
             ret = -1
             return UnsafePointer[UInt8, origin]()
         token_len = Int(current) - 1 - Int(token_start)
         current += 1
-    elif current[] == BytesConstant.LF:  # '\n'
+    elif current[] == BytesConstant.LF:
         token_len = Int(current) - Int(token_start)
         current += 1
     else:
@@ -71,17 +71,17 @@ fn is_complete[
     var current = buf if last_len < 3 else buf + last_len - 3
 
     while current < buf_end:
-        if current[] == BytesConstant.CR:  # '\r'
+        if current[] == BytesConstant.CR:
             current += 1
             if current >= buf_end:
                 ret = -2
                 return UnsafePointer[UInt8, origin]()
-            if current[] != BytesConstant.LF:  # '\n'
+            if current[] != BytesConstant.LF:
                 ret = -1
                 return UnsafePointer[UInt8, origin]()
             current += 1
             ret_cnt += 1
-        elif current[] == BytesConstant.LF:  # '\n'
+        elif current[] == BytesConstant.LF:
             current += 1
             ret_cnt += 1
         else:
@@ -137,7 +137,6 @@ fn parse_http_version[
         return UnsafePointer[UInt8, origin]()
 
     var current = buf
-    # Check "HTTP/1."
     if (
         current[] != BytesConstant.H
         or current[1] != BytesConstant.T
@@ -177,26 +176,25 @@ fn parse_headers[
 
     while current < buf_end:
         # Check for end of headers (empty line)
-        if current[] == BytesConstant.CR:  # '\r'
+        if current[] == BytesConstant.CR:
             current += 1
             if current >= buf_end:
                 ret = -2
                 return UnsafePointer[UInt8, buf_origin]()
-            if current[] != BytesConstant.LF:  # '\n'
+            if current[] != BytesConstant.LF:
                 ret = -1
                 return UnsafePointer[UInt8, buf_origin]()
             current += 1
-            break  # End of headers found
-        elif current[] == BytesConstant.LF:  # '\n'
+            break
+        elif current[] == BytesConstant.LF:
             current += 1
-            break  # End of headers found
+            break
 
         # Not end of headers, so we must be parsing a header
         if num_headers >= max_headers:
             ret = -1
             return UnsafePointer[UInt8, buf_origin]()
 
-        # Parse header name
         if num_headers == 0 or (current[] != BytesConstant.whitespace and current[] != BytesConstant.TAB):
             var name = String()
             var name_len = Int()
@@ -257,7 +255,6 @@ fn http_parse_request[
     var ret: Int = 0
     var current = buf_start
 
-    # Initialize outputs
     method = String()
     method_len = 0
     path = String()
@@ -272,19 +269,18 @@ fn http_parse_request[
 
     # Skip initial empty lines (for tolerance)
     while current < buf_end:
-        if current[] == BytesConstant.CR:  # '\r'
+        if current[] == BytesConstant.CR:
             current += 1
             if current >= buf_end:
                 return -2
-            if current[] != BytesConstant.LF:  # '\n'
-                break  # Not an empty line, start parsing
+            if current[] != BytesConstant.LF:
+                break
             current += 1
-        elif current[] == BytesConstant.LF:  # '\n'
+        elif current[] == BytesConstant.LF:
             current += 1
         else:
             break  # Start of actual request
 
-    # Parse method
     current = parse_token(current, buf_end, method, method_len, BytesConstant.whitespace, ret)
     if current == UnsafePointer[UInt8, buf_origin]():
         return ret
@@ -292,11 +288,9 @@ fn http_parse_request[
     # Skip the space
     current += 1
 
-    # Skip any extra spaces
     while current < buf_end and current[] == BytesConstant.whitespace:
         current += 1
 
-    # Parse path
     var path_start = current
     while current < buf_end and current[] != BytesConstant.whitespace:
         # Accept printable ASCII (32-126) and high-bit characters (>= 128)
@@ -314,39 +308,34 @@ fn http_parse_request[
     path_len = Int(current) - Int(path_start)
     path = create_string_from_ptr(path_start, path_len)
 
-    # Skip spaces before HTTP version
     while current < buf_end and current[] == BytesConstant.whitespace:
         current += 1
 
     if current >= buf_end:
         return -2
 
-    # Check if method or path is empty
     if method_len == 0 or path_len == 0:
         return -1
 
-    # Parse HTTP version
     current = parse_http_version(current, buf_end, minor_version, ret)
     if current == UnsafePointer[UInt8, buf_origin]():
         return ret
 
-    # Expect CRLF or LF after version
     if current >= buf_end:
         return -2
 
-    if current[] == BytesConstant.CR:  # '\r'
+    if current[] == BytesConstant.CR: 
         current += 1
         if current >= buf_end:
             return -2
-        if current[] != BytesConstant.LF:  # '\n'
+        if current[] != BytesConstant.LF:
             return -1
         current += 1
-    elif current[] == BytesConstant.LF:  # '\n'
+    elif current[] == BytesConstant.LF:
         current += 1
     else:
         return -1
 
-    # Parse headers
     current = parse_headers(current, buf_end, headers, num_headers, max_headers, ret)
     if current == UnsafePointer[UInt8, buf_origin]():
         return ret
@@ -372,25 +361,21 @@ fn http_parse_response[
     var ret: Int = 0
     var current = buf_start
 
-    # Initialize outputs
     minor_version = -1
     status = 0
     msg = String()
     msg_len = 0
     num_headers = 0
 
-    # Check if response is complete
     if last_len != 0:
         var complete = is_complete(buf_start, buf_end, last_len, ret)
         if complete == UnsafePointer[UInt8, buf_origin]():
             return ret
 
-    # Parse HTTP version
     current = parse_http_version(current, buf_end, minor_version, ret)
     if current == UnsafePointer[UInt8, buf_origin]():
         return ret
 
-    # Skip space(s)
     if current[] != BytesConstant.whitespace:
         return -1
 
@@ -401,7 +386,6 @@ fn http_parse_response[
     if Int(buf_end) - Int(current) < 4:
         return -2
 
-    # Parse 3-digit status code
     status = 0
 
     @parameter
@@ -428,7 +412,6 @@ fn http_parse_response[
         # Garbage found after status code
         return -1
 
-    # Parse headers
     current = parse_headers(current, buf_end, headers, num_headers, max_headers, ret)
     if current == UnsafePointer[UInt8, buf_origin]():
         return ret
@@ -452,13 +435,11 @@ fn http_parse_headers[
 
     num_headers = 0
 
-    # Check if headers are complete
     if last_len != 0:
         var complete = is_complete(buf_start, buf_end, last_len, ret)
         if complete == UnsafePointer[UInt8, buf_origin]():
             return ret
 
-    # Parse headers
     var current = parse_headers(buf_start, buf_end, headers, num_headers, max_headers, ret)
     if current == UnsafePointer[UInt8, buf_origin]():
         return ret

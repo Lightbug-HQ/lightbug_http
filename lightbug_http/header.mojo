@@ -107,9 +107,7 @@ struct Headers(Copyable, Stringable, Writable):
         var method = String()
         var path = String()
         var minor_version = -1
-
-        # Allocate headers array (max 100 headers)
-        var max_headers = 100
+        var max_headers = 100 # TODO: make configurable
         var headers = InlineArray[HTTPHeader, 100](fill=HTTPHeader())
 
         var num_headers = max_headers
@@ -130,7 +128,6 @@ struct Headers(Copyable, Stringable, Writable):
             else:  # ret == -2
                 raise Error("Headers.parse_raw: Incomplete HTTP request")
 
-        # Extract headers and cookies
         var cookies = List[String]()
         for i in range(num_headers):
             var key = headers[i].name.lower()
@@ -141,7 +138,6 @@ struct Headers(Copyable, Stringable, Writable):
             else:
                 self._inner[key] = value
 
-        # Build protocol string
         reader.read_pos += ret
         result = ParsedRequestResult(method^, path^, String("HTTP/1.", minor_version), cookies^)
 
@@ -156,8 +152,7 @@ struct Headers(Copyable, Stringable, Writable):
         var status = 0
         var msg = String()
 
-        # Allocate headers array (max 100 headers)
-        var max_headers = 100
+        var max_headers = 100 # TODO: make configurable
         var headers = InlineArray[HTTPHeader, 100](fill=HTTPHeader())
         var num_headers = max_headers
         var ret = http_parse_response(
@@ -177,7 +172,6 @@ struct Headers(Copyable, Stringable, Writable):
             else:  # ret == -2
                 raise Error("Headers.parse_raw: Incomplete HTTP response")
 
-        # Extract headers and cookies
         var cookies = List[String]()
         for i in range(num_headers):
             var key = headers[i].name.lower()
@@ -188,7 +182,6 @@ struct Headers(Copyable, Stringable, Writable):
             else:
                 self._inner[key] = value
 
-        # Build protocol string
         var protocol = String("HTTP/1.", minor_version)
         reader.read_pos += ret
         result = ParsedResponseResult(protocol^, status, msg^, cookies^)
@@ -197,7 +190,6 @@ struct Headers(Copyable, Stringable, Writable):
         if not r.available():
             raise Error("Headers.parse_raw: Failed to read first byte from response header.")
 
-        # Check if starts with "HTTP/" (response) or method name (request)
         var buf_span = r.as_bytes()
         return (
             len(buf_span) >= 5
