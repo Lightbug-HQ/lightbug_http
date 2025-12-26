@@ -4,6 +4,7 @@ from sys.info import CompilationTarget, size_of
 from lightbug_http.c.aliases import c_void
 from lightbug_http.c.network import SocketAddress, sockaddr, sockaddr_in, socklen_t
 from memory import stack_allocation
+from lightbug_http.c.socket_error import *
 
 
 @fieldwise_init
@@ -204,7 +205,7 @@ fn _socket(domain: c_int, type: c_int, protocol: c_int) -> c_int:
     return external_call["socket", c_int, type_of(domain), type_of(type), type_of(protocol)](domain, type, protocol)
 
 
-fn socket(domain: c_int, type: c_int, protocol: c_int) raises -> c_int:
+fn socket(domain: c_int, type: c_int, protocol: c_int) raises SocketError -> c_int:
     """Libc POSIX `socket` function.
 
     Args:
@@ -237,39 +238,19 @@ fn socket(domain: c_int, type: c_int, protocol: c_int) raises -> c_int:
     if fd == -1:
         var errno = get_errno()
         if errno == errno.EACCES:
-            raise Error(
-                "SocketError (EACCES): Permission to create a socket of the specified type and/or protocol is denied."
-            )
+            raise EACCESError()
         elif errno == errno.EAFNOSUPPORT:
-            raise Error("SocketError (EAFNOSUPPORT): The implementation does not support the specified address family.")
+            raise EAFNOSUPPORTError()
         elif errno == errno.EINVAL:
-            raise Error(
-                "SocketError (EINVAL): Invalid flags in type, Unknown protocol, or protocol family not available."
-            )
+            raise EINVALError()
         elif errno == errno.EMFILE:
-            raise Error(
-                "SocketError (EMFILE): The per-process limit on the number of open file descriptors has been reached."
-            )
+            raise EMFILEError()
         elif errno == errno.ENFILE:
-            raise Error(
-                "SocketError (ENFILE): The system-wide limit on the total number of open files has been reached."
-            )
+            raise ENFILEError()
         elif errno in [errno.ENOBUFS, errno.ENOMEM]:
-            raise Error(
-                "SocketError (ENOBUFS or ENOMEM): Insufficient memory is"
-                " available. The socket cannot be created until sufficient"
-                " resources are freed."
-            )
+            raise ENOBUFSError()
         elif errno == errno.EPROTONOSUPPORT:
-            raise Error(
-                "SocketError (EPROTONOSUPPORT): The protocol type or the"
-                " specified protocol is not supported within this domain."
-            )
-        else:
-            raise Error(
-                "SocketError: An error occurred while creating the socket. Error code: ",
-                errno,
-            )
+            raise EPROTONOSUPPORTError()
 
     return fd
 
@@ -507,7 +488,7 @@ fn _getsockname[
     ](socket, address, address_len)
 
 
-fn getsockname(socket: FileDescriptor, mut address: SocketAddress) raises:
+fn getsockname(socket: FileDescriptor, mut address: SocketAddress) raises GetsocknameError:
     """Libc POSIX `getsockname` function.
 
     Args:
@@ -535,22 +516,15 @@ fn getsockname(socket: FileDescriptor, mut address: SocketAddress) raises:
     if result == -1:
         var errno = get_errno()
         if errno == errno.EBADF:
-            raise Error("getsockname: The argument `socket` is not a valid descriptor.")
+            raise EBADFError()
         elif errno == errno.EFAULT:
-            raise Error(
-                "getsockname: The `address` argument points to memory not in a valid part of the process address space."
-            )
+            raise EFAULTError()
         elif errno == errno.EINVAL:
-            raise Error("getsockname: `address_len` is invalid (e.g., is negative).")
+            raise EINVALError()
         elif errno == errno.ENOBUFS:
-            raise Error("getsockname: Insufficient resources were available in the system to perform the operation.")
+            raise ENOBUFSError()
         elif errno == errno.ENOTSOCK:
-            raise Error("getsockname: The argument `socket` is not a socket, it is a file.")
-        else:
-            raise Error(
-                "getsockname: An error occurred while getting the socket name. Error code: ",
-                errno,
-            )
+            raise ENOTSOCKError()
 
 
 fn _getpeername[
@@ -583,7 +557,7 @@ fn _getpeername[
     ](sockfd, addr, address_len)
 
 
-fn getpeername(file_descriptor: FileDescriptor) raises -> SocketAddress:
+fn getpeername(file_descriptor: FileDescriptor) raises GetpeernameError -> SocketAddress:
     """Libc POSIX `getpeername` function.
 
     Args:
@@ -616,24 +590,17 @@ fn getpeername(file_descriptor: FileDescriptor) raises -> SocketAddress:
     if result == -1:
         var errno = get_errno()
         if errno == errno.EBADF:
-            raise Error("getpeername: The argument `socket` is not a valid descriptor.")
+            raise EBADFError()
         elif errno == errno.EFAULT:
-            raise Error(
-                "getpeername: The `addr` argument points to memory not in a valid part of the process address space."
-            )
+            raise EFAULTError()
         elif errno == errno.EINVAL:
-            raise Error("getpeername: `address_len` is invalid (e.g., is negative).")
+            raise EINVALError()
         elif errno == errno.ENOBUFS:
-            raise Error("getpeername: Insufficient resources were available in the system to perform the operation.")
+            raise ENOBUFSError()
         elif errno == errno.ENOTCONN:
-            raise Error("getpeername: The socket is not connected.")
+            raise ENOTCONNError()
         elif errno == errno.ENOTSOCK:
-            raise Error("getpeername: The argument `socket` is not a socket, it is a file.")
-        else:
-            raise Error(
-                "getpeername: An error occurred while getting the socket name. Error code: ",
-                errno,
-            )
+            raise ENOTSOCKError()
 
     # Cast sockaddr struct to sockaddr_in
     return remote_address^
@@ -664,7 +631,7 @@ fn _bind[origin: ImmutOrigin](socket: c_int, address: Pointer[sockaddr_in, origi
     )
 
 
-fn bind(socket: FileDescriptor, mut address: SocketAddress) raises:
+fn bind(socket: FileDescriptor, mut address: SocketAddress) raises BindError:
     """Libc POSIX `bind` function.
 
     Args:
@@ -703,38 +670,20 @@ fn bind(socket: FileDescriptor, mut address: SocketAddress) raises:
     if result == -1:
         var errno = get_errno()
         if errno == errno.EACCES:
-            raise Error("bind: The address, `address`, is protected, and the user is not the superuser.")
+            raise EACCESError()
         elif errno == errno.EADDRINUSE:
-            raise Error("bind: The given address is already in use.")
+            raise EADDRINUSEError()
         elif errno == errno.EBADF:
-            raise Error("bind: `socket` is not a valid descriptor.")
+            raise EBADFError()
         elif errno == errno.EINVAL:
-            raise Error("bind: The socket is already bound to an address.")
+            raise EINVALError()
         elif errno == errno.ENOTSOCK:
-            raise Error("bind: `socket` is a descriptor for a file, not a socket.")
+            raise ENOTSOCKError()
 
         # The following errors are specific to UNIX domain (AF_UNIX) sockets. TODO: Pass address_family when unix sockets supported.
         # if address_family == AF_UNIX:
         #     if errno == errno.EACCES:
-        #         raise Error("bind: Search permission is denied on a component of the path prefix. (See also path_resolution(7).)")
-        #     elif errno == EADDRNOTAVAIL:
-        #         raise Error("bind: A nonexistent interface was requested or the requested address was not local.")
-        #     elif errno == errno.EFAULT:
-        #         raise Error("bind: `address` points outside the user's accessible address space.")
-        #     elif errno == errno.EINVAL:
-        #         raise Error("bind: The `address_len` is wrong, or the socket was not in the AF_UNIX family.")
-        #     elif errno == errno.ELOOP:
-        #         raise Error("bind: Too many symbolic links were encountered in resolving addr.")
-        #     elif errno == errno.ENAMETOOLONG:
-        #         raise Error("bind: `address` is too long.")
-        #     elif errno == ENOENT:
-        #         raise Error("bind: The file does not exist.")
-        #     elif errno == errno.ENOMEM:
-        #         raise Error("bind: Insufficient kernel memory was available.")
-        #     elif errno == ENOTDIR:
-        #         raise Error("bind: A component of the path prefix is not a directory.")
-        #     elif errno == EROFS:
-        #         raise Error("bind: The socket inode would reside on a read-only file system.")
+        raise EACCESError()
 
         raise Error(
             "bind: An error occurred while binding the socket. Error code: ",
@@ -763,7 +712,7 @@ fn _listen(socket: c_int, backlog: c_int) -> c_int:
     return external_call["listen", c_int, type_of(socket), type_of(backlog)](socket, backlog)
 
 
-fn listen(socket: FileDescriptor, backlog: c_int) raises:
+fn listen(socket: FileDescriptor, backlog: c_int) raises ListenError:
     """Libc POSIX `listen` function.
 
     Args:
@@ -789,18 +738,13 @@ fn listen(socket: FileDescriptor, backlog: c_int) raises:
     if result == -1:
         var errno = get_errno()
         if errno == errno.EADDRINUSE:
-            raise Error("listen: Another socket is already listening on the same port.")
+            raise EADDRINUSEError()
         elif errno == errno.EBADF:
-            raise Error("listen: `socket` is not a valid descriptor.")
+            raise EBADFError()
         elif errno == errno.ENOTSOCK:
-            raise Error("listen: `socket` is a descriptor for a file, not a socket.")
+            raise ENOTSOCKError()
         elif errno == errno.EOPNOTSUPP:
-            raise Error("listen: The socket is not of a type that supports the `listen()` operation.")
-        else:
-            raise Error(
-                "listen: An error occurred while listening on the socket. Error code: ",
-                errno,
-            )
+            raise EOPNOTSUPPError()
 
 
 fn _accept[
@@ -829,7 +773,7 @@ fn _accept[
     )
 
 
-fn accept(socket: FileDescriptor) raises -> FileDescriptor:
+fn accept(socket: FileDescriptor) raises AcceptError -> FileDescriptor:
     """Libc POSIX `accept` function.
 
     Args:
@@ -868,53 +812,34 @@ fn accept(socket: FileDescriptor) raises -> FileDescriptor:
     if result == -1:
         var errno = get_errno()
         if errno in [errno.EAGAIN, errno.EWOULDBLOCK]:
-            raise Error(
-                "accept: The socket is marked nonblocking and no connections"
-                " are present to be accepted. POSIX.1-2001 allows either error"
-                " to be returned for this case, and does not require these"
-                " constants to have the same value, so a portable application"
-                " should check for both possibilities.."
-            )
+            raise EAGAINError()
         elif errno == errno.EBADF:
-            raise Error("accept: `socket` is not a valid descriptor.")
+            raise EBADFError()
         elif errno == errno.ECONNABORTED:
-            raise Error("accept: `socket` is not a valid descriptor.")
+            raise ECONNABORTEDError()
         elif errno == errno.EFAULT:
-            raise Error("accept: The `address` argument is not in a writable part of the user address space.")
+            raise EFAULTError()
         elif errno == errno.EINTR:
-            raise Error(
-                "accept: The system call was interrupted by a signal that was"
-                " caught before a valid connection arrived; see `signal(7)`."
-            )
+            raise EINTRError()
         elif errno == errno.EINVAL:
-            raise Error(
-                "accept: Socket is not listening for connections, or `addr_length` is invalid (e.g., is negative)."
-            )
+            raise EINVALError()
         elif errno == errno.EMFILE:
-            raise Error("accept: The per-process limit of open file descriptors has been reached.")
+            raise EMFILEError()
         elif errno == errno.ENFILE:
-            raise Error("accept: The system limit on the total number of open files has been reached.")
+            raise ENFILEError()
         elif errno in [errno.ENOBUFS, errno.ENOMEM]:
-            raise Error(
-                "accept: Not enough free memory. This often means that the"
-                " memory allocation is limited by the socket buffer limits, not"
-                " by the system memory."
-            )
+            raise ENOBUFSError()
         elif errno == errno.ENOTSOCK:
-            raise Error("accept: `socket` is a descriptor for a file, not a socket.")
+            raise ENOTSOCKError()
         elif errno == errno.EOPNOTSUPP:
-            raise Error("accept: The referenced socket is not of type `SOCK_STREAM`.")
+            raise EOPNOTSUPPError()
         elif errno == errno.EPROTO:
-            raise Error("accept: Protocol error.")
+            raise EPROTOError()
 
         @parameter
         if CompilationTarget.is_linux():
             if errno == errno.EPERM:
-                raise Error("accept: Firewall rules forbid connection.")
-        raise Error(
-            "accept: An error occurred while listening on the socket. Error code: ",
-            errno,
-        )
+                raise EPERMError()
 
     return FileDescriptor(Int(result))
 
@@ -947,7 +872,7 @@ fn _connect[origin: ImmutOrigin](socket: c_int, address: Pointer[sockaddr_in, or
     ](socket, address, address_len)
 
 
-fn connect(socket: FileDescriptor, mut address: SocketAddress) raises:
+fn connect(socket: FileDescriptor, mut address: SocketAddress) raises ConnectError:
     """Libc POSIX `connect` function.
 
     Args:
@@ -983,26 +908,19 @@ fn connect(socket: FileDescriptor, mut address: SocketAddress) raises:
     if result == -1:
         var errno = get_errno()
         if errno == errno.EACCES:
-            raise Error(
-                "connect: For UNIX domain sockets, which are identified by"
-                " pathname: Write permission is denied on the socket file, or"
-                " search permission is denied for one of the directories in the"
-                " path prefix. (See also path_resolution(7))."
-            )
+            raise EACCESError()
         elif errno == errno.EADDRINUSE:
-            raise Error("connect: Local address is already in use.")
+            raise EADDRINUSEError()
         elif errno == errno.EAGAIN:
-            raise Error("connect: No more free local ports or insufficient entries in the routing cache.")
+            raise EAGAINError()
         elif errno == errno.EALREADY:
-            raise Error(
-                "connect: The socket is nonblocking and a previous connection attempt has not yet been completed."
-            )
+            raise EALREADYError()
         elif errno == errno.EBADF:
-            raise Error("connect: The file descriptor is not a valid index in the descriptor table.")
+            raise EBADFError()
         elif errno == errno.ECONNREFUSED:
-            raise Error("connect: No-one listening on the remote address.")
+            raise ECONNREFUSEDError()
         elif errno == errno.EFAULT:
-            raise Error("connect: The socket structure address is outside the user's address space.")
+            raise EFAULTError()
         elif errno == errno.EINPROGRESS:
             raise Error(
                 "connect: The socket is nonblocking and the connection cannot"
@@ -1015,24 +933,17 @@ fn connect(socket: FileDescriptor, mut address: SocketAddress) raises:
                 " listed here, explaining the reason for the failure)."
             )
         elif errno == errno.EINTR:
-            raise Error("connect: The system call was interrupted by a signal that was caught.")
+            raise EINTRError()
         elif errno == errno.EISCONN:
-            raise Error("connect: The socket is already connected.")
+            raise EISCONNError()
         elif errno == errno.ENETUNREACH:
-            raise Error("connect: Network is unreachable.")
+            raise ENETUNREACHError()
         elif errno == errno.ENOTSOCK:
-            raise Error("connect: The file descriptor is not associated with a socket.")
+            raise ENOTSOCKError()
         elif errno == errno.EAFNOSUPPORT:
-            raise Error("connect: The passed address didn't have the correct address family in its `sa_family` field.")
+            raise EAFNOSUPPORTError()
         elif errno == errno.ETIMEDOUT:
-            raise Error(
-                "connect: Timeout while attempting connection. The server may be too busy to accept new connections."
-            )
-        else:
-            raise Error(
-                "connect: An error occurred while connecting to the socket. Error code: ",
-                errno,
-            )
+            raise ETIMEDOUTError()
 
 
 fn _recv(
@@ -1586,13 +1497,9 @@ fn _shutdown(socket: c_int, how: c_int) -> c_int:
     return external_call["shutdown", c_int, type_of(socket), type_of(how)](socket, how)
 
 
-comptime ShutdownInvalidDescriptorError = "ShutdownError (EBADF): The argument `socket` is an invalid descriptor."
-comptime ShutdownInvalidArgumentError = "ShutdownError (EINVAL): Invalid argument passed."
-comptime ShutdownNotConnectedError = "ShutdownError (ENOTCONN): The socket is not connected."
-comptime ShutdownNotSocketError = "ShutdownError (ENOTSOCK): The file descriptor is not associated with a socket."
 
 
-fn shutdown(socket: FileDescriptor, how: ShutdownOption) raises:
+fn shutdown(socket: FileDescriptor, how: ShutdownOption) raises ShutdownError:
     """Libc POSIX `shutdown` function.
 
     Args:
@@ -1618,18 +1525,13 @@ fn shutdown(socket: FileDescriptor, how: ShutdownOption) raises:
     if result == -1:
         var errno = get_errno()
         if errno == errno.EBADF:
-            raise ShutdownInvalidDescriptorError
+            raise EBADFError()
         elif errno == errno.EINVAL:
-            raise ShutdownInvalidArgumentError
+            raise EINVALError()
         elif errno == errno.ENOTCONN:
-            raise ShutdownNotConnectedError
+            raise ENOTCONNError()
         elif errno == errno.ENOTSOCK:
-            raise ShutdownNotSocketError
-        else:
-            raise Error(
-                "ShutdownError: An error occurred while attempting to receive data from the socket. Error code: ",
-                errno,
-            )
+            raise ENOTSOCKError()
 
 
 fn _close(fildes: c_int) -> c_int:
@@ -1653,13 +1555,9 @@ fn _close(fildes: c_int) -> c_int:
     return external_call["close", c_int, type_of(fildes)](fildes)
 
 
-comptime CloseInvalidDescriptorError = "CloseError (EBADF): The file_descriptor argument is not a valid open file descriptor."
-comptime CloseInterruptedError = "CloseError (EINTR): The close() function was interrupted by a signal."
-comptime CloseRWError = "CloseError (EIO): An I/O error occurred while reading from or writing to the file system."
-comptime CloseOutOfSpaceError = "CloseError (ENOSPC or EDQUOT): On NFS, these errors are not normally reported against the first write which exceeds the available storage space, but instead against a subsequent write(2), fsync(2), or close()."
 
 
-fn close(file_descriptor: FileDescriptor) raises:
+fn close(file_descriptor: FileDescriptor) raises CloseError:
     """Libc POSIX `close` function.
 
     Args:
@@ -1686,15 +1584,10 @@ fn close(file_descriptor: FileDescriptor) raises:
     if _close(file_descriptor.value) == -1:
         var errno = get_errno()
         if errno == errno.EBADF:
-            raise CloseInvalidDescriptorError
+            raise EBADFError()
         elif errno == errno.EINTR:
-            raise CloseInterruptedError
+            raise EINTRError()
         elif errno == errno.EIO:
-            raise CloseRWError
+            raise EIOError()
         elif errno in [errno.ENOSPC, errno.EDQUOT]:
-            raise CloseOutOfSpaceError
-        else:
-            raise Error(
-                "SocketError: An error occurred while creating the socket. Error code: ",
-                errno,
-            )
+            raise ENOSPCError()
