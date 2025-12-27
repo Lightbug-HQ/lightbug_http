@@ -6,7 +6,7 @@ Follows the pattern from typed_errors.mojo.
 
 from sys.ffi import c_int, external_call, get_errno
 from utils import Variant
-from lightbug_http.utils import CustomError
+from lightbug_http.utils.error import CustomError
 
 
 # ===== ERROR STRUCTS (one per errno) =====
@@ -195,6 +195,8 @@ struct AcceptError(Movable, Stringable, Writable):
 
     comptime type = Variant[
         EBADFError,
+        EINTRError,
+        EAGAINError,
         ECONNABORTEDError,
         EFAULTError,
         EINVALError,
@@ -211,6 +213,14 @@ struct AcceptError(Movable, Stringable, Writable):
 
     @implicit
     fn __init__(out self, value: EBADFError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: EINTRError):
+        self.value = value
+    
+    @implicit
+    fn __init__(out self, value: EAGAINError):
         self.value = value
 
     @implicit
@@ -260,6 +270,10 @@ struct AcceptError(Movable, Stringable, Writable):
     fn write_to[W: Writer, //](self, mut writer: W):
         if self.value.isa[EBADFError]():
             writer.write(self.value[EBADFError])
+        elif self.value.isa[EINTRError]():
+            writer.write(self.value[EINTRError])
+        elif self.value.isa[EAGAINError]():
+            writer.write(self.value[EAGAINError])
         elif self.value.isa[ECONNABORTEDError]():
             writer.write(self.value[ECONNABORTEDError])
         elif self.value.isa[EFAULTError]():

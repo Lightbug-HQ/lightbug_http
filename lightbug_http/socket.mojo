@@ -14,8 +14,11 @@ from lightbug_http.c.address import AddressFamily, AddressLength
 from lightbug_http.c.network import SocketAddress, inet_pton
 from lightbug_http.c.socket import (
     SOL_SOCKET,
-    CloseInvalidDescriptorError,
-    ShutdownInvalidArgumentError,
+    EBADFError,
+    EINVALError,
+    EINTRError, 
+    EIOError, 
+    ENOSPCError,
     ShutdownOption,
     SocketOption,
     SocketType,
@@ -78,6 +81,59 @@ struct SocketError(Movable, Stringable, Writable):
             writer.write("SocketClosedError")
         elif self.value.isa[EOF]():
             writer.write("EOF")
+        elif self.value.isa[Error]():
+            writer.write(self.value[Error])
+
+    fn isa[T: AnyType](self) -> Bool:
+        return self.value.isa[T]()
+
+    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
+        return self.value[T]
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+
+@fieldwise_init
+struct FatalCloseError(Movable, Stringable, Writable):
+    """Error type for Socket.close() that excludes EBADF.
+
+    EBADF is excluded because it indicates the socket is already closed,
+    which is the desired state. Other errors indicate actual failures
+    that should be propagated.
+    """
+
+    comptime type = Variant[
+        EINTRError,
+        EIOError,
+        ENOSPCError,
+        Error
+    ]
+    var value: Self.type
+
+    @implicit
+    fn __init__(out self, value: EINTRError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: EIOError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: ENOSPCError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, var value: Error):
+        self.value = value^
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        if self.value.isa[EINTRError]():
+            writer.write(self.value[EINTRError])
+        elif self.value.isa[EIOError]():
+            writer.write(self.value[EIOError])
+        elif self.value.isa[ENOSPCError]():
+            writer.write(self.value[ENOSPCError])
         elif self.value.isa[Error]():
             writer.write(self.value[Error])
 
@@ -162,7 +218,7 @@ struct Socket[
         self._closed = False
         self._connected = True
 
-    fn teardown(deinit self) raises SocketError:
+    fn teardown(deinit self) raises FatalCloseError:
         """Close the socket and free the file descriptor."""
         if self._connected:
             try:
@@ -528,19 +584,19 @@ struct Socket[
         """
         return self._receive_from(dest)
 
-    fn shutdown(mut self) raises SocketError -> None:
+    fn shutdown(mut self) raises EINVALError -> None:
         """Shut down the socket. The remote end will receive no more data (after queued data is flushed)."""
         try:
             shutdown(self.fd, ShutdownOption.SHUT_RDWR)
         except e:
             # For the other errors, either the socket is already closed or the descriptor is invalid.
             # At that point we can feasibly say that the socket is already shut down.
-            if String(e) == ShutdownInvalidArgumentError:
-                raise e^
+            if e.isa[EINVALError]():
+                raise e[EINVALError]
 
         self._connected = False
 
-    fn close(mut self) raises SocketError -> None:
+    fn close(mut self) raises FatalCloseError -> None:
         """Mark the socket closed.
         Once that happens, all future operations on the socket object will fail.
         The remote end will receive no more data (after queued data is flushed).
@@ -553,7 +609,7 @@ struct Socket[
         except e:
             # If the file descriptor is invalid, then it was most likely already closed.
             # Other errors indicate a failure while attempting to close the socket.
-            if String(e) != CloseInvalidDescriptorError:
+            if not e.isa[EBADFError]():
                 raise e^
 
         self._closed = True

@@ -3,9 +3,51 @@ from lightbug_http.http.common_response import BadRequest, InternalError, URIToo
 from lightbug_http.io.bytes import ByteReader, Bytes, BytesConstant, ByteView
 from lightbug_http.utils.owning_list import OwningList
 from lightbug_http.service import HTTPService
-from lightbug_http.socket import EOF, SocketError
+from lightbug_http.socket import EOF, SocketError, FatalCloseError
+from utils import Variant
 
 from lightbug_http.http import HTTPRequest, HTTPResponse, encode
+
+
+@fieldwise_init
+struct ServerError(Movable, Stringable, Writable):
+    """Error variant for server operations that may encounter socket or close errors."""
+
+    comptime type = Variant[
+        SocketError,
+        FatalCloseError,
+        Error
+    ]
+    var value: Self.type
+
+    @implicit
+    fn __init__(out self, value: SocketError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: FatalCloseError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, var value: Error):
+        self.value = value^
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        if self.value.isa[SocketError]():
+            writer.write(self.value[SocketError])
+        elif self.value.isa[FatalCloseError]():
+            writer.write(self.value[FatalCloseError])
+        elif self.value.isa[Error]():
+            writer.write(self.value[Error])
+
+    fn isa[T: AnyType](self) -> Bool:
+        return self.value.isa[T]()
+
+    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
+        return self.value[T]
+
+    fn __str__(self) -> String:
+        return String.write(self)
 
 
 @fieldwise_init
@@ -328,7 +370,7 @@ struct Server(Movable):
         except e:
             raise Error("Error while serving HTTP requests: ", e)
 
-    fn serve[T: HTTPService](self, ln: NoTLSListener, mut handler: T) raises SocketError:
+    fn serve[T: HTTPService](self, ln: NoTLSListener, mut handler: T) raises ServerError:
         """Serve HTTP requests.
 
         Parameters:

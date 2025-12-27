@@ -5,7 +5,7 @@ from lightbug_http.address import HostPort, NetworkType, TCPAddr, UDPAddr, parse
 from lightbug_http.c.address import AddressFamily
 from lightbug_http.io.bytes import Bytes
 from lightbug_http.io.sync import Duration
-from lightbug_http.socket import EOF, Socket, SocketError, SocketOption, SocketType, TCPSocket, UDPSocket
+from lightbug_http.socket import EOF, Socket, SocketError, FatalCloseError, SocketOption, SocketType, TCPSocket, UDPSocket
 
 
 comptime default_buffer_size = 4096
@@ -210,7 +210,7 @@ struct TCPConnection:
     fn shutdown(mut self) raises SocketError:
         self.socket.shutdown()
 
-    fn teardown(deinit self) raises SocketError:
+    fn teardown(deinit self) raises FatalCloseError:
         self.socket^.teardown()
 
     fn is_closed(self) -> Bool:
