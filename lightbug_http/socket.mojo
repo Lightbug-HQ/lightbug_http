@@ -38,6 +38,7 @@ from lightbug_http.c.socket import (
     shutdown,
     socket,
 )
+from lightbug_http.c.socket_error import CloseError
 from lightbug_http.connection import default_buffer_size
 from lightbug_http.io.bytes import Bytes
 from utils import Variant
@@ -126,6 +127,19 @@ struct FatalCloseError(Movable, Stringable, Writable):
     @implicit
     fn __init__(out self, var value: Error):
         self.value = value^
+
+    @implicit
+    fn __init__(out self, var value: CloseError) raises:
+        if value.isa[EINTRError]():
+            self.value = EINTRError()
+        elif value.isa[EIOError]():
+            self.value = EIOError()
+        elif value.isa[ENOSPCError]():
+            self.value = ENOSPCError()
+        elif value.isa[Error]():
+            self.value = Error(value[Error])
+        else:
+            raise Error("Cannot convert EBADF to FatalCloseError - socket already closed")
 
     fn write_to[W: Writer, //](self, mut writer: W):
         if self.value.isa[EINTRError]():
@@ -610,15 +624,7 @@ struct Socket[
             # If the file descriptor is invalid, then it was most likely already closed.
             # Other errors indicate a failure while attempting to close the socket.
             if not e.isa[EBADFError]():
-                # Convert CloseError to FatalCloseError by extracting the specific error
-                if e.isa[EINTRError]():
-                    raise EINTRError()
-                elif e.isa[EIOError]():
-                    raise EIOError()
-                elif e.isa[ENOSPCError]():
-                    raise ENOSPCError()
-                elif e.isa[Error]():
-                    raise Error(e[Error])
+                raise
 
         self._closed = True
 
