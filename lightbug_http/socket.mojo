@@ -602,7 +602,7 @@ struct Socket[
         The remote end will receive no more data (after queued data is flushed).
 
         Raises:
-            Error: If closing the socket fails.
+            FatalCloseError: If closing the socket fails (excludes EBADF which means already closed).
         """
         try:
             close(self.fd)
@@ -610,7 +610,15 @@ struct Socket[
             # If the file descriptor is invalid, then it was most likely already closed.
             # Other errors indicate a failure while attempting to close the socket.
             if not e.isa[EBADFError]():
-                raise e^
+                # Convert CloseError to FatalCloseError by extracting the specific error
+                if e.isa[EINTRError]():
+                    raise EINTRError()
+                elif e.isa[EIOError]():
+                    raise EIOError()
+                elif e.isa[ENOSPCError]():
+                    raise ENOSPCError()
+                elif e.isa[Error]():
+                    raise Error(e[Error])
 
         self._closed = True
 

@@ -21,12 +21,12 @@ struct ServerError(Movable, Stringable, Writable):
     var value: Self.type
 
     @implicit
-    fn __init__(out self, value: SocketError):
-        self.value = value
+    fn __init__(out self, var value: SocketError):
+        self.value = value^
 
     @implicit
-    fn __init__(out self, value: FatalCloseError):
-        self.value = value
+    fn __init__(out self, var value: FatalCloseError):
+        self.value = value^
 
     @implicit
     fn __init__(out self, var value: Error):

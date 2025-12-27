@@ -683,7 +683,7 @@ fn bind(socket: FileDescriptor, mut address: SocketAddress) raises BindError:
         # The following errors are specific to UNIX domain (AF_UNIX) sockets. TODO: Pass address_family when unix sockets supported.
         # if address_family == AF_UNIX:
         #     if errno == errno.EACCES:
-        raise EACCESError()
+        #       raise EACCESError()
 
         raise Error(
             "bind: An error occurred while binding the socket. Error code: ",
