@@ -360,8 +360,8 @@ fn get_ip_address(mut host: String, address_family: AddressFamily, sock_type: So
         var service = String()
         try:
             result = getaddrinfo(host, service, hints)
-        except e:
-            raise e^
+        except getaddrinfo_err:
+            raise getaddrinfo_err^
 
         if not result.unsafe_ptr()[].ai_addr:
             raise Error("Failed to get IP address because the response's `ai_addr` was null.")
@@ -384,8 +384,8 @@ fn get_ip_address(mut host: String, address_family: AddressFamily, sock_type: So
         var service = String()
         try:
             result = getaddrinfo(host, service, hints)
-        except e:
-            raise e^
+        except getaddrinfo_err:
+            raise getaddrinfo_err^
 
         if not result.unsafe_ptr()[].ai_addr:
             raise Error("Failed to get IP address because the response's `ai_addr` was null.")
@@ -479,7 +479,7 @@ fn parse_port[origin: ImmutOrigin](port_str: StringSlice[origin]) raises ParseEr
     var port: Int
     try:
         port = Int(String(port_str))
-    except e:
+    except conversion_err:
         raise ParseError(
             String(
                 "Failed to parse port: invalid integer value. Received: ",

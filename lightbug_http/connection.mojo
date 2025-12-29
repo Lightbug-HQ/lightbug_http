@@ -220,7 +220,7 @@ struct ListenConfig:
         var socket: Socket[TCPAddr]
         try:
             socket = Socket[TCPAddr]()
-        except e:
+        except socket_err:
             raise SocketCreationError()
 
         @parameter
@@ -228,7 +228,7 @@ struct ListenConfig:
         if CompilationTarget.is_macos():
             try:
                 socket.set_socket_option(SocketOption.SO_REUSEADDR, 1)
-            except e:
+            except sockopt_err:
                 # Socket option failure is not fatal, just continue
                 pass
 
@@ -239,7 +239,7 @@ struct ListenConfig:
             try:
                 socket.bind(addr.ip, addr.port)
                 bind_success = True
-            except e:
+            except bind_err:
                 if not bind_fail_logged:
                     print("Bind attempt failed (address may be in use)")
                     print("Retrying. Might take 10-15 seconds.")
@@ -256,7 +256,7 @@ struct ListenConfig:
 
         try:
             socket.listen(128)
-        except e:
+        except listen_err:
             raise ListenFailedError()
 
         var listener = NoTLSListener(socket^)
@@ -521,7 +521,7 @@ fn create_connection(mut host: String, port: UInt16) raises SocketError -> TCPCo
     var socket = Socket[TCPAddr, address_family = AddressFamily.AF_INET]()
     try:
         socket.connect(host, port)
-    except e:
+    except connect_err:
         # Connection failed - try to shutdown gracefully before propagating error
         try:
             socket.shutdown()
@@ -529,7 +529,7 @@ fn create_connection(mut host: String, port: UInt16) raises SocketError -> TCPCo
             # Shutdown failure is not critical here - connection already failed
             pass
         # Propagate the original connection error with type info
-        raise e^
+        raise connect_err^
 
     return TCPConnection(socket^)
 

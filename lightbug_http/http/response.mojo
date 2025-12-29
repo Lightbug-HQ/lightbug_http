@@ -38,8 +38,8 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
             properties = headers.parse_raw_response(reader)
             cookies.from_headers(properties.cookies^)
             reader.skip_carriage_return()
-        except e:
-            raise Error("Failed to parse response headers: ", e)
+        except parse_err:
+            raise Error("Failed to parse response headers: ", parse_err)
 
         try:
             return HTTPResponse(
@@ -50,7 +50,7 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
                 status_code=properties.status,
                 status_text=properties.msg^,
             )
-        except e:
+        except body_err:
             raise Error("Failed to read request body")
 
     @staticmethod
@@ -64,8 +64,8 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
             properties = headers.parse_raw_response(reader)
             cookies.from_headers(properties.cookies^)
             reader.skip_carriage_return()
-        except e:
-            raise Error("Failed to parse response headers: " + String(e))
+        except parse_err:
+            raise Error("Failed to parse response headers: " + String(parse_err))
 
         var response = HTTPResponse(
             Bytes(),
@@ -102,13 +102,13 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
                 # Decode chunks
                 response._decode_chunks(decoder, b^)
                 return response^
-            except e:
+            except chunk_err:
                 raise Error("Failed to read chunked response.")
 
         try:
             response.read_body(reader)
             return response^
-        except e:
+        except body_err:
             raise Error("Failed to read request body: ")
 
     fn _decode_chunks(mut self, mut decoder: HTTPChunkedDecoder, var chunks: Bytes) raises:

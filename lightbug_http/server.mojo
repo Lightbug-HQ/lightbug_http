@@ -253,11 +253,11 @@ fn handle_connection[
 
             try:
                 bytes_read = conn.read(buffer)
-            except e:
-                if e.isa[EOF]() or e.isa[SocketClosedError]():
+            except read_err:
+                if read_err.isa[EOF]() or read_err.isa[SocketClosedError]():
                     provision.state = ConnectionState.closed()
                     break
-                raise e^
+                raise read_err^
 
             if bytes_read == 0:
                 provision.state = ConnectionState.closed()
@@ -283,7 +283,7 @@ fn handle_connection[
                     else:
                         provision.state = ConnectionState.processing()
 
-                except e:
+                except parse_err:
                     var error_response: HTTPResponse
                     # TODO: Inspect error to distinguish BadRequest vs URITooLong
                     error_response = BadRequest()
@@ -298,7 +298,7 @@ fn handle_connection[
             if len(provision.recv_buffer) > config.recv_buffer_max:
                 try:
                     _ = conn.write(encode(BadRequest()))
-                except e:
+                except write_err:
                     pass
                 provision.state = ConnectionState.closed()
                 break
@@ -309,11 +309,11 @@ fn handle_connection[
 
             try:
                 bytes_read = conn.read(buffer)
-            except e:
-                if e.isa[EOF]() or e.isa[SocketClosedError]():
+            except read_err:
+                if read_err.isa[EOF]() or read_err.isa[SocketClosedError]():
                     provision.state = ConnectionState.closed()
                     break
-                raise e^
+                raise read_err^
 
             if bytes_read == 0:
                 provision.state = ConnectionState.closed()
@@ -328,7 +328,7 @@ fn handle_connection[
             if len(provision.recv_buffer) > config.max_request_body_size:
                 try:
                     _ = conn.write(encode(BadRequest()))
-                except e:
+                except write_err:
                     pass
                 provision.state = ConnectionState.closed()
                 break
@@ -340,7 +340,7 @@ fn handle_connection[
 
             try:
                 response = handler.func(request^)
-            except e:
+            except handler_err:
                 response = InternalError()
                 provision.should_close = True
 
@@ -359,7 +359,7 @@ fn handle_connection[
 
             try:
                 _ = conn.write(encode(response^))
-            except e:
+            except write_err:
                 # Failed to write response - close connection
                 # This is a socket error but we handle it here since
                 # we're already committed to this connection's fate
@@ -443,15 +443,15 @@ struct Server(Movable):
         var listener: NoTLSListener
         try:
             listener = ListenConfig().listen(address)
-        except e:
-            raise e^
+        except listener_err:
+            raise listener_err^
 
         self.set_address(String(address))
 
         try:
             self.serve(listener, handler)
-        except e:
-            raise e^
+        except server_err:
+            raise server_err^
 
     fn serve[T: HTTPService](self, ln: NoTLSListener, mut handler: T) raises ServerError:
         """Serve HTTP requests from an existing listener.
@@ -472,14 +472,13 @@ struct Server(Movable):
             var conn: TCPConnection
             try:
                 conn = ln.accept()
-            except e:
-                raise e^
+            except listener_err:
+                raise listener_err^
 
             var index: Int
             try:
                 index = provision_pool.borrow()
-            except e:
-                # No provisions available - reject this connection
+            except provision_err:
                 try:
                     conn^.teardown()
                 except teardown_err:
@@ -495,7 +494,7 @@ struct Server(Movable):
                     self.address(),
                     self.tcp_keep_alive,
                 )
-            except e:
+            except socket_err:
                 pass
             finally:
                 try:

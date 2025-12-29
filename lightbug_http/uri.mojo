@@ -194,7 +194,7 @@ struct URI(Copyable, Representable, Stringable, Writable):
 
             try:
                 port = UInt16(atol(String(host_and_port[colon + 1 : port_end])))
-            except e:
+            except conversion_err:
                 raise URIParseError(
                     String(
                         "URI.parse: Failed to convert port number from a String to Integer, received: ",

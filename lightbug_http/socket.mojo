@@ -232,7 +232,7 @@ struct Socket[
         if self._connected:
             try:
                 self.shutdown()
-            except e:
+            except shutdown_err:
                 pass
 
         if not self._closed:
@@ -245,7 +245,7 @@ struct Socket[
         """Close the socket when the object is deleted."""
         try:
             self^.teardown()
-        except e:
+        except teardown_err:
             pass
 
     fn __str__(self) -> String:
@@ -289,9 +289,9 @@ struct Socket[
         var new_socket_fd: FileDescriptor
         try:
             new_socket_fd = accept(self.fd)
-        except e:
+        except accept_err:
             # Propagate the typed AcceptError
-            raise Error("Socket.accept: " + String(e))
+            raise Error("Socket.accept: " + String(accept_err))
 
         var new_socket = Self(
             fd=new_socket_fd,
@@ -312,9 +312,9 @@ struct Socket[
         """
         try:
             listen(self.fd, backlog)
-        except e:
+        except listen_err:
             # Propagate the typed ListenError with context
-            raise Error("Socket.listen: " + String(e))
+            raise Error("Socket.listen: " + String(listen_err))
 
     fn bind(mut self, ip_address: String, port: UInt16) raises SocketError:
         """Bind the socket to address. The socket must not already be bound. (The format of address depends on the address family).
@@ -337,8 +337,8 @@ struct Socket[
         var binary_ip: c_uint
         try:
             binary_ip = inet_pton[Self.address_family](ip_address)
-        except e:
-            raise Error("Socket.bind: Failed to convert IP '" + ip_address + "' to binary: " + String(e))
+        except conversion_err:
+            raise Error("Socket.bind: Failed to convert IP '" + ip_address + "' to binary: " + String(conversion_err))
 
         var local_address = SocketAddress(
             address_family=Self.address_family,
@@ -347,9 +347,9 @@ struct Socket[
         )
         try:
             bind(self.fd, local_address)
-        except e:
+        except bind_err:
             # Propagate the typed BindError with context
-            raise Error("Socket.bind: " + String(e))
+            raise Error("Socket.bind: " + String(bind_err))
 
         var local = self.get_sock_name()
         self.local_address = Self.address(local[0], local[1])
@@ -370,9 +370,9 @@ struct Socket[
         var local_address = SocketAddress()
         try:
             getsockname(self.fd, local_address)
-        except e:
+        except getsockname_err:
             # Propagate the typed GetsocknameError with context
-            raise Error("Socket.get_sock_name: " + String(e))
+            raise Error("Socket.get_sock_name: " + String(getsockname_err))
 
         ref local_sockaddr_in = local_address.as_sockaddr_in()
         return (
@@ -396,9 +396,9 @@ struct Socket[
         var peer_address: SocketAddress
         try:
             peer_address = getpeername(self.fd)
-        except e:
+        except getpeername_err:
             # Propagate the typed GetpeernameError with context
-            raise Error("Socket.get_peer_name: " + String(e))
+            raise Error("Socket.get_peer_name: " + String(getpeername_err))
 
         ref peer_sockaddr_in = peer_address.as_sockaddr_in()
         return (
@@ -494,9 +494,9 @@ struct Socket[
                 0,
             )
             buffer._len += Int(bytes_received)
-        except e:
+        except recv_err:
             # Propagate the typed RecvError with context
-            raise Error("Socket._receive: " + String(e))
+            raise Error("Socket._receive: " + String(recv_err))
 
         if bytes_received == 0:
             raise EOF()
@@ -556,9 +556,9 @@ struct Socket[
                 remote_address,
             )
             buffer._len += Int(bytes_received)
-        except e:
+        except recvfrom_err:
             # Propagate the typed RecvfromError with context
-            raise Error("Socket._receive_from: " + String(e))
+            raise Error("Socket._receive_from: " + String(recvfrom_err))
 
         if bytes_received == 0:
             raise EOF()
@@ -604,11 +604,11 @@ struct Socket[
         """Shut down the socket. The remote end will receive no more data (after queued data is flushed)."""
         try:
             shutdown(self.fd, ShutdownOption.SHUT_RDWR)
-        except e:
+        except shutdown_err:
             # For the other errors, either the socket is already closed or the descriptor is invalid.
             # At that point we can feasibly say that the socket is already shut down.
-            if e.isa[EINVALError]():
-                raise e[EINVALError]
+            if shutdown_err.isa[EINVALError]():
+                raise shutdown_err[EINVALError]
 
         self._connected = False
 
@@ -622,10 +622,10 @@ struct Socket[
         """
         try:
             close(self.fd)
-        except e:
+        except close_err:
             # If the file descriptor is invalid, then it was most likely already closed.
             # Other errors indicate a failure while attempting to close the socket.
-            if not e.isa[EBADFError]():
+            if not close_err.isa[EBADFError]():
                 raise
 
         self._closed = True
