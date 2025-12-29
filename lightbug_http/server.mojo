@@ -1,24 +1,79 @@
-from lightbug_http.connection import ConnectionState, ListenConfig, NoTLSListener, TCPConnection, default_buffer_size
+from lightbug_http.connection import ConnectionState, ListenConfig, ListenerError, NoTLSListener, TCPConnection, default_buffer_size
 from lightbug_http.http.common_response import BadRequest, InternalError, URITooLong
 from lightbug_http.io.bytes import ByteReader, Bytes, BytesConstant, ByteView
 from lightbug_http.utils.owning_list import OwningList
 from lightbug_http.service import HTTPService
-from lightbug_http.socket import EOF, SocketError, FatalCloseError
+from lightbug_http.socket import EOF, SocketClosedError, SocketError, FatalCloseError
+from lightbug_http.utils.error import CustomError
 from utils import Variant
 
 from lightbug_http.http import HTTPRequest, HTTPResponse, encode
 
 
 @fieldwise_init
-struct ServerError(Movable, Stringable, Writable):
-    """Error variant for server operations that may encounter socket or close errors."""
+@register_passable("trivial")
+struct ProvisionPoolExhaustedError(CustomError):
+    comptime message = "ProvisionError: Connection provision pool exhausted - no available provisions"
+
+
+@fieldwise_init
+struct ProvisionError(Movable, Stringable, Writable):
+    """Error variant for provision pool operations.
+    Represents failures during provision borrowing or management.
+    """
 
     comptime type = Variant[
+        ProvisionPoolExhaustedError,
+        Error
+    ]
+    var value: Self.type
+
+    @implicit
+    fn __init__(out self, value: ProvisionPoolExhaustedError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, var value: Error):
+        self.value = value^
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        if self.value.isa[ProvisionPoolExhaustedError]():
+            writer.write(self.value[ProvisionPoolExhaustedError])
+        elif self.value.isa[Error]():
+            writer.write(self.value[Error])
+
+    fn isa[T: AnyType](self) -> Bool:
+        return self.value.isa[T]()
+
+    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
+        return self.value[T]
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+
+@fieldwise_init
+struct ServerError(Movable, Stringable, Writable):
+    """Error variant for server operations. 
+    Represents failures during listener setup, connection handling, etc.
+    """
+
+    comptime type = Variant[
+        ListenerError,
+        ProvisionError,
         SocketError,
         FatalCloseError,
         Error
     ]
     var value: Self.type
+
+    @implicit
+    fn __init__(out self, var value: ListenerError):
+        self.value = value^
+
+    @implicit
+    fn __init__(out self, var value: ProvisionError):
+        self.value = value^
 
     @implicit
     fn __init__(out self, var value: SocketError):
@@ -33,7 +88,11 @@ struct ServerError(Movable, Stringable, Writable):
         self.value = value^
 
     fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[SocketError]():
+        if self.value.isa[ListenerError]():
+            writer.write(self.value[ListenerError])
+        elif self.value.isa[ProvisionError]():
+            writer.write(self.value[ProvisionError])
+        elif self.value.isa[SocketError]():
             writer.write(self.value[SocketError])
         elif self.value.isa[FatalCloseError]():
             writer.write(self.value[FatalCloseError])
@@ -124,23 +183,22 @@ struct ProvisionPool(Movable):
         self.capacity = capacity
         self.initialized_count = 0
 
-        # Pre-allocate all provisions
         for i in range(capacity):
             self.provisions.append(ConnectionProvision(config))
             self.available.append(i)
             self.initialized_count += 1
 
-    fn borrow(mut self) raises -> Int:
+    fn borrow(mut self) raises ProvisionError -> Int:
         """Borrow a provision from the pool.
 
         Returns:
             Index of the borrowed provision.
 
         Raises:
-            Error if no provisions are available.
+            ProvisionError: If no provisions are available (pool exhausted).
         """
         if len(self.available) == 0:
-            raise Error("ProvisionPool: No provisions available")
+            raise ProvisionPoolExhaustedError()
 
         return self.available.pop()
 
@@ -182,6 +240,21 @@ fn handle_connection[
     server_address: String,
     tcp_keep_alive: Bool,
 ) raises SocketError:
+    """Handle a single connection through its lifecycle.
+    Only propagates SocketError for true socket failures - handles protocol
+    errors (bad requests, etc.) internally by sending error responses.
+
+    Args:
+        conn: The TCP connection to handle.
+        provision: Pre-allocated resources for this connection.
+        handler: The HTTP service handler.
+        config: Server configuration.
+        server_address: The server's address string.
+        tcp_keep_alive: Whether to enable TCP keep-alive.
+
+    Raises:
+        SocketError: If a socket operation fails (not including clean EOF/close).
+    """
     while True:
         if provision.state.kind == ConnectionState.READING_HEADERS:
             var buffer = Bytes(capacity=config.socket_buffer_size)
@@ -190,10 +263,10 @@ fn handle_connection[
             try:
                 bytes_read = conn.read(buffer)
             except e:
-                # if e.isa[EOF]():
-                # print("Error reading from connection:", e)
-                provision.state = ConnectionState.closed()
-                break
+                if e.isa[EOF]() or e.isa[SocketClosedError]():
+                    provision.state = ConnectionState.closed()
+                    break
+                raise e^
 
             if bytes_read == 0:
                 provision.state = ConnectionState.closed()
@@ -221,17 +294,21 @@ fn handle_connection[
 
                 except e:
                     var error_response: HTTPResponse
-                    # if "URI too long" in String(e):
-                    # error_response = URITooLong()
-                    # else:
+                    # TODO: Inspect error to distinguish BadRequest vs URITooLong
                     error_response = BadRequest()
 
-                    _ = conn.write(encode(error_response^))
+                    try:
+                        _ = conn.write(encode(error_response^))
+                    except write_err:
+                        pass
                     provision.state = ConnectionState.closed()
                     break
 
             if len(provision.recv_buffer) > config.recv_buffer_max:
-                _ = conn.write(encode(BadRequest()))
+                try:
+                    _ = conn.write(encode(BadRequest()))
+                except e:
+                    pass
                 provision.state = ConnectionState.closed()
                 break
 
@@ -242,8 +319,10 @@ fn handle_connection[
             try:
                 bytes_read = conn.read(buffer)
             except e:
-                provision.state = ConnectionState.closed()
-                break
+                if e.isa[EOF]() or e.isa[SocketClosedError]():
+                    provision.state = ConnectionState.closed()
+                    break
+                raise e^
 
             if bytes_read == 0:
                 provision.state = ConnectionState.closed()
@@ -256,7 +335,10 @@ fn handle_connection[
                 provision.state = ConnectionState.processing()
 
             if len(provision.recv_buffer) > config.max_request_body_size:
-                _ = conn.write(encode(BadRequest()))
+                try:
+                    _ = conn.write(encode(BadRequest()))
+                except e:
+                    pass
                 provision.state = ConnectionState.closed()
                 break
 
@@ -287,6 +369,9 @@ fn handle_connection[
             try:
                 _ = conn.write(encode(response^))
             except e:
+                # Failed to write response - close connection
+                # This is a socket error but we handle it here since
+                # we're already committed to this connection's fate
                 provision.state = ConnectionState.closed()
                 break
 
@@ -294,7 +379,6 @@ fn handle_connection[
                 provision.state = ConnectionState.closed()
                 break
 
-            # Enforce keep-alive request cap only when explicitly configured.
             if (config.max_keepalive_requests > 0) and (provision.keepalive_count >= config.max_keepalive_requests):
                 provision.state = ConnectionState.closed()
                 break
@@ -352,7 +436,7 @@ struct Server(Movable):
     fn set_max_request_uri_length(mut self, length: Int):
         self.config.max_request_uri_length = length
 
-    fn listen_and_serve[T: HTTPService](mut self, address: StringSlice, mut handler: T) raises:
+    fn listen_and_serve[T: HTTPService](mut self, address: StringSlice, mut handler: T) raises ServerError:
         """Listen for incoming connections and serve HTTP requests.
 
         Parameters:
@@ -361,17 +445,25 @@ struct Server(Movable):
         Args:
             address: The address (host:port) to listen on.
             handler: An object that handles incoming HTTP requests.
+
+        Raises:
+            ServerError: If listener setup fails or serving encounters fatal errors.
         """
-        var listener = ListenConfig().listen(address)
+        var listener: NoTLSListener
+        try:
+            listener = ListenConfig().listen(address)
+        except e:
+            raise e^
+
         self.set_address(String(address))
 
         try:
             self.serve(listener, handler)
         except e:
-            raise Error("Error while serving HTTP requests: ", e)
+            raise e^
 
     fn serve[T: HTTPService](self, ln: NoTLSListener, mut handler: T) raises ServerError:
-        """Serve HTTP requests.
+        """Serve HTTP requests from an existing listener.
 
         Parameters:
             T: The type of HTTPService that handles incoming requests.
@@ -381,18 +473,26 @@ struct Server(Movable):
             handler: An object that handles incoming HTTP requests.
 
         Raises:
-            If there is an error while serving requests.
+            ServerError: If accept fails or critical connection handling errors occur.
         """
         var provision_pool = ProvisionPool(self.config.max_connections, self.config)
 
         while True:
-            var conn = ln.accept()
+            var conn: TCPConnection
+            try:
+                conn = ln.accept()
+            except e:
+                raise e^
 
             var index: Int
             try:
                 index = provision_pool.borrow()
             except e:
-                conn^.teardown()
+                # No provisions available - reject this connection
+                try:
+                    conn^.teardown()
+                except teardown_err:
+                    pass
                 continue
 
             try:
@@ -404,8 +504,13 @@ struct Server(Movable):
                     self.address(),
                     self.tcp_keep_alive,
                 )
+            except e:
+                pass
             finally:
-                conn^.teardown()
+                try:
+                    conn^.teardown()
+                except teardown_err:
+                    pass
                 provision_pool.provisions[index].prepare_for_new_request()
                 provision_pool.provisions[index].keepalive_count = 0
                 provision_pool.release(index)

@@ -1,17 +1,112 @@
 from sys.info import CompilationTarget
 from time import sleep
 
-from lightbug_http.address import HostPort, NetworkType, TCPAddr, UDPAddr, parse_address
+from lightbug_http.address import HostPort, NetworkType, TCPAddr, UDPAddr, parse_address, ParseError
 from lightbug_http.c.address import AddressFamily
 from lightbug_http.io.bytes import Bytes
 from lightbug_http.io.sync import Duration
 from lightbug_http.socket import EOF, Socket, SocketError, FatalCloseError, SocketOption, SocketType, TCPSocket, UDPSocket
+from lightbug_http.utils.error import CustomError
+from utils import Variant
 
 
 comptime default_buffer_size = 4096
 """The default buffer size for reading and writing data."""
 comptime default_tcp_keep_alive = Duration(15 * 1000 * 1000 * 1000)  # 15 seconds
 """The default TCP keep-alive duration."""
+
+
+# ===== Listener Error Marker Structs =====
+
+@fieldwise_init
+@register_passable("trivial")
+struct AddressParseError(CustomError):
+    comptime message = "ListenerError: Failed to parse listen address"
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct SocketCreationError(CustomError):
+    comptime message = "ListenerError: Failed to create socket"
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct BindFailedError(CustomError):
+    comptime message = "ListenerError: Failed to bind socket to address"
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct ListenFailedError(CustomError):
+    comptime message = "ListenerError: Failed to listen on socket"
+
+
+# ===== Listener Error Variant =====
+
+@fieldwise_init
+struct ListenerError(Movable, Stringable, Writable):
+    """Error variant for listener creation operations.
+
+    Represents failures during address parsing, socket creation, binding, or listening.
+    """
+
+    comptime type = Variant[
+        AddressParseError,
+        SocketCreationError,
+        BindFailedError,
+        ListenFailedError,
+        SocketError,
+        Error
+    ]
+    var value: Self.type
+
+    @implicit
+    fn __init__(out self, value: AddressParseError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: SocketCreationError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: BindFailedError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: ListenFailedError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, var value: SocketError):
+        self.value = value^
+
+    @implicit
+    fn __init__(out self, var value: Error):
+        self.value = value^
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        if self.value.isa[AddressParseError]():
+            writer.write(self.value[AddressParseError])
+        elif self.value.isa[SocketCreationError]():
+            writer.write(self.value[SocketCreationError])
+        elif self.value.isa[BindFailedError]():
+            writer.write(self.value[BindFailedError])
+        elif self.value.isa[ListenFailedError]():
+            writer.write(self.value[ListenFailedError])
+        elif self.value.isa[SocketError]():
+            writer.write(self.value[SocketError])
+        elif self.value.isa[Error]():
+            writer.write(self.value[Error])
+
+    fn isa[T: AnyType](self) -> Bool:
+        return self.value.isa[T]()
+
+    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
+        return self.value[T]
+
+    fn __str__(self) -> String:
+        return String.write(self)
 
 
 trait Connection(Movable):
@@ -49,15 +144,38 @@ struct NoTLSListener(Movable):
         self.socket = Socket[TCPAddr]()
 
     fn accept(self) raises SocketError -> TCPConnection:
+        """Accept an incoming TCP connection.
+
+        Returns:
+            A new TCPConnection for the accepted client.
+
+        Raises:
+            SocketError: If accept fails.
+        """
         return TCPConnection(self.socket.accept())
 
-    fn close(mut self) raises SocketError -> None:
+    fn close(mut self) raises FatalCloseError -> None:
+        """Close the listener socket.
+
+        Raises:
+            FatalCloseError: If close fails (excludes EBADF).
+        """
         return self.socket.close()
 
-    fn shutdown(mut self) raises SocketError -> None:
+    fn shutdown(mut self) raises:
+        """Shutdown the listener socket.
+
+        Raises:
+            Error: If shutdown fails.
+        """
         return self.socket.shutdown()
 
-    fn teardown(deinit self) raises SocketError:
+    fn teardown(deinit self) raises FatalCloseError:
+        """Teardown the listener socket on destruction.
+
+        Raises:
+            FatalCloseError: If close fails during teardown.
+        """
         self.socket^.teardown()
 
     fn addr(self) -> TCPAddr:
@@ -70,18 +188,32 @@ struct ListenConfig:
     fn __init__(out self, keep_alive: Duration = default_tcp_keep_alive):
         self._keep_alive = keep_alive
 
-    fn listen[network: NetworkType = NetworkType.tcp4](self, address: StringSlice) raises -> NoTLSListener:
+    fn listen[network: NetworkType = NetworkType.tcp4](self, address: StringSlice) raises ListenerError -> NoTLSListener:
+        """Create a TCP listener on the specified address.
+
+        Parameters:
+            network: The network type (tcp4 or tcp6).
+
+        Args:
+            address: The address to listen on (host:port).
+
+        Returns:
+            A NoTLSListener ready to accept connections.
+
+        Raises:
+            ListenerError: If address parsing, socket creation, bind, or listen fails.
+        """
         var local: HostPort
         try:
             local = parse_address[network](address)
         except ParseError:
-            raise Error("ListenConfig.listen: Failed to create listener due to invalid address.")
+            raise AddressParseError()
 
         var socket: Socket[TCPAddr]
         try:
             socket = Socket[TCPAddr]()
         except e:
-            raise Error("ListenConfig.listen: Failed to create listener due to socket creation failure.")
+            raise SocketCreationError()
 
         @parameter
         # TODO: do we want to add SO_REUSEPORT on linux? Doesn't work on some systems
@@ -89,6 +221,7 @@ struct ListenConfig:
             try:
                 socket.set_socket_option(SocketOption.SO_REUSEADDR, 1)
             except e:
+                # Socket option failure is not fatal, just continue
                 pass
 
         var addr = TCPAddr(ip=local.host^, port=local.port)
@@ -100,26 +233,23 @@ struct ListenConfig:
                 bind_success = True
             except e:
                 if not bind_fail_logged:
-                    # print("Bind attempt failed: ", e)
-                    print("Bind attempt failed: ")
+                    print("Bind attempt failed (address may be in use)")
                     print("Retrying. Might take 10-15 seconds.")
                     bind_fail_logged = True
                 print(".", end="", flush=True)
 
                 try:
                     socket.shutdown()
-                except e:
+                except shutdown_err:
+                    # Shutdown failure during retry is not critical
+                    # The socket will be closed and recreated on next attempt
                     pass
-                    # TODO: Should shutdown failure be a hard failure? We can still ungracefully close the socket.
                 sleep(UInt(1))
 
         try:
             socket.listen(128)
         except e:
-            raise Error(
-                "ListenConfig.listen: Listen failed on sockfd: ",
-                socket.fd.value,
-            )
+            raise ListenFailedError()
 
         var listener = NoTLSListener(socket^)
         var msg = String(
@@ -193,24 +323,56 @@ struct TCPConnection:
         self.socket = socket^
 
     fn read(self, mut buf: Bytes) raises SocketError -> UInt:
-        try:
-            return self.socket.receive(buf)
-        except e:
-            if e.isa[EOF]():
-                raise e^
-            else:
-                raise Error("TCPConnection.read: Failed to read data from connection.")
+        """Read data from the TCP connection.
+
+        Args:
+            buf: Buffer to read data into.
+
+        Returns:
+            Number of bytes read.
+
+        Raises:
+            SocketError: If read fails or connection is closed.
+        """
+        # Just propagate SocketError from socket.receive - it already has all the type info
+        return self.socket.receive(buf)
 
     fn write(self, buf: Span[Byte]) raises SocketError -> UInt:
+        """Write data to the TCP connection.
+
+        Args:
+            buf: Buffer containing data to write.
+
+        Returns:
+            Number of bytes written.
+
+        Raises:
+            SocketError: If write fails.
+        """
         return self.socket.send(buf)
 
-    fn close(mut self) raises SocketError:
+    fn close(mut self) raises FatalCloseError:
+        """Close the TCP connection.
+
+        Raises:
+            FatalCloseError: If close fails (excludes EBADF).
+        """
         self.socket.close()
 
-    fn shutdown(mut self) raises SocketError:
+    fn shutdown(mut self) raises:
+        """Shutdown the TCP connection.
+
+        Raises:
+            Error: If shutdown fails.
+        """
         self.socket.shutdown()
 
     fn teardown(deinit self) raises FatalCloseError:
+        """Teardown the connection on destruction.
+
+        Raises:
+            FatalCloseError: If close fails during teardown.
+        """
         self.socket^.teardown()
 
     fn is_closed(self) -> Bool:
@@ -301,13 +463,28 @@ struct UDPConnection[
 
         return self.socket.send_to(src, host, port)
 
-    fn close(mut self) raises SocketError:
+    fn close(mut self) raises FatalCloseError:
+        """Close the UDP connection.
+
+        Raises:
+            FatalCloseError: If close fails (excludes EBADF).
+        """
         self.socket.close()
 
-    fn shutdown(mut self) raises SocketError:
+    fn shutdown(mut self) raises:
+        """Shutdown the UDP connection.
+
+        Raises:
+            Error: If shutdown fails.
+        """
         self.socket.shutdown()
 
-    fn teardown(deinit self) raises SocketError:
+    fn teardown(deinit self) raises FatalCloseError:
+        """Teardown the connection on destruction.
+
+        Raises:
+            FatalCloseError: If close fails during teardown.
+        """
         self.socket^.teardown()
 
     fn is_closed(self) -> Bool:
@@ -321,24 +498,30 @@ struct UDPConnection[
 
 
 fn create_connection(mut host: String, port: UInt16) raises SocketError -> TCPConnection:
-    """Connect to a server using a socket.
+    """Connect to a server using a TCP socket.
 
     Args:
         host: The host to connect to.
         port: The port to connect on.
 
     Returns:
-        The socket file descriptor.
+        A connected TCPConnection.
+
+    Raises:
+        SocketError: If connection fails.
     """
     var socket = Socket[TCPAddr, address_family = AddressFamily.AF_INET]()
     try:
         socket.connect(host, port)
     except e:
+        # Connection failed - try to shutdown gracefully before propagating error
         try:
             socket.shutdown()
-        except e:
+        except shutdown_err:
+            # Shutdown failure is not critical here - connection already failed
             pass
-        raise Error("Failed to establish a connection to the server.")
+        # Propagate the original connection error with type info
+        raise e^
 
     return TCPConnection(socket^)
 

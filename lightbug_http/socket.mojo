@@ -289,13 +289,14 @@ struct Socket[
             A new socket object and the address of the remote socket.
 
         Raises:
-            Error: If the connection fails.
+            SocketError: If accept fails or getting peer address fails.
         """
         var new_socket_fd: FileDescriptor
         try:
             new_socket_fd = accept(self.fd)
         except e:
-            raise Error("Socket.accept: Failed to accept connection, system `accept()` returned an error.")
+            # Propagate the typed AcceptError
+            raise Error("Socket.accept: " + String(e))
 
         var new_socket = Self(
             fd=new_socket_fd,
@@ -317,7 +318,8 @@ struct Socket[
         try:
             listen(self.fd, backlog)
         except e:
-            raise Error("Socket.listen: Failed to listen for connections.")
+            # Propagate the typed ListenError with context
+            raise Error("Socket.listen: " + String(e))
 
     fn bind(mut self, ip_address: String, port: UInt16) raises SocketError:
         """Bind the socket to address. The socket must not already be bound. (The format of address depends on the address family).
@@ -335,13 +337,13 @@ struct Socket[
             port: The port number to bind the socket to.
 
         Raises:
-            Error: If binding the socket fails.
+            SocketError: If IP conversion fails, bind fails, or getting socket name fails.
         """
         var binary_ip: c_uint
         try:
             binary_ip = inet_pton[Self.address_family](ip_address)
         except e:
-            raise Error("ListenConfig.listen: Failed to convert IP address to binary form.")
+            raise Error("Socket.bind: Failed to convert IP '" + ip_address + "' to binary: " + String(e))
 
         var local_address = SocketAddress(
             address_family=Self.address_family,
@@ -351,7 +353,8 @@ struct Socket[
         try:
             bind(self.fd, local_address)
         except e:
-            raise Error("Socket.bind: Binding socket failed.")
+            # Propagate the typed BindError with context
+            raise Error("Socket.bind: " + String(e))
 
         var local = self.get_sock_name()
         self.local_address = Self.address(local[0], local[1])
@@ -363,7 +366,7 @@ struct Socket[
             The address of the socket.
 
         Raises:
-            Error: If getting the address of the socket fails.
+            SocketError: If socket is closed or getsockname fails.
         """
         if self._closed:
             raise SocketError(SocketClosedError())
@@ -373,7 +376,8 @@ struct Socket[
         try:
             getsockname(self.fd, local_address)
         except e:
-            raise Error("get_sock_name: Failed to get address of local socket.")
+            # Propagate the typed GetsocknameError with context
+            raise Error("Socket.get_sock_name: " + String(e))
 
         ref local_sockaddr_in = local_address.as_sockaddr_in()
         return (
@@ -388,7 +392,7 @@ struct Socket[
             The address of the peer connected to the socket.
 
         Raises:
-            Error: If getting the address of the peer connected to the socket fails.
+            SocketError: If socket is closed or getpeername fails.
         """
         if self._closed:
             raise SocketClosedError()
@@ -398,7 +402,8 @@ struct Socket[
         try:
             peer_address = getpeername(self.fd)
         except e:
-            raise Error("get_peer_name: Failed to get address of remote socket.")
+            # Propagate the typed GetpeernameError with context
+            raise Error("Socket.get_peer_name: " + String(e))
 
         ref peer_sockaddr_in = peer_address.as_sockaddr_in()
         return (
@@ -478,11 +483,11 @@ struct Socket[
             buffer: The buffer to read data into.
 
         Returns:
-            The buffer with the received data, and an error if one occurred.
+            The number of bytes received.
 
         Raises:
-            Error: If reading data from the socket fails.
-            EOF: If 0 bytes are received, return EOF.
+            SocketError: If reading data from the socket fails.
+            EOF: If 0 bytes are received.
         """
         var bytes_received: UInt
         var size = len(buffer)
@@ -495,7 +500,8 @@ struct Socket[
             )
             buffer._len += Int(bytes_received)
         except e:
-            raise Error("Socket.receive: Failed to read data from connection.")
+            # Propagate the typed RecvError with context
+            raise Error("Socket._receive: " + String(e))
 
         if bytes_received == 0:
             raise EOF()
@@ -537,11 +543,11 @@ struct Socket[
             buffer: The buffer to read data into.
 
         Returns:
-            The buffer with the received data, and an error if one occurred.
+            Tuple of (bytes received, remote host, remote port).
 
         Raises:
-            Error: If reading data from the socket fails.
-            EOF: If 0 bytes are received, return EOF.
+            SocketError: If reading data from the socket fails.
+            EOF: If 0 bytes are received.
         """
         var remote_address = SocketAddress()
         var bytes_received: UInt
@@ -556,7 +562,8 @@ struct Socket[
             )
             buffer._len += Int(bytes_received)
         except e:
-            raise Error("Socket._receive_from: Failed to read data from connection.")
+            # Propagate the typed RecvfromError with context
+            raise Error("Socket._receive_from: " + String(e))
 
         if bytes_received == 0:
             raise EOF()
