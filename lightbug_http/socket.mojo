@@ -38,7 +38,20 @@ from lightbug_http.c.socket import (
     shutdown,
     socket,
 )
-from lightbug_http.c.socket_error import CloseError
+from lightbug_http.c.socket_error import (
+    AcceptError,
+    BindError,
+    CloseError,
+    ConnectError,
+    GetpeernameError,
+    GetsocknameError,
+    GetsockoptError,
+    RecvError,
+    RecvfromError,
+    SendError,
+    SendtoError,
+    SetsockoptError,
+)
 from lightbug_http.connection import default_buffer_size
 from lightbug_http.io.bytes import Bytes
 from utils import Variant
@@ -449,7 +462,7 @@ struct Socket[
         var remote = self.get_peer_name()
         self.remote_address = Self.address(remote[0], remote[1])
 
-    fn send(self, buffer: Span[Byte]) raises SocketError -> UInt:
+    fn send(self, buffer: Span[Byte]) raises SendError -> UInt:
         return send(self.fd, buffer, UInt(len(buffer)), 0)
 
     fn send_to(self, src: Span[Byte], mut host: String, port: UInt16) raises SocketError -> UInt:

@@ -3,6 +3,7 @@ from time import sleep
 
 from lightbug_http.address import HostPort, NetworkType, ParseError, TCPAddr, UDPAddr, parse_address
 from lightbug_http.c.address import AddressFamily
+from lightbug_http.c.socket_error import SendError
 from lightbug_http.io.bytes import Bytes
 from lightbug_http.io.sync import Duration
 from lightbug_http.socket import (
@@ -24,8 +25,6 @@ comptime default_buffer_size = 4096
 comptime default_tcp_keep_alive = Duration(15 * 1000 * 1000 * 1000)  # 15 seconds
 """The default TCP keep-alive duration."""
 
-
-# ===== Listener Error Marker Structs =====
 
 
 @fieldwise_init
@@ -51,8 +50,6 @@ struct BindFailedError(CustomError):
 struct ListenFailedError(CustomError):
     comptime message = "ListenerError: Failed to listen on socket"
 
-
-# ===== Listener Error Variant =====
 
 
 @fieldwise_init
@@ -345,7 +342,7 @@ struct TCPConnection:
         # Just propagate SocketError from socket.receive - it already has all the type info
         return self.socket.receive(buf)
 
-    fn write(self, buf: Span[Byte]) raises SocketError -> UInt:
+    fn write(self, buf: Span[Byte]) raises SendError -> UInt:
         """Write data to the TCP connection.
 
         Args:
@@ -355,7 +352,7 @@ struct TCPConnection:
             Number of bytes written.
 
         Raises:
-            SocketError: If write fails.
+            SendError: If write fails.
         """
         return self.socket.send(buf)
 
