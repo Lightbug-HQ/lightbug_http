@@ -983,7 +983,7 @@ fn _recv(
 
 fn recv[
     origin: MutOrigin
-](socket: FileDescriptor, buffer: Span[c_uchar, origin], length: c_size_t, flags: c_int,) raises -> c_size_t:
+](socket: FileDescriptor, buffer: Span[c_uchar, origin], length: c_size_t, flags: c_int,) raises RecvError -> c_size_t:
     """Libc POSIX `recv` function.
 
     Args:
@@ -994,6 +994,9 @@ fn recv[
 
     Returns:
         The number of bytes received.
+
+    Raises:
+        RecvError: If an error occurs while receiving data from the socket.
 
     #### C Function
     ```c
@@ -1007,32 +1010,22 @@ fn recv[
     if result == -1:
         var errno = get_errno()
         if errno in [errno.EAGAIN, errno.EWOULDBLOCK]:
-            raise Error(
-                "ReceiveError: The socket is marked nonblocking and the receive"
-                " operation would block, or a receive timeout had been set and"
-                " the timeout expired before data was received."
-            )
+            raise EAGAINError()
         elif errno == errno.EBADF:
-            raise Error("ReceiveError: The argument `socket` is an invalid descriptor.")
+            raise EBADFError()
         elif errno == errno.ECONNREFUSED:
-            raise Error(
-                "ReceiveError: The remote host refused to allow the network"
-                " connection (typically because it is not running the requested"
-                " service)."
-            )
+            raise ECONNREFUSEDError()
         elif errno == errno.EFAULT:
-            raise Error("ReceiveError: `buffer` points outside the process's address space.")
+            raise EFAULTError()
         elif errno == errno.EINTR:
-            raise Error(
-                "ReceiveError: The receive was interrupted by delivery of a signal before any data were available."
-            )
+            raise EINTRError()
         elif errno == errno.ENOTCONN:
-            raise Error("ReceiveError: The socket is not connected.")
+            raise ENOTCONNError()
         elif errno == errno.ENOTSOCK:
-            raise Error("ReceiveError: The file descriptor is not associated with a socket.")
+            raise ENOTSOCKError()
         else:
             raise Error(
-                "ReceiveError: An error occurred while attempting to receive data from the socket. Error code: ",
+                "RecvError: An error occurred while attempting to receive data from the socket. Error code: ",
                 errno,
             )
 
@@ -1097,7 +1090,7 @@ fn recvfrom[
     length: c_size_t,
     flags: c_int,
     mut address: SocketAddress,
-) raises -> c_size_t:
+) raises RecvfromError -> c_size_t:
     """Libc POSIX `recvfrom` function.
 
     Args:
@@ -1109,6 +1102,9 @@ fn recvfrom[
 
     Returns:
         The number of bytes received.
+
+    Raises:
+        RecvfromError: If an error occurs while receiving data from the socket.
 
     #### C Function
     ```c
@@ -1136,32 +1132,32 @@ fn recvfrom[
     if result == -1:
         var errno = get_errno()
         if errno in [errno.EAGAIN, errno.EWOULDBLOCK]:
-            raise "ReceiveError: The socket's file descriptor is marked `O_NONBLOCK` and no data is waiting to be received; or MSG_OOB is set and no out-of-band data is available and either the socket's file descriptor is marked `O_NONBLOCK` or the socket does not support blocking to await out-of-band data."
+            raise EAGAINError()
         elif errno == errno.EBADF:
-            raise "ReceiveError: The socket argument is not a valid file descriptor."
+            raise EBADFError()
         elif errno == errno.ECONNRESET:
-            raise "ReceiveError: A connection was forcibly closed by a peer."
+            raise ECONNRESETError()
         elif errno == errno.EINTR:
-            raise "ReceiveError: A signal interrupted `recvfrom()` before any data was available."
+            raise EINTRError()
         elif errno == errno.EINVAL:
-            raise "ReceiveError: The `MSG_OOB` flag is set and no out-of-band data is available."
+            raise EINVALError()
         elif errno == errno.ENOTCONN:
-            raise "ReceiveError: A receive is attempted on a connection-mode socket that is not connected."
+            raise ENOTCONNError()
         elif errno == errno.ENOTSOCK:
-            raise "ReceiveError: The socket argument does not refer to a socket."
+            raise ENOTSOCKError()
         elif errno == errno.EOPNOTSUPP:
-            raise "ReceiveError: The specified flags are not supported for this socket type."
+            raise EOPNOTSUPPError()
         elif errno == errno.ETIMEDOUT:
-            raise "ReceiveError: The connection timed out during connection establishment, or due to a transmission timeout on active connection."
+            raise ETIMEDOUTError()
         elif errno == errno.EIO:
-            raise "ReceiveError: An I/O error occurred while reading from or writing to the file system."
+            raise EIOError()
         elif errno == errno.ENOBUFS:
-            raise "ReceiveError: Insufficient resources were available in the system to perform the operation."
+            raise ENOBUFSError()
         elif errno == errno.ENOMEM:
-            raise "ReceiveError: Insufficient memory was available to fulfill the request."
+            raise ENOMEMError()
         else:
             raise Error(
-                "ReceiveError: An error occurred while attempting to receive data from the socket. Error code: ",
+                "RecvfromError: An error occurred while attempting to receive data from the socket. Error code: ",
                 errno,
             )
 
@@ -1205,7 +1201,7 @@ fn _send(
 
 fn send[
     origin: ImmutOrigin
-](socket: FileDescriptor, buffer: Span[c_uchar, origin], length: c_size_t, flags: c_int,) raises -> c_size_t:
+](socket: FileDescriptor, buffer: Span[c_uchar, origin], length: c_size_t, flags: c_int,) raises SendError -> c_size_t:
     """Libc POSIX `send` function.
 
     Args:
@@ -1248,64 +1244,36 @@ fn send[
     if result == -1:
         var errno = get_errno()
         if errno in [errno.EAGAIN, errno.EWOULDBLOCK]:
-            raise Error(
-                "SendError: The socket is marked nonblocking and the receive"
-                " operation would block, or a receive timeout had been set and"
-                " the timeout expired before data was received."
-            )
+            raise EAGAINError()
         elif errno == errno.EBADF:
-            raise Error("SendError: The argument `socket` is an invalid descriptor.")
-        elif errno == errno.EAGAIN:
-            raise Error("SendError: No more free local ports or insufficient entries in the routing cache.")
+            raise EBADFError()
         elif errno == errno.ECONNRESET:
-            raise Error("SendError: Connection reset by peer.")
+            raise ECONNRESETError()
         elif errno == errno.EDESTADDRREQ:
-            raise Error("SendError: The socket is not connection-mode, and no peer address is set.")
+            raise EDESTADDRREQError()
         elif errno == errno.ECONNREFUSED:
-            raise Error(
-                "SendError: The remote host refused to allow the network"
-                " connection (typically because it is not running the requested"
-                " service)."
-            )
+            raise ECONNREFUSEDError()
         elif errno == errno.EFAULT:
-            raise Error("SendError: `buffer` points outside the process's address space.")
+            raise EFAULTError()
         elif errno == errno.EINTR:
-            raise Error(
-                "SendError: The receive was interrupted by delivery of a signal before any data were available."
-            )
+            raise EINTRError()
         elif errno == errno.EINVAL:
-            raise Error("SendError: Invalid argument passed.")
+            raise EINVALError()
         elif errno == errno.EISCONN:
-            raise Error("SendError: The connection-mode socket was connected already but a recipient was specified.")
-        elif errno == errno.EMSGSIZE:
-            raise Error(
-                "SendError: The socket type requires that message be sent"
-                " atomically, and the size of the message to be sent made this"
-                " impossible.."
-            )
+            raise EISCONNError()
         elif errno == errno.ENOBUFS:
-            raise Error(
-                "SendError: The output queue for a network interface was full."
-                " This generally indicates that the interface has stopped"
-                " sending, but may be caused by transient congestion."
-            )
+            raise ENOBUFSError()
         elif errno == errno.ENOMEM:
-            raise Error("SendError: No memory available.")
+            raise ENOMEMError()
         elif errno == errno.ENOTCONN:
-            raise Error("SendError: The socket is not connected.")
+            raise ENOTCONNError()
         elif errno == errno.ENOTSOCK:
-            raise Error("SendError: The file descriptor is not associated with a socket.")
+            raise ENOTSOCKError()
         elif errno == errno.EOPNOTSUPP:
-            raise Error("SendError: Some bit in the flags argument is inappropriate for the socket type.")
-        elif errno == errno.EPIPE:
-            raise Error(
-                "SendError: The local end has been shut down on a connection"
-                " oriented socket. In this case the process will also receive a"
-                " SIGPIPE unless MSG_NOSIGNAL is set."
-            )
+            raise EOPNOTSUPPError()
         else:
             raise Error(
-                "SendError: An error occurred while attempting to receive data from the socket. Error code: ",
+                "SendError: An error occurred while attempting to send data to the socket. Error code: ",
                 errno,
             )
 
@@ -1367,7 +1335,7 @@ fn sendto[
     length: c_size_t,
     flags: c_int,
     mut dest_addr: SocketAddress,
-) raises -> c_size_t:
+) raises SendtoError -> c_size_t:
     """Libc POSIX `sendto` function.
 
     Args:
@@ -1378,27 +1346,7 @@ fn sendto[
         dest_addr: Points to a sockaddr structure containing the destination address.
 
     Raises:
-        Error: If an error occurs while attempting to send data to the socket.
-        EAFNOSUPPORT: Addresses in the specified address family cannot be used with this socket.
-        EAGAIN or EWOULDBLOCK: The socket's file descriptor is marked `O_NONBLOCK` and the requested operation would block.
-        EBADF: The socket argument is not a valid file descriptor.
-        ECONNRESET: A connection was forcibly closed by a peer.
-        EINTR: A signal interrupted `sendto()` before any data was transmitted.
-        EMSGSIZE: The message is too large to be sent all at once, as the socket requires.
-        ENOTCONN: The socket is connection-mode but is not connected.
-        ENOTSOCK: The socket argument does not refer to a socket.
-        EPIPE: The socket is shut down for writing, or the socket is connection-mode and is no longer connected.
-        EACCES: Search permission is denied for a component of the path prefix; or write access to the named socket is denied.
-        EDESTADDRREQ: The socket is not connection-mode and does not have its peer address set, and no destination address was specified.
-        EHOSTUNREACH: The destination host cannot be reached (probably because the host is down or a remote router cannot reach it).
-        EINVAL: The `dest_len` argument is not a valid length for the address family.
-        EIO: An I/O error occurred while reading from or writing to the file system.
-        ENETDOWN: The local network interface used to reach the destination is down.
-        ENETUNREACH: No route to the network is present.
-        ENOBUFS: Insufficient resources were available in the system to perform the operation.
-        ENOMEM: Insufficient memory was available to fulfill the request.
-        ELOOP: More than `SYMLOOP_MAX` symbolic links were encountered during resolution of the pathname in the socket address.
-        ENAMETOOLONG: The length of a pathname exceeds `PATH_MAX`, or pathname resolution of a symbolic link produced an intermediate result with a length that exceeds `PATH_MAX`.
+        SendtoError: If an error occurs while sending data to the socket.
 
     #### C Function
     ```c
@@ -1426,50 +1374,50 @@ fn sendto[
     if result == -1:
         var errno = get_errno()
         if errno == errno.EAFNOSUPPORT:
-            raise "SendToError (EAFNOSUPPORT): Addresses in the specified address family cannot be used with this socket."
+            raise EAFNOSUPPORTError()
         elif errno in [errno.EAGAIN, errno.EWOULDBLOCK]:
-            raise "SendToError (EAGAIN/EWOULDBLOCK): The socket's file descriptor is marked `O_NONBLOCK` and the requested operation would block."
+            raise EAGAINError()
         elif errno == errno.EBADF:
-            raise "SendToError (EBADF): The socket argument is not a valid file descriptor."
+            raise EBADFError()
         elif errno == errno.ECONNRESET:
-            raise "SendToError (ECONNRESET): A connection was forcibly closed by a peer."
+            raise ECONNRESETError()
         elif errno == errno.EINTR:
-            raise "SendToError (EINTR): A signal interrupted `sendto()` before any data was transmitted."
+            raise EINTRError()
         elif errno == errno.EMSGSIZE:
-            raise "SendToError (EMSGSIZE): The message is too large to be sent all at once, as the socket requires."
+            raise EMSGSIZEError()
         elif errno == errno.ENOTCONN:
-            raise "SendToError (ENOTCONN): The socket is connection-mode but is not connected."
+            raise ENOTCONNError()
         elif errno == errno.ENOTSOCK:
-            raise "SendToError (ENOTSOCK): The socket argument does not refer to a socket."
+            raise ENOTSOCKError()
         elif errno == errno.EPIPE:
-            raise "SendToError (EPIPE): The socket is shut down for writing, or the socket is connection-mode and is no longer connected."
+            raise EPIPEError()
         elif errno == errno.EACCES:
-            raise "SendToError (EACCES): Search permission is denied for a component of the path prefix; or write access to the named socket is denied."
+            raise EACCESError()
         elif errno == errno.EDESTADDRREQ:
-            raise "SendToError (EDESTADDRREQ): The socket is not connection-mode and does not have its peer address set, and no destination address was specified."
+            raise EDESTADDRREQError()
         elif errno == errno.EHOSTUNREACH:
-            raise "SendToError (EHOSTUNREACH): The destination host cannot be reached (probably because the host is down or a remote router cannot reach it)."
+            raise EHOSTUNREACHError()
         elif errno == errno.EINVAL:
-            raise "SendToError (EINVAL): The dest_len argument is not a valid length for the address family."
+            raise EINVALError()
         elif errno == errno.EIO:
-            raise "SendToError (EIO): An I/O error occurred while reading from or writing to the file system."
+            raise EIOError()
         elif errno == errno.EISCONN:
-            raise "SendToError (EISCONN): A destination address was specified and the socket is already connected."
+            raise EISCONNError()
         elif errno == errno.ENETDOWN:
-            raise "SendToError (ENETDOWN): The local network interface used to reach the destination is down."
+            raise ENETDOWNError()
         elif errno == errno.ENETUNREACH:
-            raise "SendToError (ENETUNREACH): No route to the network is present."
+            raise ENETUNREACHError()
         elif errno == errno.ENOBUFS:
-            raise "SendToError (ENOBUFS): Insufficient resources were available in the system to perform the operation."
+            raise ENOBUFSError()
         elif errno == errno.ENOMEM:
-            raise "SendToError (ENOMEM): Insufficient memory was available to fulfill the request."
+            raise ENOMEMError()
         elif errno == errno.ELOOP:
-            raise "SendToError (ELOOP): More than `SYMLOOP_MAX` symbolic links were encountered during resolution of the pathname in the socket address."
+            raise ELOOPError()
         elif errno == errno.ENAMETOOLONG:
-            raise "SendToError (ENAMETOOLONG): The length of a pathname exceeds `PATH_MAX`, or pathname resolution of a symbolic link produced an intermediate result with a length that exceeds `PATH_MAX`."
+            raise ENAMETOOLONGError()
         else:
             raise Error(
-                "SendToError: An error occurred while attempting to send data to the socket. Error code: ",
+                "SendtoError: An error occurred while attempting to send data to the socket. Error code: ",
                 errno,
             )
 
