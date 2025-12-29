@@ -300,7 +300,7 @@ fn setsockopt(
     level: c_int,
     option_name: c_int,
     option_value: c_int,
-) raises:
+) raises SetsockoptError:
     """Libc POSIX `setsockopt` function. Manipulate options for the socket referred to by the file descriptor, `socket`.
 
     Args:
@@ -310,7 +310,7 @@ fn setsockopt(
         option_value: A UnsafePointer to the value to set.
 
     Raises:
-        Error: If an error occurs while setting the socket option.
+        SetsockoptError: If an error occurs while setting the socket option.
         * EBADF: The argument `socket` is not a valid descriptor.
         * EFAULT: The argument `option_value` points outside the process's allocated address space.
         * EINVAL: The argument `option_len` is invalid. Can sometimes occur when `option_value` is invalid.
@@ -335,26 +335,18 @@ fn setsockopt(
     if result == -1:
         var errno = get_errno()
         if errno == errno.EBADF:
-            raise Error("LibCFFIError [setsockopt - EBADF]: The argument `socket` is not a valid descriptor.")
+            raise EBADFError()
         elif errno == errno.EFAULT:
-            raise Error(
-                "LibCFFIError [setsockopt - EFAULT]: The argument"
-                " `option_value` points outside the process's allocated address"
-                " space."
-            )
+            raise EFAULTError()
         elif errno == errno.EINVAL:
-            raise Error(
-                "LibCFFIError [setsockopt - EINVAL]: The argument `option_len`"
-                " is invalid. Can sometimes occur when `option_value` is"
-                " invalid."
-            )
+            raise EINVALError()
         elif errno == errno.ENOPROTOOPT:
-            raise Error("LibCFFIError [setsockopt - ENOPROTOOPT]: The option is unknown at the level indicated.")
+            raise ENOPROTOOPTError()
         elif errno == errno.ENOTSOCK:
-            raise Error("LibCFFIError [setsockopt - ENOTSOCK]: The argument `socket` is not a socket.")
+            raise ENOTSOCKError()
         else:
             raise Error(
-                "LibCFFIError [setsockopt]: An error occurred while setting the socket option. Error code: ",
+                "SetsockoptError: An error occurred while setting the socket option. Error code: ",
                 errno,
             )
 
@@ -403,7 +395,7 @@ fn getsockopt(
     socket: FileDescriptor,
     level: c_int,
     option_name: c_int,
-) raises -> Int:
+) raises GetsockoptError -> Int:
     """Libc POSIX `getsockopt` function.
 
     Manipulate options for the socket referred to by the file descriptor, `socket`.
@@ -417,7 +409,7 @@ fn getsockopt(
         The value of the option.
 
     Raises:
-        Error: If an error occurs while setting the socket option.
+        GetsockoptError: If an error occurs while getting the socket option.
         * EBADF: The argument `socket` is not a valid descriptor.
         * EFAULT: The argument `option_value` points outside the process's allocated address space.
         * EINVAL: The argument `option_len` is invalid. Can sometimes occur when `option_value` is invalid.
@@ -438,20 +430,18 @@ fn getsockopt(
     if result == -1:
         var errno = get_errno()
         if errno == errno.EBADF:
-            raise Error("getsockopt: The argument `socket` is not a valid descriptor.")
+            raise EBADFError()
         elif errno == errno.EFAULT:
-            raise Error("getsockopt: The argument `option_value` points outside the process's allocated address space.")
+            raise EFAULTError()
         elif errno == errno.EINVAL:
-            raise Error(
-                "getsockopt: The argument `option_len` is invalid. Can sometimes occur when `option_value` is invalid."
-            )
+            raise EINVALError()
         elif errno == errno.ENOPROTOOPT:
-            raise Error("getsockopt: The option is unknown at the level indicated.")
+            raise ENOPROTOOPTError()
         elif errno == errno.ENOTSOCK:
-            raise Error("getsockopt: The argument `socket` is not a socket.")
+            raise ENOTSOCKError()
         else:
             raise Error(
-                "getsockopt: An error occurred while setting the socket option. Error code: ",
+                "GetsockoptError: An error occurred while getting the socket option. Error code: ",
                 errno,
             )
 
