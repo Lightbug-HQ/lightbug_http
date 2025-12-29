@@ -1,7 +1,8 @@
 from hashlib.hash import Hasher
 
 from lightbug_http.io.bytes import ByteReader, Bytes, ByteView
-from lightbug_http.strings import http, https, strHttp10, strHttp11, find_all
+from lightbug_http.strings import find_all, http, https, strHttp10, strHttp11
+
 
 fn unquote[expand_plus: Bool = False](input_str: String, disallowed_escapes: List[String] = List[String]()) -> String:
     var encoded_str = input_str.replace(QueryDelimiters.PLUS_ESCAPED_SPACE, " ") if expand_plus else input_str

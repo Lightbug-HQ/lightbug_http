@@ -4,6 +4,7 @@ trait CustomError(Movable, Stringable, Writable):
     Provides default implementations for write_to and __str__ that use
     the comptime 'message' field.
     """
+
     comptime message: String
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -11,4 +12,3 @@ trait CustomError(Movable, Stringable, Writable):
 
     fn __str__(self) -> String:
         return Self.message
-

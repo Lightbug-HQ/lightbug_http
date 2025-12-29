@@ -3,8 +3,8 @@ from sys.info import CompilationTarget, size_of
 
 from lightbug_http.c.aliases import c_void
 from lightbug_http.c.network import SocketAddress, sockaddr, sockaddr_in, socklen_t
-from memory import stack_allocation
 from lightbug_http.c.socket_error import *
+from memory import stack_allocation
 
 
 @fieldwise_init
@@ -1497,8 +1497,6 @@ fn _shutdown(socket: c_int, how: c_int) -> c_int:
     return external_call["shutdown", c_int, type_of(socket), type_of(how)](socket, how)
 
 
-
-
 fn shutdown(socket: FileDescriptor, how: ShutdownOption) raises ShutdownError:
     """Libc POSIX `shutdown` function.
 
@@ -1553,8 +1551,6 @@ fn _close(fildes: c_int) -> c_int:
     * Reference: https://man7.org/linux/man-pages/man3/close.3p.html
     """
     return external_call["close", c_int, type_of(fildes)](fildes)
-
-
 
 
 fn close(file_descriptor: FileDescriptor) raises CloseError:

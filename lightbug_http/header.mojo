@@ -97,9 +97,7 @@ struct Headers(Copyable, Stringable, Writable):
         except:
             return 0
 
-    fn parse_raw_request(
-        mut self, mut reader: ByteReader, out result: ParsedRequestResult
-    ) raises:
+    fn parse_raw_request(mut self, mut reader: ByteReader, out result: ParsedRequestResult) raises:
         """Parse HTTP request."""
         if self.check_if_response(reader):
             raise Error("Headers.parse_raw: Not a valid HTTP request.")
@@ -107,7 +105,7 @@ struct Headers(Copyable, Stringable, Writable):
         var method = String()
         var path = String()
         var minor_version = -1
-        var max_headers = 100 # TODO: make configurable
+        var max_headers = 100  # TODO: make configurable
         var headers = InlineArray[HTTPHeader, 100](fill=HTTPHeader())
 
         var num_headers = max_headers
@@ -141,9 +139,7 @@ struct Headers(Copyable, Stringable, Writable):
         reader.read_pos += ret
         result = ParsedRequestResult(method^, path^, String("HTTP/1.", minor_version), cookies^)
 
-    fn parse_raw_response(
-        mut self, mut reader: ByteReader, out result: ParsedResponseResult
-    ) raises:
+    fn parse_raw_response(mut self, mut reader: ByteReader, out result: ParsedResponseResult) raises:
         """Parse HTTP response."""
         if not self.check_if_response(reader):
             raise Error("Headers.parse_raw: Not a valid HTTP response.")
@@ -152,7 +148,7 @@ struct Headers(Copyable, Stringable, Writable):
         var status = 0
         var msg = String()
 
-        var max_headers = 100 # TODO: make configurable
+        var max_headers = 100  # TODO: make configurable
         var headers = InlineArray[HTTPHeader, 100](fill=HTTPHeader())
         var num_headers = max_headers
         var ret = http_parse_response(

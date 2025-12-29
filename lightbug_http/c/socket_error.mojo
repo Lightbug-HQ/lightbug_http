@@ -5,181 +5,217 @@ Follows the pattern from typed_errors.mojo.
 """
 
 from sys.ffi import c_int, external_call, get_errno
-from utils import Variant
+
 from lightbug_http.utils.error import CustomError
+from utils import Variant
 
 
 # ===== ERROR STRUCTS (one per errno) =====
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct EACCESError(CustomError):
     comptime message = "SendToError (EACCES): Search permission is denied for a component of the path prefix; or write access to the named socket is denied."
 
+
 @fieldwise_init
 @register_passable("trivial")
 struct EADDRINUSEError(CustomError):
     comptime message = "connect (EADDRINUSE): Local address is already in use."
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct EAFNOSUPPORTError(CustomError):
     comptime message = "SendToError (EAFNOSUPPORT): Addresses in the specified address family cannot be used with this socket."
 
+
 @fieldwise_init
 @register_passable("trivial")
 struct EAGAINError(CustomError):
     comptime message = "SendToError (EAGAIN/EWOULDBLOCK) (EAGAIN): The socket's file descriptor is marked `O_NONBLOCK` and the requested operation would block."
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct EALREADYError(CustomError):
     comptime message = "connect (EALREADY): The file descriptor is not a valid index in the descriptor table."
 
+
 @fieldwise_init
 @register_passable("trivial")
 struct EBADFError(CustomError):
     comptime message = "CloseError (EBADF): The file_descriptor argument is not a valid open file descriptor."
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct ECONNABORTEDError(CustomError):
     comptime message = "accept (ECONNABORTED): `socket` is not a valid descriptor."
 
+
 @fieldwise_init
 @register_passable("trivial")
 struct ECONNREFUSEDError(CustomError):
     comptime message = "SendError (ECONNREFUSED): `buffer` points outside the process's address space."
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct ECONNRESETError(CustomError):
     comptime message = "SendToError (ECONNRESET): A connection was forcibly closed by a peer."
 
+
 @fieldwise_init
 @register_passable("trivial")
 struct EDESTADDRREQError(CustomError):
     comptime message = "SendToError (EDESTADDRREQ): The socket is not connection-mode and does not have its peer address set, and no destination address was specified."
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct EFAULTError(CustomError):
     comptime message = "SendError (EFAULT): `buffer` points outside the process's address space."
 
+
 @fieldwise_init
 @register_passable("trivial")
 struct EHOSTUNREACHError(CustomError):
     comptime message = "SendToError (EHOSTUNREACH): The destination host cannot be reached (probably because the host is down or a remote router cannot reach it)."
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct EINTRError(CustomError):
     comptime message = "CloseError (EINTR): The close() function was interrupted by a signal."
 
+
 @fieldwise_init
 @register_passable("trivial")
 struct EINVALError(CustomError):
     comptime message = "ShutdownError (EINVAL): Invalid argument passed."
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct EIOError(CustomError):
     comptime message = "CloseError (EIO): An I/O error occurred while reading from or writing to the file system."
 
+
 @fieldwise_init
 @register_passable("trivial")
 struct EISCONNError(CustomError):
     comptime message = "SendToError (EISCONN): A destination address was specified and the socket is already connected."
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct ELOOPError(CustomError):
     comptime message = "SendToError (ELOOP): More than `SYMLOOP_MAX` symbolic links were encountered during resolution of the pathname in the socket address."
 
+
 @fieldwise_init
 @register_passable("trivial")
 struct EMFILEError(CustomError):
     comptime message = "accept (EMFILE): The per-process limit of open file descriptors has been reached."
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct EMSGSIZEError(CustomError):
     comptime message = "SendToError (EMSGSIZE): The message is too large to be sent all at once, as the socket requires."
 
+
 @fieldwise_init
 @register_passable("trivial")
 struct ENAMETOOLONGError(CustomError):
     comptime message = "SendToError (ENAMETOOLONG): The length of a pathname exceeds `PATH_MAX`, or pathname resolution of a symbolic link produced an intermediate result with a length that exceeds `PATH_MAX`."
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct ENETDOWNError(CustomError):
     comptime message = "SendToError (ENETDOWN): The local network interface used to reach the destination is down."
 
+
 @fieldwise_init
 @register_passable("trivial")
 struct ENETUNREACHError(CustomError):
     comptime message = "SendToError (ENETUNREACH): No route to the network is present."
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct ENFILEError(CustomError):
     comptime message = "accept (ENFILE): The system limit on the total number of open files has been reached."
 
+
 @fieldwise_init
 @register_passable("trivial")
 struct ENOBUFSError(CustomError):
     comptime message = "SendToError (ENOBUFS): Insufficient resources were available in the system to perform the operation."
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct ENOMEMError(CustomError):
     comptime message = "SendToError (ENOMEM): Insufficient memory was available to fulfill the request."
 
+
 @fieldwise_init
 @register_passable("trivial")
 struct ENOPROTOOPTError(CustomError):
     comptime message = "getsockopt (ENOPROTOOPT): The option is unknown at the level indicated."
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct ENOSPCError(CustomError):
     comptime message = "CloseError (ENOSPC or EDQUOT): On NFS, these errors are not normally reported against the first write which exceeds the available storage space, but instead against a subsequent write(2), fsync(2), or close()."
 
+
 @fieldwise_init
 @register_passable("trivial")
 struct ENOTCONNError(CustomError):
     comptime message = "ShutdownError (ENOTCONN): The socket is not connected."
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct ENOTSOCKError(CustomError):
     comptime message = "ShutdownError (ENOTSOCK): The file descriptor is not associated with a socket."
 
+
 @fieldwise_init
 @register_passable("trivial")
 struct EOPNOTSUPPError(CustomError):
     comptime message = "SendError (EOPNOTSUPP): Some bit in the flags argument is inappropriate for the socket type."
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct EPERMError(CustomError):
     comptime message = "accept (EPERM): Firewall rules forbid connection."
 
+
 @fieldwise_init
 @register_passable("trivial")
 struct EPIPEError(CustomError):
     comptime message = "SendToError (EPIPE): The socket is shut down for writing, or the socket is connection-mode and is no longer connected."
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct EPROTOError(CustomError):
     comptime message = "accept (EPROTO): Protocol error."
 
+
 @fieldwise_init
 @register_passable("trivial")
 struct EPROTONOSUPPORTError(CustomError):
     comptime message = "SocketError (EPROTONOSUPPORT): The protocol type or the specified protocol is not supported within this domain."
+
 
 @fieldwise_init
 @register_passable("trivial")
@@ -188,6 +224,7 @@ struct ETIMEDOUTError(CustomError):
 
 
 # ===== VARIANT ERROR TYPES (one per function) =====
+
 
 @fieldwise_init
 struct AcceptError(Movable, Stringable, Writable):
@@ -207,7 +244,7 @@ struct AcceptError(Movable, Stringable, Writable):
         EOPNOTSUPPError,
         EPERMError,
         EPROTOError,
-        Error
+        Error,
     ]
     var value: Self.type
 
@@ -218,7 +255,7 @@ struct AcceptError(Movable, Stringable, Writable):
     @implicit
     fn __init__(out self, value: EINTRError):
         self.value = value
-    
+
     @implicit
     fn __init__(out self, value: EAGAINError):
         self.value = value
@@ -306,6 +343,7 @@ struct AcceptError(Movable, Stringable, Writable):
     fn __str__(self) -> String:
         return String.write(self)
 
+
 @fieldwise_init
 struct BindError(Movable, Stringable, Writable):
     """Typed error variant for bind() function."""
@@ -320,7 +358,7 @@ struct BindError(Movable, Stringable, Writable):
         ENAMETOOLONGError,
         ENOMEMError,
         ENOTSOCKError,
-        Error
+        Error,
     ]
     var value: Self.type
 
@@ -395,17 +433,12 @@ struct BindError(Movable, Stringable, Writable):
     fn __str__(self) -> String:
         return String.write(self)
 
+
 @fieldwise_init
 struct CloseError(Movable, Stringable, Writable):
     """Typed error variant for close() function."""
 
-    comptime type = Variant[
-        EBADFError,
-        EINTRError,
-        EIOError,
-        ENOSPCError,
-        Error
-    ]
+    comptime type = Variant[EBADFError, EINTRError, EIOError, ENOSPCError, Error]
     var value: Self.type
 
     @implicit
@@ -449,6 +482,7 @@ struct CloseError(Movable, Stringable, Writable):
     fn __str__(self) -> String:
         return String.write(self)
 
+
 @fieldwise_init
 struct ConnectError(Movable, Stringable, Writable):
     """Typed error variant for connect() function."""
@@ -466,7 +500,7 @@ struct ConnectError(Movable, Stringable, Writable):
         EISCONNError,
         ENETUNREACHError,
         ENOTSOCKError,
-        Error
+        Error,
     ]
     var value: Self.type
 
@@ -559,19 +593,12 @@ struct ConnectError(Movable, Stringable, Writable):
     fn __str__(self) -> String:
         return String.write(self)
 
+
 @fieldwise_init
 struct GetpeernameError(Movable, Stringable, Writable):
     """Typed error variant for getpeername() function."""
 
-    comptime type = Variant[
-        EBADFError,
-        EFAULTError,
-        EINVALError,
-        ENOBUFSError,
-        ENOTCONNError,
-        ENOTSOCKError,
-        Error
-    ]
+    comptime type = Variant[EBADFError, EFAULTError, EINVALError, ENOBUFSError, ENOTCONNError, ENOTSOCKError, Error]
     var value: Self.type
 
     @implicit
@@ -627,18 +654,12 @@ struct GetpeernameError(Movable, Stringable, Writable):
     fn __str__(self) -> String:
         return String.write(self)
 
+
 @fieldwise_init
 struct GetsocknameError(Movable, Stringable, Writable):
     """Typed error variant for getsockname() function."""
 
-    comptime type = Variant[
-        EBADFError,
-        EFAULTError,
-        EINVALError,
-        ENOBUFSError,
-        ENOTSOCKError,
-        Error
-    ]
+    comptime type = Variant[EBADFError, EFAULTError, EINVALError, ENOBUFSError, ENOTSOCKError, Error]
     var value: Self.type
 
     @implicit
@@ -688,18 +709,12 @@ struct GetsocknameError(Movable, Stringable, Writable):
     fn __str__(self) -> String:
         return String.write(self)
 
+
 @fieldwise_init
 struct GetsockoptError(Movable, Stringable, Writable):
     """Typed error variant for getsockopt() function."""
 
-    comptime type = Variant[
-        EBADFError,
-        EFAULTError,
-        EINVALError,
-        ENOPROTOOPTError,
-        ENOTSOCKError,
-        Error
-    ]
+    comptime type = Variant[EBADFError, EFAULTError, EINVALError, ENOPROTOOPTError, ENOTSOCKError, Error]
     var value: Self.type
 
     @implicit
@@ -749,17 +764,12 @@ struct GetsockoptError(Movable, Stringable, Writable):
     fn __str__(self) -> String:
         return String.write(self)
 
+
 @fieldwise_init
 struct ListenError(Movable, Stringable, Writable):
     """Typed error variant for listen() function."""
 
-    comptime type = Variant[
-        EADDRINUSEError,
-        EBADFError,
-        ENOTSOCKError,
-        EOPNOTSUPPError,
-        Error
-    ]
+    comptime type = Variant[EADDRINUSEError, EBADFError, ENOTSOCKError, EOPNOTSUPPError, Error]
     var value: Self.type
 
     @implicit
@@ -803,19 +813,13 @@ struct ListenError(Movable, Stringable, Writable):
     fn __str__(self) -> String:
         return String.write(self)
 
+
 @fieldwise_init
 struct RecvError(Movable, Stringable, Writable):
     """Typed error variant for recv() function."""
 
     comptime type = Variant[
-        EAGAINError,
-        EBADFError,
-        ECONNREFUSEDError,
-        EFAULTError,
-        EINTRError,
-        ENOTCONNError,
-        ENOTSOCKError,
-        Error
+        EAGAINError, EBADFError, ECONNREFUSEDError, EFAULTError, EINTRError, ENOTCONNError, ENOTSOCKError, Error
     ]
     var value: Self.type
 
@@ -878,6 +882,7 @@ struct RecvError(Movable, Stringable, Writable):
     fn __str__(self) -> String:
         return String.write(self)
 
+
 @fieldwise_init
 struct RecvfromError(Movable, Stringable, Writable):
     """Typed error variant for recvfrom() function."""
@@ -895,7 +900,7 @@ struct RecvfromError(Movable, Stringable, Writable):
         ENOTSOCKError,
         EOPNOTSUPPError,
         ETIMEDOUTError,
-        Error
+        Error,
     ]
     var value: Self.type
 
@@ -988,6 +993,7 @@ struct RecvfromError(Movable, Stringable, Writable):
     fn __str__(self) -> String:
         return String.write(self)
 
+
 @fieldwise_init
 struct SendError(Movable, Stringable, Writable):
     """Typed error variant for send() function."""
@@ -1007,7 +1013,7 @@ struct SendError(Movable, Stringable, Writable):
         ENOTCONNError,
         ENOTSOCKError,
         EOPNOTSUPPError,
-        Error
+        Error,
     ]
     var value: Self.type
 
@@ -1112,6 +1118,7 @@ struct SendError(Movable, Stringable, Writable):
     fn __str__(self) -> String:
         return String.write(self)
 
+
 @fieldwise_init
 struct SendtoError(Movable, Stringable, Writable):
     """Typed error variant for sendto() function."""
@@ -1138,7 +1145,7 @@ struct SendtoError(Movable, Stringable, Writable):
         ENOTCONNError,
         ENOTSOCKError,
         EPIPEError,
-        Error
+        Error,
     ]
     var value: Self.type
 
@@ -1285,18 +1292,12 @@ struct SendtoError(Movable, Stringable, Writable):
     fn __str__(self) -> String:
         return String.write(self)
 
+
 @fieldwise_init
 struct SetsockoptError(Movable, Stringable, Writable):
     """Typed error variant for setsockopt() function."""
 
-    comptime type = Variant[
-        EBADFError,
-        EFAULTError,
-        EINVALError,
-        ENOPROTOOPTError,
-        ENOTSOCKError,
-        Error
-    ]
+    comptime type = Variant[EBADFError, EFAULTError, EINVALError, ENOPROTOOPTError, ENOTSOCKError, Error]
     var value: Self.type
 
     @implicit
@@ -1346,17 +1347,12 @@ struct SetsockoptError(Movable, Stringable, Writable):
     fn __str__(self) -> String:
         return String.write(self)
 
+
 @fieldwise_init
 struct ShutdownError(Movable, Stringable, Writable):
     """Typed error variant for shutdown() function."""
 
-    comptime type = Variant[
-        EBADFError,
-        EINVALError,
-        ENOTCONNError,
-        ENOTSOCKError,
-        Error
-    ]
+    comptime type = Variant[EBADFError, EINVALError, ENOTCONNError, ENOTSOCKError, Error]
     var value: Self.type
 
     @implicit
@@ -1400,19 +1396,13 @@ struct ShutdownError(Movable, Stringable, Writable):
     fn __str__(self) -> String:
         return String.write(self)
 
+
 @fieldwise_init
 struct SocketError(Movable, Stringable, Writable):
     """Typed error variant for socket() function."""
 
     comptime type = Variant[
-        EACCESError,
-        EAFNOSUPPORTError,
-        EINVALError,
-        EMFILEError,
-        ENFILEError,
-        ENOBUFSError,
-        EPROTONOSUPPORTError,
-        Error
+        EACCESError, EAFNOSUPPORTError, EINVALError, EMFILEError, ENFILEError, ENOBUFSError, EPROTONOSUPPORTError, Error
     ]
     var value: Self.type
 
@@ -1474,4 +1464,3 @@ struct SocketError(Movable, Stringable, Writable):
 
     fn __str__(self) -> String:
         return String.write(self)
-

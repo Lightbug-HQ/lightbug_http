@@ -1,70 +1,29 @@
-from lightbug_http.connection import ConnectionState, ListenConfig, ListenerError, NoTLSListener, TCPConnection, default_buffer_size
+from lightbug_http.connection import (
+    ConnectionState,
+    ListenConfig,
+    ListenerError,
+    NoTLSListener,
+    TCPConnection,
+    default_buffer_size,
+)
 from lightbug_http.http.common_response import BadRequest, InternalError, URITooLong
 from lightbug_http.io.bytes import ByteReader, Bytes, BytesConstant, ByteView
-from lightbug_http.utils.owning_list import OwningList
 from lightbug_http.service import HTTPService
-from lightbug_http.socket import EOF, SocketClosedError, SocketError, FatalCloseError
+from lightbug_http.socket import EOF, FatalCloseError, SocketClosedError, SocketError
 from lightbug_http.utils.error import CustomError
+from lightbug_http.utils.owning_list import OwningList
 from utils import Variant
 
 from lightbug_http.http import HTTPRequest, HTTPResponse, encode
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ProvisionPoolExhaustedError(CustomError):
-    comptime message = "ProvisionError: Connection provision pool exhausted - no available provisions"
-
-
-@fieldwise_init
-struct ProvisionError(Movable, Stringable, Writable):
-    """Error variant for provision pool operations.
-    Represents failures during provision borrowing or management.
-    """
-
-    comptime type = Variant[
-        ProvisionPoolExhaustedError,
-        Error
-    ]
-    var value: Self.type
-
-    @implicit
-    fn __init__(out self, value: ProvisionPoolExhaustedError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
-    fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[ProvisionPoolExhaustedError]():
-            writer.write(self.value[ProvisionPoolExhaustedError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
-
-    fn isa[T: AnyType](self) -> Bool:
-        return self.value.isa[T]()
-
-    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
-        return self.value[T]
-
-    fn __str__(self) -> String:
-        return String.write(self)
-
-
-@fieldwise_init
 struct ServerError(Movable, Stringable, Writable):
-    """Error variant for server operations. 
+    """Error variant for server operations.
     Represents failures during listener setup, connection handling, etc.
     """
 
-    comptime type = Variant[
-        ListenerError,
-        ProvisionError,
-        SocketError,
-        FatalCloseError,
-        Error
-    ]
+    comptime type = Variant[ListenerError, ProvisionError, SocketError, FatalCloseError, Error]
     var value: Self.type
 
     @implicit
@@ -159,6 +118,38 @@ struct ConnectionProvision(Movable):
         self.recv_buffer.clear()
         self.state = ConnectionState.reading_headers()
         self.should_close = False
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct ProvisionPoolExhaustedError(CustomError):
+    comptime message = "ProvisionError: Connection provision pool exhausted - no available provisions"
+
+
+@fieldwise_init
+struct ProvisionError(Movable, Stringable, Writable):
+    """Error variant for provision pool operations.
+    Represents failures during provision borrowing or management.
+    """
+
+    comptime type = Variant[ProvisionPoolExhaustedError]
+    var value: Self.type
+
+    @implicit
+    fn __init__(out self, value: ProvisionPoolExhaustedError):
+        self.value = value
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write(self.value[ProvisionPoolExhaustedError])
+
+    fn isa[T: AnyType](self) -> Bool:
+        return self.value.isa[T]()
+
+    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
+        return self.value[T]
+
+    fn __str__(self) -> String:
+        return String.write(self)
 
 
 struct ProvisionPool(Movable):

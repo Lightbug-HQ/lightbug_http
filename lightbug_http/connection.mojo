@@ -1,11 +1,20 @@
 from sys.info import CompilationTarget
 from time import sleep
 
-from lightbug_http.address import HostPort, NetworkType, TCPAddr, UDPAddr, parse_address, ParseError
+from lightbug_http.address import HostPort, NetworkType, ParseError, TCPAddr, UDPAddr, parse_address
 from lightbug_http.c.address import AddressFamily
 from lightbug_http.io.bytes import Bytes
 from lightbug_http.io.sync import Duration
-from lightbug_http.socket import EOF, Socket, SocketError, FatalCloseError, SocketOption, SocketType, TCPSocket, UDPSocket
+from lightbug_http.socket import (
+    EOF,
+    FatalCloseError,
+    Socket,
+    SocketError,
+    SocketOption,
+    SocketType,
+    TCPSocket,
+    UDPSocket,
+)
 from lightbug_http.utils.error import CustomError
 from utils import Variant
 
@@ -17,6 +26,7 @@ comptime default_tcp_keep_alive = Duration(15 * 1000 * 1000 * 1000)  # 15 second
 
 
 # ===== Listener Error Marker Structs =====
+
 
 @fieldwise_init
 @register_passable("trivial")
@@ -44,6 +54,7 @@ struct ListenFailedError(CustomError):
 
 # ===== Listener Error Variant =====
 
+
 @fieldwise_init
 struct ListenerError(Movable, Stringable, Writable):
     """Error variant for listener creation operations.
@@ -52,12 +63,7 @@ struct ListenerError(Movable, Stringable, Writable):
     """
 
     comptime type = Variant[
-        AddressParseError,
-        SocketCreationError,
-        BindFailedError,
-        ListenFailedError,
-        SocketError,
-        Error
+        AddressParseError, SocketCreationError, BindFailedError, ListenFailedError, SocketError, Error
     ]
     var value: Self.type
 
@@ -188,7 +194,9 @@ struct ListenConfig:
     fn __init__(out self, keep_alive: Duration = default_tcp_keep_alive):
         self._keep_alive = keep_alive
 
-    fn listen[network: NetworkType = NetworkType.tcp4](self, address: StringSlice) raises ListenerError -> NoTLSListener:
+    fn listen[
+        network: NetworkType = NetworkType.tcp4
+    ](self, address: StringSlice) raises ListenerError -> NoTLSListener:
         """Create a TCP listener on the specified address.
 
         Parameters:

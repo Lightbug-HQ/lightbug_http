@@ -324,7 +324,7 @@ fn http_parse_request[
     if current >= buf_end:
         return -2
 
-    if current[] == BytesConstant.CR: 
+    if current[] == BytesConstant.CR:
         current += 1
         if current >= buf_end:
             return -2

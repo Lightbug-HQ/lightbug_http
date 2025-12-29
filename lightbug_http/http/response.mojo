@@ -111,9 +111,7 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
         except e:
             raise Error("Failed to read request body: ")
 
-    fn _decode_chunks(
-        mut self, mut decoder: HTTPChunkedDecoder, var chunks: Bytes
-    ) raises:
+    fn _decode_chunks(mut self, mut decoder: HTTPChunkedDecoder, var chunks: Bytes) raises:
         """Decode chunked transfer encoding.
         Args:
             decoder: The chunked decoder state machine.
@@ -132,9 +130,7 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
 
         if ret == -1:
             # buf_ptr.free()
-            raise Error(
-                "HTTPResponse._decode_chunks: Invalid chunked encoding"
-            )
+            raise Error("HTTPResponse._decode_chunks: Invalid chunked encoding")
         # ret == -2 means incomplete, but we'll proceed with what we have
         # ret >= 0 means complete, with ret bytes of trailing data
 

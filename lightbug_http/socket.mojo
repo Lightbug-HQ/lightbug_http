@@ -15,9 +15,9 @@ from lightbug_http.c.network import SocketAddress, inet_pton
 from lightbug_http.c.socket import (
     SOL_SOCKET,
     EBADFError,
+    EINTRError,
     EINVALError,
-    EINTRError, 
-    EIOError, 
+    EIOError,
     ENOSPCError,
     ShutdownOption,
     SocketOption,
@@ -104,12 +104,7 @@ struct FatalCloseError(Movable, Stringable, Writable):
     that should be propagated.
     """
 
-    comptime type = Variant[
-        EINTRError,
-        EIOError,
-        ENOSPCError,
-        Error
-    ]
+    comptime type = Variant[EINTRError, EIOError, ENOSPCError, Error]
     var value: Self.type
 
     @implicit
