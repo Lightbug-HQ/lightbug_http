@@ -352,11 +352,11 @@ struct TCPConnection:
         """
         self.socket.close()
 
-    fn shutdown(mut self) raises:
+    fn shutdown(mut self) raises EINVALError:
         """Shutdown the TCP connection.
 
         Raises:
-            Error: If shutdown fails.
+            EINVALError: If shutdown fails.
         """
         self.socket.shutdown()
 
