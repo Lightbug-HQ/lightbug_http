@@ -9,7 +9,14 @@ from lightbug_http.connection import (
 from lightbug_http.http.common_response import BadRequest, InternalError, URITooLong
 from lightbug_http.io.bytes import ByteReader, Bytes, BytesConstant, ByteView
 from lightbug_http.service import HTTPService
-from lightbug_http.socket import EOF, FatalCloseError, SocketClosedError, SocketError
+from lightbug_http.socket import (
+    EOF,
+    FatalCloseError,
+    SocketAcceptError,
+    SocketClosedError,
+    SocketError,
+    SocketRecvError,
+)
 from lightbug_http.utils.error import CustomError
 from lightbug_http.utils.owning_list import OwningList
 from utils import Variant
@@ -23,7 +30,15 @@ struct ServerError(Movable, Stringable, Writable):
     Represents failures during listener setup, connection handling, etc.
     """
 
-    comptime type = Variant[ListenerError, ProvisionError, SocketError, FatalCloseError, Error]
+    comptime type = Variant[
+        ListenerError,
+        ProvisionError,
+        SocketAcceptError,
+        SocketRecvError,
+        SocketError,
+        FatalCloseError,
+        Error,
+    ]
     var value: Self.type
 
     @implicit
@@ -32,6 +47,14 @@ struct ServerError(Movable, Stringable, Writable):
 
     @implicit
     fn __init__(out self, var value: ProvisionError):
+        self.value = value^
+
+    @implicit
+    fn __init__(out self, var value: SocketAcceptError):
+        self.value = value^
+
+    @implicit
+    fn __init__(out self, var value: SocketRecvError):
         self.value = value^
 
     @implicit
@@ -51,6 +74,10 @@ struct ServerError(Movable, Stringable, Writable):
             writer.write(self.value[ListenerError])
         elif self.value.isa[ProvisionError]():
             writer.write(self.value[ProvisionError])
+        elif self.value.isa[SocketAcceptError]():
+            writer.write(self.value[SocketAcceptError])
+        elif self.value.isa[SocketRecvError]():
+            writer.write(self.value[SocketRecvError])
         elif self.value.isa[SocketError]():
             writer.write(self.value[SocketError])
         elif self.value.isa[FatalCloseError]():
@@ -230,7 +257,7 @@ fn handle_connection[
     config: ServerConfig,
     server_address: String,
     tcp_keep_alive: Bool,
-) raises SocketError:
+) raises SocketRecvError:
     """Handle a single connection through its lifecycle.
     Only propagates SocketError for true socket failures - handles protocol
     errors (bad requests, etc.) internally by sending error responses.

@@ -3,15 +3,25 @@ from time import sleep
 
 from lightbug_http.address import HostPort, NetworkType, ParseError, TCPAddr, UDPAddr, parse_address
 from lightbug_http.c.address import AddressFamily
-from lightbug_http.c.socket_error import SendError
+from lightbug_http.c.socket_error import (
+    AcceptError,
+    GetpeernameError,
+    RecvError,
+    RecvfromError,
+    SendError,
+    SendtoError,
+)
 from lightbug_http.io.bytes import Bytes
 from lightbug_http.io.sync import Duration
 from lightbug_http.socket import (
     EOF,
     FatalCloseError,
     Socket,
+    SocketAcceptError,
     SocketError,
     SocketOption,
+    SocketRecvError,
+    SocketRecvfromError,
     SocketType,
     TCPSocket,
     UDPSocket,
@@ -146,14 +156,14 @@ struct NoTLSListener(Movable):
     fn __init__(out self) raises:
         self.socket = Socket[TCPAddr]()
 
-    fn accept(self) raises SocketError -> TCPConnection:
+    fn accept(self) raises SocketAcceptError -> TCPConnection:
         """Accept an incoming TCP connection.
 
         Returns:
             A new TCPConnection for the accepted client.
 
         Raises:
-            SocketError: If accept fails.
+            SocketAcceptError: If accept fails.
         """
         return TCPConnection(self.socket.accept())
 
@@ -327,7 +337,7 @@ struct TCPConnection:
     fn __init__(out self, var socket: TCPSocket[TCPAddr]):
         self.socket = socket^
 
-    fn read(self, mut buf: Bytes) raises SocketError -> UInt:
+    fn read(self, mut buf: Bytes) raises SocketRecvError -> UInt:
         """Read data from the TCP connection.
 
         Args:
@@ -337,9 +347,8 @@ struct TCPConnection:
             Number of bytes read.
 
         Raises:
-            SocketError: If read fails or connection is closed.
+            SocketRecvError: If read fails or connection is closed.
         """
-        # Just propagate SocketError from socket.receive - it already has all the type info
         return self.socket.receive(buf)
 
     fn write(self, buf: Span[Byte]) raises SendError -> UInt:
@@ -405,7 +414,7 @@ struct UDPConnection[
     fn __init__(out self, var socket: Self._sock_type):
         self.socket = socket^
 
-    fn read_from(mut self, size: Int = default_buffer_size) raises SocketError -> Tuple[Bytes, String, UInt16]:
+    fn read_from(mut self, size: Int = default_buffer_size) raises SocketRecvfromError -> Tuple[Bytes, String, UInt16]:
         """Reads data from the underlying file descriptor.
 
         Args:
@@ -415,12 +424,12 @@ struct UDPConnection[
             The number of bytes read, or an error if one occurred.
 
         Raises:
-            Error: If an error occurred while reading data.
+            SocketRecvfromError: If an error occurred while reading data.
         """
 
         return self.socket.receive_from(size)
 
-    fn read_from(mut self, mut dest: Bytes) raises SocketError -> Tuple[UInt, String, UInt16]:
+    fn read_from(mut self, mut dest: Bytes) raises SocketRecvfromError -> Tuple[UInt, String, UInt16]:
         """Reads data from the underlying file descriptor.
 
         Args:
@@ -430,12 +439,12 @@ struct UDPConnection[
             The number of bytes read, or an error if one occurred.
 
         Raises:
-            Error: If an error occurred while reading data.
+            SocketRecvfromError: If an error occurred while reading data.
         """
 
         return self.socket.receive_from(dest)
 
-    fn write_to(mut self, src: Span[Byte], mut address: UDPAddr) raises SocketError -> UInt:
+    fn write_to(mut self, src: Span[Byte], mut address: UDPAddr) raises SendtoError -> UInt:
         """Writes data to the underlying file descriptor.
 
         Args:
@@ -446,12 +455,12 @@ struct UDPConnection[
             The number of bytes written, or an error if one occurred.
 
         Raises:
-            Error: If an error occurred while writing data.
+            SendtoError: If an error occurred while writing data.
         """
 
         return self.socket.send_to(src, address.ip, address.port)
 
-    fn write_to(mut self, src: Span[Byte], mut host: String, port: UInt16) raises SocketError -> UInt:
+    fn write_to(mut self, src: Span[Byte], mut host: String, port: UInt16) raises SendtoError -> UInt:
         """Writes data to the underlying file descriptor.
 
         Args:
@@ -463,7 +472,7 @@ struct UDPConnection[
             The number of bytes written, or an error if one occurred.
 
         Raises:
-            Error: If an error occurred while writing data.
+            SendtoError: If an error occurred while writing data.
         """
 
         return self.socket.send_to(src, host, port)
