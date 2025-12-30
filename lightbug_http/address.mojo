@@ -2,9 +2,11 @@ from sys.ffi import CompilationTarget, c_char, c_int, c_uchar, external_call
 
 from lightbug_http.c.address import AddressFamily, AddressLength
 from lightbug_http.c.aliases import ExternalImmutUnsafePointer, ExternalMutUnsafePointer, c_void
-from lightbug_http.c.network import in_addr_t, inet_ntop, ntohs, sockaddr, sockaddr_in, socklen_t
+from lightbug_http.c.network import InetNtopError, InetPtonError, in_addr_t, inet_ntop, ntohs, sockaddr, sockaddr_in, socklen_t
 from lightbug_http.c.socket import SocketType, socket
 from lightbug_http.socket import Socket
+from lightbug_http.utils.error import CustomError
+from utils import Variant
 
 
 comptime MAX_PORT = 65535
@@ -335,7 +337,7 @@ struct addrinfo_unix(AnAddrInfo):
         return self.ai_next
 
 
-fn get_ip_address(mut host: String, address_family: AddressFamily, sock_type: SocketType) raises -> in_addr_t:
+fn get_ip_address(mut host: String, address_family: AddressFamily, sock_type: SocketType) raises GetaddrinfoError -> in_addr_t:
     """Returns an IP address based on the host.
     This is a Unix-specific implementation.
 
@@ -364,7 +366,7 @@ fn get_ip_address(mut host: String, address_family: AddressFamily, sock_type: So
             raise getaddrinfo_err^
 
         if not result.unsafe_ptr()[].ai_addr:
-            raise Error("Failed to get IP address because the response's `ai_addr` was null.")
+            raise GetaddrinfoNullAddrError()
 
         # extend result's lifetime to avoid invalid access of pointer, it'd get freed early
         return (
@@ -388,7 +390,7 @@ fn get_ip_address(mut host: String, address_family: AddressFamily, sock_type: So
             raise getaddrinfo_err^
 
         if not result.unsafe_ptr()[].ai_addr:
-            raise Error("Failed to get IP address because the response's `ai_addr` was null.")
+            raise GetaddrinfoNullAddrError()
 
         return (
             result.unsafe_ptr()[]
@@ -413,20 +415,200 @@ fn is_ipv6(network: NetworkType) -> Bool:
     return network in (NetworkType.tcp6, NetworkType.udp6, NetworkType.ip6)
 
 
-struct ParseError(Stringable, Writable):
-    var message: String
+# ===== PARSE ERROR STRUCTS =====
 
-    fn __init__(out self, var message: String):
-        self.message = message^
 
-    fn write_to[W: Writer, //](self, mut writer: W) -> None:
-        writer.write(self.message)
+@fieldwise_init
+@register_passable("trivial")
+struct ParseEmptyAddressError(CustomError):
+    comptime message = "ParseError: Failed to parse address: received empty address string."
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct ParseMissingClosingBracketError(CustomError):
+    comptime message = "ParseError: Failed to parse ipv6 address: missing ']'"
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct ParseMissingPortError(CustomError):
+    comptime message = "ParseError: Failed to parse ipv6 address: missing port in address"
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct ParseUnexpectedBracketError(CustomError):
+    comptime message = "ParseError: Address failed bracket validation, unexpectedly contained brackets"
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct ParseEmptyPortError(CustomError):
+    comptime message = "ParseError: Failed to parse port: port string is empty."
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct ParseInvalidPortNumberError(CustomError):
+    comptime message = "ParseError: Failed to parse port: invalid integer value."
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct ParsePortOutOfRangeError(CustomError):
+    comptime message = "ParseError: Failed to parse port: Port number out of range (0-65535)."
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct ParseMissingSeparatorError(CustomError):
+    comptime message = "ParseError: Failed to parse address: missing port separator ':' in address."
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct ParseTooManyColonsError(CustomError):
+    comptime message = "ParseError: Failed to parse address: too many colons in address"
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct ParseIPProtocolPortError(CustomError):
+    comptime message = "ParseError: IP protocol addresses should not include ports"
+
+
+# ===== ADDRESS ERROR STRUCTS =====
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct GetaddrinfoNullAddrError(CustomError):
+    comptime message = "GetaddrinfoError: Failed to get IP address because the response's `ai_addr` was null."
+
+
+# ===== VARIANT ERROR TYPES =====
+
+
+@fieldwise_init
+struct ParseError(Movable, Stringable, Writable):
+    """Typed error variant for address parsing functions."""
+
+    comptime type = Variant[
+        ParseEmptyAddressError,
+        ParseMissingClosingBracketError,
+        ParseMissingPortError,
+        ParseUnexpectedBracketError,
+        ParseEmptyPortError,
+        ParseInvalidPortNumberError,
+        ParsePortOutOfRangeError,
+        ParseMissingSeparatorError,
+        ParseTooManyColonsError,
+        ParseIPProtocolPortError,
+    ]
+    var value: Self.type
+
+    @implicit
+    fn __init__(out self, value: ParseEmptyAddressError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: ParseMissingClosingBracketError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: ParseMissingPortError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: ParseUnexpectedBracketError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: ParseEmptyPortError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: ParseInvalidPortNumberError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: ParsePortOutOfRangeError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: ParseMissingSeparatorError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: ParseTooManyColonsError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: ParseIPProtocolPortError):
+        self.value = value
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        if self.value.isa[ParseEmptyAddressError]():
+            writer.write(self.value[ParseEmptyAddressError])
+        elif self.value.isa[ParseMissingClosingBracketError]():
+            writer.write(self.value[ParseMissingClosingBracketError])
+        elif self.value.isa[ParseMissingPortError]():
+            writer.write(self.value[ParseMissingPortError])
+        elif self.value.isa[ParseUnexpectedBracketError]():
+            writer.write(self.value[ParseUnexpectedBracketError])
+        elif self.value.isa[ParseEmptyPortError]():
+            writer.write(self.value[ParseEmptyPortError])
+        elif self.value.isa[ParseInvalidPortNumberError]():
+            writer.write(self.value[ParseInvalidPortNumberError])
+        elif self.value.isa[ParsePortOutOfRangeError]():
+            writer.write(self.value[ParsePortOutOfRangeError])
+        elif self.value.isa[ParseMissingSeparatorError]():
+            writer.write(self.value[ParseMissingSeparatorError])
+        elif self.value.isa[ParseTooManyColonsError]():
+            writer.write(self.value[ParseTooManyColonsError])
+        elif self.value.isa[ParseIPProtocolPortError]():
+            writer.write(self.value[ParseIPProtocolPortError])
+
+    fn isa[T: AnyType](self) -> Bool:
+        return self.value.isa[T]()
+
+    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
+        return self.value[T]
 
     fn __str__(self) -> String:
-        return self.message.copy()
+        return String.write(self)
 
 
-comptime TooManyColonsError = ParseError("too many colons in address")
+@fieldwise_init
+struct GetaddrinfoError(Movable, Stringable, Writable):
+    """Typed error variant for getaddrinfo() function."""
+
+    comptime type = Variant[GetaddrinfoNullAddrError, Error]
+    var value: Self.type
+
+    @implicit
+    fn __init__(out self, value: GetaddrinfoNullAddrError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, var value: Error):
+        self.value = value^
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        if self.value.isa[GetaddrinfoNullAddrError]():
+            writer.write(self.value[GetaddrinfoNullAddrError])
+        elif self.value.isa[Error]():
+            writer.write(self.value[Error])
+
+    fn isa[T: AnyType](self) -> Bool:
+        return self.value.isa[T]()
+
+    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
+        return self.value[T]
+
+    fn __str__(self) -> String:
+        return String.write(self)
 
 
 fn parse_ipv6_bracketed_address[
@@ -442,14 +624,14 @@ fn parse_ipv6_bracketed_address[
 
     var end_bracket_index = address.find("]")
     if end_bracket_index == -1:
-        raise ParseError("Failed to parse ipv6 address: missing ']'")
+        raise ParseMissingClosingBracketError()
 
     if end_bracket_index + 1 == len(address):
-        raise ParseError("Failed to parse ipv6 address: missing port in address")
+        raise ParseMissingPortError()
 
     var colon_index = end_bracket_index + 1
     if address[colon_index] != ":":
-        raise ParseError("Failed to parse ipv6 address: missing port in address")
+        raise ParseMissingPortError()
 
     return address[1:end_bracket_index], UInt16(end_bracket_index + 1)
 
@@ -466,34 +648,24 @@ fn validate_no_brackets[
         segment = address[Int(start_idx) : Int(end_idx.value())]
 
     if segment.find("[") != -1:
-        raise ParseError("Address failed bracket validation, unexpectedly contained '['")
+        raise ParseUnexpectedBracketError()
     if segment.find("]") != -1:
-        raise ParseError("Address failed bracket validation, unexpectedly contained ']'")
+        raise ParseUnexpectedBracketError()
 
 
 fn parse_port[origin: ImmutOrigin](port_str: StringSlice[origin]) raises ParseError -> UInt16:
     """Parse and validate port number."""
     if port_str == AddressConstants.EMPTY:
-        raise ParseError("Failed to parse port: port string is empty.")
+        raise ParseEmptyPortError()
 
     var port: Int
     try:
         port = Int(String(port_str))
     except conversion_err:
-        raise ParseError(
-            String(
-                "Failed to parse port: invalid integer value. Received: ",
-                port_str,
-            )
-        )
+        raise ParseInvalidPortNumberError()
 
     if port < MIN_PORT or port > MAX_PORT:
-        raise ParseError(
-            String(
-                "Failed to parse port: Port number out of range (0-65535). Received: ",
-                port_str,
-            )
-        )
+        raise ParsePortOutOfRangeError()
 
     return UInt16(port)
 
@@ -522,7 +694,7 @@ fn parse_address[
         Tuple containing the host and port.
     """
     if address == AddressConstants.EMPTY:
-        raise ParseError("Failed to parse address: received empty address string.")
+        raise ParseEmptyAddressError()
 
     if address == AddressConstants.LOCALHOST:
 
@@ -538,13 +710,13 @@ fn parse_address[
             return HostPort(String(address), DEFAULT_IP_PORT)
 
         if address.find(":") != -1:
-            raise ParseError("IP protocol addresses should not include ports")
+            raise ParseIPProtocolPortError()
 
         return HostPort(String(address), DEFAULT_IP_PORT)
 
     var colon_index = address.rfind(":")
     if colon_index == -1:
-        raise ParseError("Failed to parse address: missing port separator ':' in address.")
+        raise ParseMissingSeparatorError()
 
     var host: StringSlice[origin]
     var port: UInt16
@@ -556,7 +728,7 @@ fn parse_address[
     else:
         host = address[:colon_index]
         if host.find(":") != -1:
-            raise ParseError("Failed to parse address: too many colons in address")
+            raise ParseTooManyColonsError()
 
     port = parse_port(address[colon_index + 1 :])
     if host == AddressConstants.LOCALHOST:
@@ -589,7 +761,7 @@ fn binary_port_to_int(port: UInt16) -> Int:
     return Int(ntohs(port))
 
 
-fn binary_ip_to_string[address_family: AddressFamily](ip_address: UInt32) raises -> String:
+fn binary_ip_to_string[address_family: AddressFamily](ip_address: UInt32) raises InetNtopError -> String:
     """Convert a binary IP address to a string by calling `inet_ntop`.
 
     Parameters:
@@ -770,7 +942,7 @@ fn _getaddrinfo[
     ](nodename, servname, hints, res)
 
 
-fn getaddrinfo[T: AnAddrInfo, //](mut node: String, mut service: String, hints: T) raises -> CAddrInfo[T]:
+fn getaddrinfo[T: AnAddrInfo, //](mut node: String, mut service: String, hints: T) raises GetaddrinfoError -> CAddrInfo[T]:
     """Libc POSIX `getaddrinfo` function.
 
     Args:
@@ -779,7 +951,7 @@ fn getaddrinfo[T: AnAddrInfo, //](mut node: String, mut service: String, hints: 
         hints: An addrinfo struct containing hints for the lookup.
 
     Raises:
-        Error: If an error occurs while attempting to receive data from the socket.
+        GetaddrinfoError: If an error occurs while attempting to receive data from the socket.
         * EAI_AGAIN: The name could not be resolved at this time. Future attempts may succeed.
         * EAI_BADFLAGS: The `ai_flags` value was invalid.
         * EAI_FAIL: A non-recoverable error occurred when attempting to resolve the name.

@@ -11,7 +11,7 @@ from lightbug_http.address import (
     get_ip_address,
 )
 from lightbug_http.c.address import AddressFamily, AddressLength
-from lightbug_http.c.network import SocketAddress, inet_pton
+from lightbug_http.c.network import InetNtopError, InetPtonError, SocketAddress, inet_pton
 from lightbug_http.c.socket import (
     SOL_SOCKET,
     EBADFError,
@@ -148,9 +148,9 @@ struct SocketRecvfromError(Movable, Stringable, Writable):
 @fieldwise_init
 struct SocketAcceptError(Movable, Stringable, Writable):
     """Error variant for socket accept operations.
-    Can be AcceptError or GetpeernameError from the syscall, or SocketClosedError.
+    Can be AcceptError or GetpeernameError from the syscall, SocketClosedError, or InetNtopError from binary_ip_to_string.
     """
-    comptime type = Variant[AcceptError, GetpeernameError, SocketClosedError, Error]
+    comptime type = Variant[AcceptError, GetpeernameError, SocketClosedError, InetNtopError]
     var value: Self.type
 
     @implicit
@@ -166,7 +166,7 @@ struct SocketAcceptError(Movable, Stringable, Writable):
         self.value = value
 
     @implicit
-    fn __init__(out self, var value: Error):
+    fn __init__(out self, var value: InetNtopError):
         self.value = value^
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -176,8 +176,8 @@ struct SocketAcceptError(Movable, Stringable, Writable):
             writer.write(self.value[GetpeernameError])
         elif self.value.isa[SocketClosedError]():
             writer.write("SocketClosedError")
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
+        elif self.value.isa[InetNtopError]():
+            writer.write(self.value[InetNtopError])
 
     fn isa[T: AnyType](self) -> Bool:
         return self.value.isa[T]()
@@ -192,9 +192,9 @@ struct SocketAcceptError(Movable, Stringable, Writable):
 @fieldwise_init
 struct SocketBindError(Movable, Stringable, Writable):
     """Error variant for socket bind operations.
-    Can be BindError from bind(), SocketGetsocknameError from get_sock_name(), or Error from inet_pton.
+    Can be BindError from bind(), SocketGetsocknameError from get_sock_name(), or InetPtonError from inet_pton.
     """
-    comptime type = Variant[BindError, SocketGetsocknameError, Error]
+    comptime type = Variant[BindError, SocketGetsocknameError, InetPtonError]
     var value: Self.type
 
     @implicit
@@ -206,7 +206,7 @@ struct SocketBindError(Movable, Stringable, Writable):
         self.value = value^
 
     @implicit
-    fn __init__(out self, var value: Error):
+    fn __init__(out self, var value: InetPtonError):
         self.value = value^
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -214,8 +214,8 @@ struct SocketBindError(Movable, Stringable, Writable):
             writer.write(self.value[BindError])
         elif self.value.isa[SocketGetsocknameError]():
             writer.write(self.value[SocketGetsocknameError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
+        elif self.value.isa[InetPtonError]():
+            writer.write(self.value[InetPtonError])
 
     fn isa[T: AnyType](self) -> Bool:
         return self.value.isa[T]()
@@ -262,9 +262,9 @@ struct SocketConnectError(Movable, Stringable, Writable):
 @fieldwise_init
 struct SocketGetsocknameError(Movable, Stringable, Writable):
     """Error variant for socket getsockname operations.
-    Can be GetsocknameError from the syscall or SocketClosedError.
+    Can be GetsocknameError from the syscall, SocketClosedError, or InetNtopError from binary_ip_to_string.
     """
-    comptime type = Variant[GetsocknameError, SocketClosedError, Error]
+    comptime type = Variant[GetsocknameError, SocketClosedError, InetNtopError]
     var value: Self.type
 
     @implicit
@@ -276,7 +276,7 @@ struct SocketGetsocknameError(Movable, Stringable, Writable):
         self.value = value
 
     @implicit
-    fn __init__(out self, var value: Error):
+    fn __init__(out self, var value: InetNtopError):
         self.value = value^
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -284,8 +284,8 @@ struct SocketGetsocknameError(Movable, Stringable, Writable):
             writer.write(self.value[GetsocknameError])
         elif self.value.isa[SocketClosedError]():
             writer.write("SocketClosedError")
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
+        elif self.value.isa[InetNtopError]():
+            writer.write(self.value[InetNtopError])
 
     fn isa[T: AnyType](self) -> Bool:
         return self.value.isa[T]()

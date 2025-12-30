@@ -3,8 +3,101 @@ from sys.info import size_of
 
 from lightbug_http.c.address import AddressFamily, AddressLength
 from lightbug_http.c.aliases import ExternalImmutUnsafePointer, ExternalMutUnsafePointer, c_void
+from lightbug_http.utils.error import CustomError
 from memory import stack_allocation
-from utils import StaticTuple
+from utils import StaticTuple, Variant
+
+
+# ===== NETWORK ERROR STRUCTS =====
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct InetNtopEAFNOSUPPORTError(CustomError):
+    comptime message = "inet_ntop Error (EAFNOSUPPORT): `*src` was not an `AF_INET` or `AF_INET6` family address."
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct InetNtopENOSPCError(CustomError):
+    comptime message = "inet_ntop Error (ENOSPC): The buffer size was not large enough to store the presentation form of the address."
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct InetPtonInvalidAddressError(CustomError):
+    comptime message = "inet_pton Error: The input is not a valid address."
+
+
+# ===== VARIANT ERROR TYPES =====
+
+
+@fieldwise_init
+struct InetNtopError(Movable, Stringable, Writable):
+    """Typed error variant for inet_ntop() function."""
+
+    comptime type = Variant[InetNtopEAFNOSUPPORTError, InetNtopENOSPCError, Error]
+    var value: Self.type
+
+    @implicit
+    fn __init__(out self, value: InetNtopEAFNOSUPPORTError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: InetNtopENOSPCError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, var value: Error):
+        self.value = value^
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        if self.value.isa[InetNtopEAFNOSUPPORTError]():
+            writer.write(self.value[InetNtopEAFNOSUPPORTError])
+        elif self.value.isa[InetNtopENOSPCError]():
+            writer.write(self.value[InetNtopENOSPCError])
+        elif self.value.isa[Error]():
+            writer.write(self.value[Error])
+
+    fn isa[T: AnyType](self) -> Bool:
+        return self.value.isa[T]()
+
+    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
+        return self.value[T]
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+
+@fieldwise_init
+struct InetPtonError(Movable, Stringable, Writable):
+    """Typed error variant for inet_pton() function."""
+
+    comptime type = Variant[InetPtonInvalidAddressError, Error]
+    var value: Self.type
+
+    @implicit
+    fn __init__(out self, value: InetPtonInvalidAddressError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, var value: Error):
+        self.value = value^
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        if self.value.isa[InetPtonInvalidAddressError]():
+            writer.write(self.value[InetPtonInvalidAddressError])
+        elif self.value.isa[Error]():
+            writer.write(self.value[Error])
+
+    fn isa[T: AnyType](self) -> Bool:
+        return self.value.isa[T]()
+
+    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
+        return self.value[T]
+
+    fn __str__(self) -> String:
+        return String.write(self)
 
 
 fn htonl(hostlong: c_uint) -> c_uint:
@@ -270,7 +363,7 @@ fn _inet_ntop(
     ](af, src, dst, size)
 
 
-fn inet_ntop[address_family: AddressFamily, address_length: AddressLength](ip_address: UInt32) raises -> String:
+fn inet_ntop[address_family: AddressFamily, address_length: AddressLength](ip_address: UInt32) raises InetNtopError -> String:
     """Libc POSIX `inet_ntop` function.
 
     Parameters:
@@ -284,7 +377,7 @@ fn inet_ntop[address_family: AddressFamily, address_length: AddressLength](ip_ad
         The IP Address in the human readable format.
 
     Raises:
-        Error: If an error occurs while converting the address.
+        InetNtopError: If an error occurs while converting the address.
         EAFNOSUPPORT: `*src` was not an `AF_INET` or `AF_INET6` family address.
         ENOSPC: The buffer size, `size`, was not large enough to store the presentation form of the address.
 
@@ -308,12 +401,9 @@ fn inet_ntop[address_family: AddressFamily, address_length: AddressLength](ip_ad
     if not result:
         var errno = get_errno()
         if errno == errno.EAFNOSUPPORT:
-            raise Error("inet_ntop Error: `*src` was not an `AF_INET` or `AF_INET6` family address.")
+            raise InetNtopEAFNOSUPPORTError()
         elif errno == errno.ENOSPC:
-            raise Error(
-                "inet_ntop Error: The buffer size, `size`, was not large enough"
-                " to store the presentation form of the address."
-            )
+            raise InetNtopENOSPCError()
         else:
             raise Error(
                 "inet_ntop Error: An error occurred while converting the address. Error code: ",
@@ -355,7 +445,7 @@ fn _inet_pton(af: c_int, src: ImmutUnsafePointer[c_char], dst: MutUnsafePointer[
     ](af, src, dst)
 
 
-fn inet_pton[address_family: AddressFamily](var src: String) raises -> c_uint:
+fn inet_pton[address_family: AddressFamily](var src: String) raises InetPtonError -> c_uint:
     """Libc POSIX `inet_pton` function. Converts a presentation format address (that is, printable form as held in a character string)
     to network format (usually a struct in_addr or some other internal binary representation, in network byte order).
 
@@ -369,7 +459,7 @@ fn inet_pton[address_family: AddressFamily](var src: String) raises -> c_uint:
         The binary representation of the ip address.
 
     Raises:
-        Error: If an error occurs while converting the address or the input is not a valid address.
+        InetPtonError: If an error occurs while converting the address or the input is not a valid address.
 
     #### C Function
     ```c
@@ -390,7 +480,7 @@ fn inet_pton[address_family: AddressFamily](var src: String) raises -> c_uint:
 
     var result = _inet_pton(address_family.value, src.as_c_string_slice().unsafe_ptr(), ip_buffer)
     if result == 0:
-        raise Error("inet_pton Error: The input is not a valid address.")
+        raise InetPtonInvalidAddressError()
     elif result == -1:
         var errno = get_errno()
         raise Error(
