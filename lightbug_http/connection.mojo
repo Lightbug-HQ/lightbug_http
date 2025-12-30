@@ -20,6 +20,7 @@ from lightbug_http.socket import (
     FatalCloseError,
     Socket,
     SocketAcceptError,
+    SocketConnectError,
     SocketError,
     SocketOption,
     SocketRecvError,
@@ -490,7 +491,45 @@ struct UDPConnection[
     #     return self.socket.remote_address
 
 
-fn create_connection(mut host: String, port: UInt16) raises SocketError -> TCPConnection:
+@fieldwise_init
+struct CreateConnectionError(Movable, Stringable, Writable):
+    """Error variant for create_connection operations.
+    Can be CSocketError from socket creation or SocketConnectError from connect.
+    """
+    comptime type = Variant[CSocketError, SocketConnectError, Error]
+    var value: Self.type
+
+    @implicit
+    fn __init__(out self, var value: CSocketError):
+        self.value = value^
+
+    @implicit
+    fn __init__(out self, var value: SocketConnectError):
+        self.value = value^
+
+    @implicit
+    fn __init__(out self, var value: Error):
+        self.value = value^
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        if self.value.isa[CSocketError]():
+            writer.write(self.value[CSocketError])
+        elif self.value.isa[SocketConnectError]():
+            writer.write(self.value[SocketConnectError])
+        elif self.value.isa[Error]():
+            writer.write(self.value[Error])
+
+    fn isa[T: AnyType](self) -> Bool:
+        return self.value.isa[T]()
+
+    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
+        return self.value[T]
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+
+fn create_connection(mut host: String, port: UInt16) raises CreateConnectionError -> TCPConnection:
     """Connect to a server using a TCP socket.
 
     Args:
@@ -501,7 +540,7 @@ fn create_connection(mut host: String, port: UInt16) raises SocketError -> TCPCo
         A connected TCPConnection.
 
     Raises:
-        SocketError: If connection fails.
+        CreateConnectionError: If socket creation or connection fails.
     """
     var socket = Socket[TCPAddr, address_family = AddressFamily.AF_INET]()
     try:
