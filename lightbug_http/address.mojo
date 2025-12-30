@@ -337,7 +337,7 @@ struct addrinfo_unix(AnAddrInfo):
         return self.ai_next
 
 
-fn get_ip_address(mut host: String, address_family: AddressFamily, sock_type: SocketType) raises GetaddrinfoNullAddrError -> in_addr_t:
+fn get_ip_address(mut host: String, address_family: AddressFamily, sock_type: SocketType) raises GetIPAddressError -> in_addr_t:
     """Returns an IP address based on the host.
     This is a Unix-specific implementation.
 
@@ -487,7 +487,44 @@ struct GetaddrinfoNullAddrError(CustomError):
     comptime message = "GetaddrinfoError: Failed to get IP address because the response's `ai_addr` was null."
 
 
+@fieldwise_init
+@register_passable("trivial")
+struct GetaddrinfoError(CustomError):
+    comptime message = "GetaddrinfoError: Failed to resolve address information."
+
+
 # ===== VARIANT ERROR TYPES =====
+
+
+@fieldwise_init
+struct GetIPAddressError(Movable, Stringable, Writable):
+    """Typed error variant for get_ip_address() function."""
+
+    comptime type = Variant[GetaddrinfoError, GetaddrinfoNullAddrError]
+    var value: Self.type
+
+    @implicit
+    fn __init__(out self, value: GetaddrinfoError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: GetaddrinfoNullAddrError):
+        self.value = value
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        if self.value.isa[GetaddrinfoError]():
+            writer.write(self.value[GetaddrinfoError])
+        elif self.value.isa[GetaddrinfoNullAddrError]():
+            writer.write(self.value[GetaddrinfoNullAddrError])
+
+    fn isa[T: AnyType](self) -> Bool:
+        return self.value.isa[T]()
+
+    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
+        return self.value[T]
+
+    fn __str__(self) -> String:
+        return String.write(self)
 
 
 @fieldwise_init
@@ -948,10 +985,7 @@ fn getaddrinfo[T: AnAddrInfo, //](mut node: String, mut service: String, hints: 
     )
 
     if result != 0:
-        raise Error(
-            "getaddrinfo: ",
-            StringSlice(unsafe_from_utf8_ptr=gai_strerror(result)),
-        )
+        raise GetaddrinfoError()
 
     # CAddrInfo will be responsible for freeing the memory allocated by getaddrinfo.
     return CAddrInfo[T](ptr=ptr)
