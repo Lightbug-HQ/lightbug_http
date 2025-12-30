@@ -9,7 +9,6 @@ from utils import Variant
 from lightbug_http.cookie import RequestCookieJar
 
 
-# Request parsing error types
 @fieldwise_init
 struct URITooLongError(ImplicitlyCopyable):
     """Request URI exceeded maximum length."""
@@ -113,7 +112,7 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
         try:
             rest = headers.parse_raw_request(reader)
         except e:
-            raise RequestParseError(HeaderParseError(String(e)))
+            raise RequestParseError(HeaderParseError(detail=String(e)))
 
         if len(rest.path.as_bytes()) > max_uri_length:
             raise RequestParseError(URITooLongError())
@@ -122,7 +121,7 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
         try:
             cookies.parse_cookies(headers)
         except e:
-            raise RequestParseError(CookieParseError(String(e)))
+            raise RequestParseError(CookieParseError(detail=String(e)))
 
         var content_length = headers.content_length()
         if content_length > 0 and max_body_size > 0 and content_length > max_body_size:
@@ -143,11 +142,8 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
         )
 
         if content_length > 0:
-            try:
-                reader.skip_carriage_return()
-                request.read_body(reader, content_length, max_body_size)
-            except e:
-                raise RequestParseError(BodyReadError(String(e)))
+            reader.skip_carriage_return()
+            request.read_body(reader, content_length, max_body_size)
 
         return request^
 
@@ -195,24 +191,28 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
         return result.value() == "close"
 
     @always_inline
-    fn read_body(mut self, mut r: ByteReader, content_length: Int, max_body_size: Int) raises -> None:
+    fn read_body(mut self, mut r: ByteReader, content_length: Int, max_body_size: Int) raises RequestParseError -> None:
         if content_length > max_body_size:
-            raise Error("Request body too large")
+            raise RequestParseError(RequestBodyTooLargeError())
 
         if r.remaining() > content_length:
             try:
                 self.body_raw = Bytes(r.read_bytes(content_length).as_bytes())
             except OutOfBoundsError:
-                raise Error(
-                    "Failed to read request body: reached the end of the reader before reaching content length."
+                raise RequestParseError(
+                    BodyReadError(detail="Reached the end of the reader before reaching content length")
                 )
 
             if len(self.body_raw) != content_length:
-                raise Error(
-                    "Content length mismatch, expected ",
-                    content_length,
-                    " but got ",
-                    len(self.body_raw),
+                raise RequestParseError(
+                    BodyReadError(
+                        detail=String(
+                            "Content length mismatch, expected ",
+                            content_length,
+                            " but got ",
+                            len(self.body_raw),
+                        )
+                    )
                 )
 
             self.set_content_length(len(self.body_raw))

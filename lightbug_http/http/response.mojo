@@ -5,6 +5,44 @@ from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter, byte
 from lightbug_http.strings import CR, LF, http, lineBreak, strHttp11, whitespace
 from lightbug_http.uri import URI
 from small_time.small_time import now
+from utils import Variant
+
+
+@fieldwise_init
+struct ResponseHeaderParseError(ImplicitlyCopyable):
+    """Failed to parse response headers."""
+
+    var detail: String
+
+    fn message(self) -> String:
+        return String("Failed to parse response headers: ", self.detail)
+
+
+@fieldwise_init
+struct ResponseBodyReadError(ImplicitlyCopyable):
+    """Failed to read response body."""
+
+    var detail: String
+
+    fn message(self) -> String:
+        return String("Failed to read response body: ", self.detail)
+
+
+@fieldwise_init
+struct ChunkedEncodingError(ImplicitlyCopyable):
+    """Invalid chunked transfer encoding."""
+
+    var detail: String
+
+    fn message(self) -> String:
+        return String("Invalid chunked encoding: ", self.detail)
+
+
+comptime ResponseParseError = Variant[
+    ResponseHeaderParseError,
+    ResponseBodyReadError,
+    ChunkedEncodingError,
+]
 
 
 struct StatusCode:
@@ -28,7 +66,7 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
     var protocol: String
 
     @staticmethod
-    fn from_bytes(b: Span[Byte]) raises -> HTTPResponse:
+    fn from_bytes(b: Span[Byte]) raises ResponseParseError -> HTTPResponse:
         var reader = ByteReader(b)
         var headers = Headers()
         var cookies = ResponseCookieJar()
@@ -39,7 +77,7 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
             cookies.from_headers(properties.cookies^)
             reader.skip_carriage_return()
         except parse_err:
-            raise Error("Failed to parse response headers: ", parse_err)
+            raise ResponseParseError(ResponseHeaderParseError(detail=String(parse_err)))
 
         try:
             return HTTPResponse(
@@ -51,10 +89,10 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
                 status_text=properties.msg^,
             )
         except body_err:
-            raise Error("Failed to read request body")
+            raise ResponseParseError(ResponseBodyReadError(detail=String(body_err)))
 
     @staticmethod
-    fn from_bytes(b: Span[Byte], conn: TCPConnection) raises -> HTTPResponse:
+    fn from_bytes(b: Span[Byte], conn: TCPConnection) raises ResponseParseError -> HTTPResponse:
         var reader = ByteReader(b)
         var headers = Headers()
         var cookies = ResponseCookieJar()
@@ -65,7 +103,7 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
             cookies.from_headers(properties.cookies^)
             reader.skip_carriage_return()
         except parse_err:
-            raise Error("Failed to parse response headers: " + String(parse_err))
+            raise ResponseParseError(ResponseHeaderParseError(detail=String(parse_err)))
 
         var response = HTTPResponse(
             Bytes(),
@@ -103,15 +141,15 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
                 response._decode_chunks(decoder, b^)
                 return response^
             except chunk_err:
-                raise Error("Failed to read chunked response.")
+                raise ResponseParseError(ChunkedEncodingError(detail=String(chunk_err)))
 
         try:
             response.read_body(reader)
             return response^
         except body_err:
-            raise Error("Failed to read request body: ")
+            raise ResponseParseError(ResponseBodyReadError(detail=String(body_err)))
 
-    fn _decode_chunks(mut self, mut decoder: HTTPChunkedDecoder, var chunks: Bytes) raises:
+    fn _decode_chunks(mut self, mut decoder: HTTPChunkedDecoder, var chunks: Bytes) raises ResponseParseError:
         """Decode chunked transfer encoding.
         Args:
             decoder: The chunked decoder state machine.
@@ -130,7 +168,7 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
 
         if ret == -1:
             # buf_ptr.free()
-            raise Error("HTTPResponse._decode_chunks: Invalid chunked encoding")
+            raise ResponseParseError(ChunkedEncodingError(detail="Invalid chunked encoding"))
         # ret == -2 means incomplete, but we'll proceed with what we have
         # ret >= 0 means complete, with ret bytes of trailing data
 
