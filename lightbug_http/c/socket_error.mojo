@@ -592,7 +592,7 @@ struct ConnectError(Movable, Stringable, Writable):
 struct GetpeernameError(Movable, Stringable, Writable):
     """Typed error variant for getpeername() function."""
 
-    comptime type = Variant[EBADFError, EFAULTError, EINVALError, ENOBUFSError, ENOTCONNError, ENOTSOCKError, Error]
+    comptime type = Variant[EBADFError, EFAULTError, EINVALError, ENOBUFSError, ENOTCONNError, ENOTSOCKError]
     var value: Self.type
 
     @implicit
@@ -619,10 +619,6 @@ struct GetpeernameError(Movable, Stringable, Writable):
     fn __init__(out self, value: ENOTSOCKError):
         self.value = value
 
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
     fn write_to[W: Writer, //](self, mut writer: W):
         if self.value.isa[EBADFError]():
             writer.write(self.value[EBADFError])
@@ -636,8 +632,6 @@ struct GetpeernameError(Movable, Stringable, Writable):
             writer.write(self.value[ENOTCONNError])
         elif self.value.isa[ENOTSOCKError]():
             writer.write(self.value[ENOTSOCKError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
 
     fn isa[T: AnyType](self) -> Bool:
         return self.value.isa[T]()
@@ -653,7 +647,7 @@ struct GetpeernameError(Movable, Stringable, Writable):
 struct GetsocknameError(Movable, Stringable, Writable):
     """Typed error variant for getsockname() function."""
 
-    comptime type = Variant[EBADFError, EFAULTError, EINVALError, ENOBUFSError, ENOTSOCKError, Error]
+    comptime type = Variant[EBADFError, EFAULTError, EINVALError, ENOBUFSError, ENOTSOCKError]
     var value: Self.type
 
     @implicit
@@ -676,10 +670,6 @@ struct GetsocknameError(Movable, Stringable, Writable):
     fn __init__(out self, value: ENOTSOCKError):
         self.value = value
 
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
     fn write_to[W: Writer, //](self, mut writer: W):
         if self.value.isa[EBADFError]():
             writer.write(self.value[EBADFError])
@@ -691,8 +681,6 @@ struct GetsocknameError(Movable, Stringable, Writable):
             writer.write(self.value[ENOBUFSError])
         elif self.value.isa[ENOTSOCKError]():
             writer.write(self.value[ENOTSOCKError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
 
     fn isa[T: AnyType](self) -> Bool:
         return self.value.isa[T]()
@@ -708,7 +696,7 @@ struct GetsocknameError(Movable, Stringable, Writable):
 struct GetsockoptError(Movable, Stringable, Writable):
     """Typed error variant for getsockopt() function."""
 
-    comptime type = Variant[EBADFError, EFAULTError, EINVALError, ENOPROTOOPTError, ENOTSOCKError, Error]
+    comptime type = Variant[EBADFError, EFAULTError, EINVALError, ENOPROTOOPTError, ENOTSOCKError]
     var value: Self.type
 
     @implicit
@@ -731,10 +719,6 @@ struct GetsockoptError(Movable, Stringable, Writable):
     fn __init__(out self, value: ENOTSOCKError):
         self.value = value
 
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
     fn write_to[W: Writer, //](self, mut writer: W):
         if self.value.isa[EBADFError]():
             writer.write(self.value[EBADFError])
@@ -746,8 +730,6 @@ struct GetsockoptError(Movable, Stringable, Writable):
             writer.write(self.value[ENOPROTOOPTError])
         elif self.value.isa[ENOTSOCKError]():
             writer.write(self.value[ENOTSOCKError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
 
     fn isa[T: AnyType](self) -> Bool:
         return self.value.isa[T]()
@@ -763,7 +745,7 @@ struct GetsockoptError(Movable, Stringable, Writable):
 struct ListenError(Movable, Stringable, Writable):
     """Typed error variant for listen() function."""
 
-    comptime type = Variant[EADDRINUSEError, EBADFError, ENOTSOCKError, EOPNOTSUPPError, Error]
+    comptime type = Variant[EADDRINUSEError, EBADFError, ENOTSOCKError, EOPNOTSUPPError]
     var value: Self.type
 
     @implicit
@@ -782,10 +764,6 @@ struct ListenError(Movable, Stringable, Writable):
     fn __init__(out self, value: EOPNOTSUPPError):
         self.value = value
 
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
     fn write_to[W: Writer, //](self, mut writer: W):
         if self.value.isa[EADDRINUSEError]():
             writer.write(self.value[EADDRINUSEError])
@@ -795,8 +773,6 @@ struct ListenError(Movable, Stringable, Writable):
             writer.write(self.value[ENOTSOCKError])
         elif self.value.isa[EOPNOTSUPPError]():
             writer.write(self.value[EOPNOTSUPPError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
 
     fn isa[T: AnyType](self) -> Bool:
         return self.value.isa[T]()
@@ -1346,7 +1322,7 @@ struct SetsockoptError(Movable, Stringable, Writable):
 struct ShutdownError(Movable, Stringable, Writable):
     """Typed error variant for shutdown() function."""
 
-    comptime type = Variant[EBADFError, EINVALError, ENOTCONNError, ENOTSOCKError, Error]
+    comptime type = Variant[EBADFError, EINVALError, ENOTCONNError, ENOTSOCKError]
     var value: Self.type
 
     @implicit
@@ -1365,10 +1341,6 @@ struct ShutdownError(Movable, Stringable, Writable):
     fn __init__(out self, value: ENOTSOCKError):
         self.value = value
 
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
     fn write_to[W: Writer, //](self, mut writer: W):
         if self.value.isa[EBADFError]():
             writer.write(self.value[EBADFError])
@@ -1378,8 +1350,6 @@ struct ShutdownError(Movable, Stringable, Writable):
             writer.write(self.value[ENOTCONNError])
         elif self.value.isa[ENOTSOCKError]():
             writer.write(self.value[ENOTSOCKError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
 
     fn isa[T: AnyType](self) -> Bool:
         return self.value.isa[T]()
