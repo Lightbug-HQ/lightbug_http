@@ -496,7 +496,7 @@ struct CreateConnectionError(Movable, Stringable, Writable):
     """Error variant for create_connection operations.
     Can be CSocketError from socket creation or SocketConnectError from connect.
     """
-    comptime type = Variant[CSocketError, SocketConnectError, Error]
+    comptime type = Variant[CSocketError, SocketConnectError]
     var value: Self.type
 
     @implicit
@@ -507,17 +507,11 @@ struct CreateConnectionError(Movable, Stringable, Writable):
     fn __init__(out self, var value: SocketConnectError):
         self.value = value^
 
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
     fn write_to[W: Writer, //](self, mut writer: W):
         if self.value.isa[CSocketError]():
             writer.write(self.value[CSocketError])
         elif self.value.isa[SocketConnectError]():
             writer.write(self.value[SocketConnectError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
 
     fn isa[T: AnyType](self) -> Bool:
         return self.value.isa[T]()

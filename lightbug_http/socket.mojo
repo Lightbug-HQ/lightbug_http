@@ -72,11 +72,21 @@ struct EOF(Movable):
 
 
 @fieldwise_init
+@register_passable("trivial")
+struct InvalidCloseErrorConversionError(Movable, Stringable, Writable):
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write("InvalidCloseErrorConversionError: Cannot convert EBADF to FatalCloseError")
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+
+@fieldwise_init
 struct SocketRecvError(Movable, Stringable, Writable):
     """Error variant for socket receive operations.
     Can be RecvError from the syscall or EOF if connection closed cleanly.
     """
-    comptime type = Variant[RecvError, EOF, Error]
+    comptime type = Variant[RecvError, EOF]
     var value: Self.type
 
     @implicit
@@ -87,17 +97,11 @@ struct SocketRecvError(Movable, Stringable, Writable):
     fn __init__(out self, value: EOF):
         self.value = value
 
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
     fn write_to[W: Writer, //](self, mut writer: W):
         if self.value.isa[RecvError]():
             writer.write(self.value[RecvError])
         elif self.value.isa[EOF]():
             writer.write("EOF")
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
 
     fn isa[T: AnyType](self) -> Bool:
         return self.value.isa[T]()
@@ -114,7 +118,7 @@ struct SocketRecvfromError(Movable, Stringable, Writable):
     """Error variant for socket recvfrom operations.
     Can be RecvfromError from the syscall or EOF if connection closed cleanly.
     """
-    comptime type = Variant[RecvfromError, EOF, Error]
+    comptime type = Variant[RecvfromError, EOF]
     var value: Self.type
 
     @implicit
@@ -125,17 +129,11 @@ struct SocketRecvfromError(Movable, Stringable, Writable):
     fn __init__(out self, value: EOF):
         self.value = value
 
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
     fn write_to[W: Writer, //](self, mut writer: W):
         if self.value.isa[RecvfromError]():
             writer.write(self.value[RecvfromError])
         elif self.value.isa[EOF]():
             writer.write("EOF")
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
 
     fn isa[T: AnyType](self) -> Bool:
         return self.value.isa[T]()
@@ -234,7 +232,7 @@ struct SocketConnectError(Movable, Stringable, Writable):
     """Error variant for socket connect operations.
     Can be ConnectError from the syscall or SocketAcceptError from get_peer_name.
     """
-    comptime type = Variant[ConnectError, SocketAcceptError, Error]
+    comptime type = Variant[ConnectError, SocketAcceptError]
     var value: Self.type
 
     @implicit
@@ -245,17 +243,11 @@ struct SocketConnectError(Movable, Stringable, Writable):
     fn __init__(out self, var value: SocketAcceptError):
         self.value = value^
 
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
     fn write_to[W: Writer, //](self, mut writer: W):
         if self.value.isa[ConnectError]():
             writer.write(self.value[ConnectError])
         elif self.value.isa[SocketAcceptError]():
             writer.write(self.value[SocketAcceptError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
 
     fn isa[T: AnyType](self) -> Bool:
         return self.value.isa[T]()
@@ -353,7 +345,7 @@ struct FatalCloseError(Movable, Stringable, Writable):
     that should be propagated.
     """
 
-    comptime type = Variant[EINTRError, EIOError, ENOSPCError, Error]
+    comptime type = Variant[EINTRError, EIOError, ENOSPCError]
     var value: Self.type
 
     @implicit
@@ -369,21 +361,15 @@ struct FatalCloseError(Movable, Stringable, Writable):
         self.value = value
 
     @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
-    @implicit
-    fn __init__(out self, var value: CloseError) raises:
+    fn __init__(out self, var value: CloseError) raises InvalidCloseErrorConversionError:
         if value.isa[EINTRError]():
             self.value = EINTRError()
         elif value.isa[EIOError]():
             self.value = EIOError()
         elif value.isa[ENOSPCError]():
             self.value = ENOSPCError()
-        elif value.isa[Error]():
-            self.value = Error(value[Error])
         else:
-            raise Error("Cannot convert EBADF to FatalCloseError - socket already closed")
+            raise InvalidCloseErrorConversionError()
 
     fn write_to[W: Writer, //](self, mut writer: W):
         if self.value.isa[EINTRError]():
@@ -392,8 +378,6 @@ struct FatalCloseError(Movable, Stringable, Writable):
             writer.write(self.value[EIOError])
         elif self.value.isa[ENOSPCError]():
             writer.write(self.value[ENOSPCError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
 
     fn isa[T: AnyType](self) -> Bool:
         return self.value.isa[T]()
@@ -840,10 +824,15 @@ struct Socket[
         try:
             close(self.fd)
         except close_err:
-            # If the file descriptor is invalid, then it was most likely already closed.
-            # Other errors indicate a failure while attempting to close the socket.
+            # EBADF is silently ignored as it means socket already closed
             if not close_err.isa[EBADFError]():
-                raise
+                if close_err.isa[EINTRError]():
+                    raise close_err[EINTRError]
+                elif close_err.isa[EIOError]():
+                    raise close_err[EIOError]
+                elif close_err.isa[ENOSPCError]():
+                    raise close_err[ENOSPCError]
+
 
         self._closed = True
 

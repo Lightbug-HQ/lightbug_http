@@ -438,7 +438,7 @@ struct BindError(Movable, Stringable, Writable):
 struct CloseError(Movable, Stringable, Writable):
     """Typed error variant for close() function."""
 
-    comptime type = Variant[EBADFError, EINTRError, EIOError, ENOSPCError, Error]
+    comptime type = Variant[EBADFError, EINTRError, EIOError, ENOSPCError]
     var value: Self.type
 
     @implicit
@@ -457,10 +457,6 @@ struct CloseError(Movable, Stringable, Writable):
     fn __init__(out self, value: ENOSPCError):
         self.value = value
 
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
     fn write_to[W: Writer, //](self, mut writer: W):
         if self.value.isa[EBADFError]():
             writer.write(self.value[EBADFError])
@@ -470,8 +466,6 @@ struct CloseError(Movable, Stringable, Writable):
             writer.write(self.value[EIOError])
         elif self.value.isa[ENOSPCError]():
             writer.write(self.value[ENOSPCError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
 
     fn isa[T: AnyType](self) -> Bool:
         return self.value.isa[T]()
