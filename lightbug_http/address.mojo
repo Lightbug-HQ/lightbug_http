@@ -337,7 +337,7 @@ struct addrinfo_unix(AnAddrInfo):
         return self.ai_next
 
 
-fn get_ip_address(mut host: String, address_family: AddressFamily, sock_type: SocketType) raises GetaddrinfoError -> in_addr_t:
+fn get_ip_address(mut host: String, address_family: AddressFamily, sock_type: SocketType) raises GetaddrinfoNullAddrError -> in_addr_t:
     """Returns an IP address based on the host.
     This is a Unix-specific implementation.
 
@@ -569,37 +569,6 @@ struct ParseError(Movable, Stringable, Writable):
             writer.write(self.value[ParseTooManyColonsError])
         elif self.value.isa[ParseIPProtocolPortError]():
             writer.write(self.value[ParseIPProtocolPortError])
-
-    fn isa[T: AnyType](self) -> Bool:
-        return self.value.isa[T]()
-
-    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
-        return self.value[T]
-
-    fn __str__(self) -> String:
-        return String.write(self)
-
-
-@fieldwise_init
-struct GetaddrinfoError(Movable, Stringable, Writable):
-    """Typed error variant for getaddrinfo() function."""
-
-    comptime type = Variant[GetaddrinfoNullAddrError, Error]
-    var value: Self.type
-
-    @implicit
-    fn __init__(out self, value: GetaddrinfoNullAddrError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
-    fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[GetaddrinfoNullAddrError]():
-            writer.write(self.value[GetaddrinfoNullAddrError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
 
     fn isa[T: AnyType](self) -> Bool:
         return self.value.isa[T]()
