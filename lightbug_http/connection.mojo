@@ -10,11 +10,13 @@ from lightbug_http.c.socket_error import (
     RecvfromError,
     SendError,
     SendtoError,
+    SocketError as CSocketError,
 )
 from lightbug_http.io.bytes import Bytes
 from lightbug_http.io.sync import Duration
 from lightbug_http.socket import (
     EOF,
+    EINVALError,
     FatalCloseError,
     Socket,
     SocketAcceptError,
@@ -122,29 +124,6 @@ struct ListenerError(Movable, Stringable, Writable):
         return String.write(self)
 
 
-trait Connection(Movable):
-    fn read(self, mut buf: Bytes) raises -> UInt:
-        ...
-
-    fn write(self, buf: Span[Byte]) raises -> UInt:
-        ...
-
-    fn close(mut self) raises:
-        ...
-
-    fn shutdown(mut self) raises -> None:
-        ...
-
-    fn teardown(deinit self) raises:
-        ...
-
-    fn local_addr(self) -> TCPAddr:
-        ...
-
-    fn remote_addr(self) -> TCPAddr:
-        ...
-
-
 struct NoTLSListener(Movable):
     """A TCP listener that listens for incoming connections and can accept them."""
 
@@ -153,7 +132,7 @@ struct NoTLSListener(Movable):
     fn __init__(out self, var socket: TCPSocket[TCPAddr]):
         self.socket = socket^
 
-    fn __init__(out self) raises:
+    fn __init__(out self) raises CSocketError:
         self.socket = Socket[TCPAddr]()
 
     fn accept(self) raises SocketAcceptError -> TCPConnection:
@@ -175,11 +154,11 @@ struct NoTLSListener(Movable):
         """
         return self.socket.close()
 
-    fn shutdown(mut self) raises:
+    fn shutdown(mut self) raises EINVALError:
         """Shutdown the listener socket.
 
         Raises:
-            Error: If shutdown fails.
+            EINVALError: If shutdown fails.
         """
         return self.socket.shutdown()
 

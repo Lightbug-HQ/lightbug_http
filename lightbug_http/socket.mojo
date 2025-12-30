@@ -52,6 +52,7 @@ from lightbug_http.c.socket_error import (
     SendError,
     SendtoError,
     SetsockoptError,
+    SocketError as CSocketError,
 )
 from lightbug_http.connection import default_buffer_size
 from lightbug_http.io.bytes import Bytes
@@ -437,7 +438,7 @@ struct Socket[
         out self,
         local_address: Self.address = Self.address(),
         remote_address: Self.address = Self.address(),
-    ) raises:
+    ) raises CSocketError:
         """Create a new socket object.
 
         Args:
