@@ -14,11 +14,6 @@ from lightbug_http.c.address import AddressFamily, AddressLength
 from lightbug_http.c.network import InetNtopError, InetPtonError, SocketAddress, inet_pton
 from lightbug_http.c.socket import (
     SOL_SOCKET,
-    EBADFError,
-    EINTRError,
-    EINVALError,
-    EIOError,
-    ENOSPCError,
     ShutdownOption,
     SocketOption,
     SocketType,
@@ -42,6 +37,10 @@ from lightbug_http.c.socket_error import (
     AcceptError,
     BindError,
     CloseError,
+    CloseEBADFError,
+    CloseEINTRError,
+    CloseEIOError,
+    CloseENOSPCError,
     ConnectError,
     GetpeernameError,
     GetsocknameError,
@@ -52,6 +51,8 @@ from lightbug_http.c.socket_error import (
     SendError,
     SendtoError,
     SetsockoptError,
+    ShutdownError,
+    ShutdownEINVALError,
     SocketError as CSocketError,
 )
 from lightbug_http.connection import default_buffer_size
@@ -345,39 +346,39 @@ struct FatalCloseError(Movable, Stringable, Writable):
     that should be propagated.
     """
 
-    comptime type = Variant[EINTRError, EIOError, ENOSPCError]
+    comptime type = Variant[CloseEINTRError, CloseEIOError, CloseENOSPCError]
     var value: Self.type
 
     @implicit
-    fn __init__(out self, value: EINTRError):
+    fn __init__(out self, value: CloseEINTRError):
         self.value = value
 
     @implicit
-    fn __init__(out self, value: EIOError):
+    fn __init__(out self, value: CloseEIOError):
         self.value = value
 
     @implicit
-    fn __init__(out self, value: ENOSPCError):
+    fn __init__(out self, value: CloseENOSPCError):
         self.value = value
 
     @implicit
     fn __init__(out self, var value: CloseError) raises InvalidCloseErrorConversionError:
-        if value.isa[EINTRError]():
-            self.value = EINTRError()
-        elif value.isa[EIOError]():
-            self.value = EIOError()
-        elif value.isa[ENOSPCError]():
-            self.value = ENOSPCError()
+        if value.isa[CloseEINTRError]():
+            self.value = CloseEINTRError()
+        elif value.isa[CloseEIOError]():
+            self.value = CloseEIOError()
+        elif value.isa[CloseENOSPCError]():
+            self.value = CloseENOSPCError()
         else:
             raise InvalidCloseErrorConversionError()
 
     fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[EINTRError]():
-            writer.write(self.value[EINTRError])
-        elif self.value.isa[EIOError]():
-            writer.write(self.value[EIOError])
-        elif self.value.isa[ENOSPCError]():
-            writer.write(self.value[ENOSPCError])
+        if self.value.isa[CloseEINTRError]():
+            writer.write(self.value[CloseEINTRError])
+        elif self.value.isa[CloseEIOError]():
+            writer.write(self.value[CloseEIOError])
+        elif self.value.isa[CloseENOSPCError]():
+            writer.write(self.value[CloseENOSPCError])
 
     fn isa[T: AnyType](self) -> Bool:
         return self.value.isa[T]()
@@ -801,15 +802,15 @@ struct Socket[
         """
         return self._receive_from(dest)
 
-    fn shutdown(mut self) raises EINVALError -> None:
+    fn shutdown(mut self) raises ShutdownEINVALError -> None:
         """Shut down the socket. The remote end will receive no more data (after queued data is flushed)."""
         try:
             shutdown(self.fd, ShutdownOption.SHUT_RDWR)
         except shutdown_err:
             # For the other errors, either the socket is already closed or the descriptor is invalid.
             # At that point we can feasibly say that the socket is already shut down.
-            if shutdown_err.isa[EINVALError]():
-                raise shutdown_err[EINVALError]
+            if shutdown_err.isa[ShutdownEINVALError]():
+                raise shutdown_err[ShutdownEINVALError]
 
         self._connected = False
 
@@ -825,13 +826,13 @@ struct Socket[
             close(self.fd)
         except close_err:
             # EBADF is silently ignored as it means socket already closed
-            if not close_err.isa[EBADFError]():
-                if close_err.isa[EINTRError]():
-                    raise close_err[EINTRError]
-                elif close_err.isa[EIOError]():
-                    raise close_err[EIOError]
-                elif close_err.isa[ENOSPCError]():
-                    raise close_err[ENOSPCError]
+            if not close_err.isa[CloseEBADFError]():
+                if close_err.isa[CloseEINTRError]():
+                    raise close_err[CloseEINTRError]
+                elif close_err.isa[CloseEIOError]():
+                    raise close_err[CloseEIOError]
+                elif close_err.isa[CloseENOSPCError]():
+                    raise close_err[CloseENOSPCError]
 
 
         self._closed = True
