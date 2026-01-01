@@ -3,6 +3,20 @@ from hashlib.hash import Hasher
 
 from lightbug_http.header import HeaderKey, write_header
 from lightbug_http.io.bytes import ByteWriter
+from lightbug_http.cookie.cookie import InvalidCookieError
+from utils import Variant
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct CookieParseError(Movable, Stringable, Writable):
+    """Error raised when a cookie header string fails to parse."""
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write("CookieParseError: Failed to parse cookie header string")
+
+    fn __str__(self) -> String:
+        return String.write(self)
 
 
 @fieldwise_init
@@ -93,12 +107,12 @@ struct ResponseCookieJar(Copyable, Sized, Stringable, Writable):
     fn empty(self) -> Bool:
         return len(self) == 0
 
-    fn from_headers(mut self, headers: List[String]) raises:
+    fn from_headers(mut self, headers: List[String]) raises CookieParseError:
         for header in headers:
             try:
                 self.set_cookie(Cookie.from_set_header(header))
             except:
-                raise Error("Failed to parse cookie header string " + header)
+                raise CookieParseError()
 
     # fn encode_to(mut self, mut writer: ByteWriter):
     #     for cookie in self._inner.values():

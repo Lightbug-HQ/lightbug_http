@@ -1,4 +1,17 @@
 from lightbug_http.header import HeaderKey
+from utils import Variant
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct InvalidCookieError(Movable, Stringable, Writable):
+    """Error raised when a cookie is invalid."""
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write("InvalidCookieError: Invalid cookie format")
+
+    fn __str__(self) -> String:
+        return String.write(self)
 
 
 struct Cookie(Copyable):
@@ -26,10 +39,10 @@ struct Cookie(Copyable):
     var max_age: Optional[Duration]
 
     @staticmethod
-    fn from_set_header(header_str: String) raises -> Self:
+    fn from_set_header(header_str: String) raises InvalidCookieError -> Self:
         var parts = header_str.split(Cookie.SEPERATOR)
         if len(parts) < 1:
-            raise Error("invalid Cookie")
+            raise InvalidCookieError()
 
         var cookie = Cookie("", String(parts[0]), path=String("/"))
         if Cookie.EQUAL in parts[0]:
