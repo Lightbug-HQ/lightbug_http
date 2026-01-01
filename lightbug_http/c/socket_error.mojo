@@ -223,6 +223,12 @@ struct ConnectEFAULTError(CustomError):
 
 @fieldwise_init
 @register_passable("trivial")
+struct ConnectEINPROGRESSError(CustomError):
+    comptime message = "connect (EINPROGRESS): The socket is nonblocking and the connection cannot be completed immediately. It is possible to select(2) or poll(2) for completion by selecting the socket for writing. After select(2) indicates writability, use getsockopt(2) to read the SO_ERROR option at level SOL_SOCKET to determine whether connect() completed successfully (SO_ERROR is zero) or unsuccessfully (SO_ERROR is one of the usual error codes listed here, explaining the reason for the failure)."
+
+
+@fieldwise_init
+@register_passable("trivial")
 struct ConnectEINTRError(CustomError):
     comptime message = "connect (EINTR): The system call was interrupted by a signal that was caught."
 
@@ -1069,6 +1075,7 @@ struct ConnectError(Movable, Stringable, Writable):
         ConnectEBADFError,
         ConnectECONNREFUSEDError,
         ConnectEFAULTError,
+        ConnectEINPROGRESSError,
         ConnectEINTRError,
         ConnectEISCONNError,
         ConnectENETUNREACHError,
@@ -1108,6 +1115,10 @@ struct ConnectError(Movable, Stringable, Writable):
 
     @implicit
     fn __init__(out self, value: ConnectEFAULTError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: ConnectEINPROGRESSError):
         self.value = value
 
     @implicit
@@ -1151,6 +1162,8 @@ struct ConnectError(Movable, Stringable, Writable):
             writer.write(self.value[ConnectECONNREFUSEDError])
         elif self.value.isa[ConnectEFAULTError]():
             writer.write(self.value[ConnectEFAULTError])
+        elif self.value.isa[ConnectEINPROGRESSError]():
+            writer.write(self.value[ConnectEINPROGRESSError])
         elif self.value.isa[ConnectEINTRError]():
             writer.write(self.value[ConnectEINTRError])
         elif self.value.isa[ConnectEISCONNError]():

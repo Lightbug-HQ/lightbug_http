@@ -912,16 +912,7 @@ fn connect(socket: FileDescriptor, mut address: SocketAddress) raises ConnectErr
         elif errno == errno.EFAULT:
             raise ConnectEFAULTError()
         elif errno == errno.EINPROGRESS:
-            raise Error(
-                "connect: The socket is nonblocking and the connection cannot"
-                " be completed immediately. It is possible to select(2) or"
-                " poll(2) for completion by selecting the socket for writing."
-                " After select(2) indicates writability, use getsockopt(2) to"
-                " read the SO_ERROR option at level SOL_SOCKET to determine"
-                " whether connect() completed successfully (SO_ERROR is zero)"
-                " or unsuccessfully (SO_ERROR is one of the usual error codes"
-                " listed here, explaining the reason for the failure)."
-            )
+            raise ConnectEINPROGRESSError()
         elif errno == errno.EINTR:
             raise ConnectEINTRError()
         elif errno == errno.EISCONN:
