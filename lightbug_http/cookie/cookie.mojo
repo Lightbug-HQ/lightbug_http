@@ -24,7 +24,7 @@ struct Cookie(Copyable):
     comptime SAME_SITE = "SameSite"
     comptime PARTITIONED = "Partitioned"
 
-    comptime SEPERATOR = "; "
+    comptime SEPARATOR = "; "
     comptime EQUAL = "="
 
     var name: String
@@ -40,7 +40,7 @@ struct Cookie(Copyable):
 
     @staticmethod
     fn from_set_header(header_str: String) raises InvalidCookieError -> Self:
-        var parts = header_str.split(Cookie.SEPERATOR)
+        var parts = header_str.split(Cookie.SEPARATOR)
         if len(parts) < 1:
             raise InvalidCookieError()
 
@@ -144,34 +144,34 @@ struct Cookie(Copyable):
                 pass
 
             if v:
-                header_value.write(Cookie.SEPERATOR, Cookie.EXPIRES, Cookie.EQUAL, v.value())
+                header_value.write(Cookie.SEPARATOR, Cookie.EXPIRES, Cookie.EQUAL, v.value())
         if self.max_age:
             header_value.write(
-                Cookie.SEPERATOR,
+                Cookie.SEPARATOR,
                 Cookie.MAX_AGE,
                 Cookie.EQUAL,
                 String(self.max_age.value().total_seconds),
             )
         if self.domain:
             header_value.write(
-                Cookie.SEPERATOR,
+                Cookie.SEPARATOR,
                 Cookie.DOMAIN,
                 Cookie.EQUAL,
                 self.domain.value(),
             )
         if self.path:
-            header_value.write(Cookie.SEPERATOR, Cookie.PATH, Cookie.EQUAL, self.path.value())
+            header_value.write(Cookie.SEPARATOR, Cookie.PATH, Cookie.EQUAL, self.path.value())
         if self.secure:
-            header_value.write(Cookie.SEPERATOR, Cookie.SECURE)
+            header_value.write(Cookie.SEPARATOR, Cookie.SECURE)
         if self.http_only:
-            header_value.write(Cookie.SEPERATOR, Cookie.HTTP_ONLY)
+            header_value.write(Cookie.SEPARATOR, Cookie.HTTP_ONLY)
         if self.same_site:
             header_value.write(
-                Cookie.SEPERATOR,
+                Cookie.SEPARATOR,
                 Cookie.SAME_SITE,
                 Cookie.EQUAL,
                 String(self.same_site.value()),
             )
         if self.partitioned:
-            header_value.write(Cookie.SEPERATOR, Cookie.PARTITIONED)
+            header_value.write(Cookie.SEPARATOR, Cookie.PARTITIONED)
         return header_value
