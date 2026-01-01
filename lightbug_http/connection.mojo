@@ -20,8 +20,8 @@ from lightbug_http.socket import (
     FatalCloseError,
     Socket,
     SocketAcceptError,
+    SocketBindError,
     SocketConnectError,
-    SocketError,
     SocketOption,
     SocketRecvError,
     SocketRecvfromError,
@@ -73,7 +73,7 @@ struct ListenerError(Movable, Stringable, Writable):
     """
 
     comptime type = Variant[
-        AddressParseError, SocketCreationError, BindFailedError, ListenFailedError, SocketError, Error
+        AddressParseError, SocketCreationError, BindFailedError, ListenFailedError, CSocketError, SocketBindError, Error
     ]
     var value: Self.type
 
@@ -94,7 +94,11 @@ struct ListenerError(Movable, Stringable, Writable):
         self.value = value
 
     @implicit
-    fn __init__(out self, var value: SocketError):
+    fn __init__(out self, var value: CSocketError):
+        self.value = value^
+
+    @implicit
+    fn __init__(out self, var value: SocketBindError):
         self.value = value^
 
     @implicit
@@ -110,8 +114,10 @@ struct ListenerError(Movable, Stringable, Writable):
             writer.write(self.value[BindFailedError])
         elif self.value.isa[ListenFailedError]():
             writer.write(self.value[ListenFailedError])
-        elif self.value.isa[SocketError]():
-            writer.write(self.value[SocketError])
+        elif self.value.isa[CSocketError]():
+            writer.write(self.value[CSocketError])
+        elif self.value.isa[SocketBindError]():
+            writer.write(self.value[SocketBindError])
         elif self.value.isa[Error]():
             writer.write(self.value[Error])
 
@@ -554,7 +560,7 @@ fn create_connection(mut host: String, port: UInt16) raises CreateConnectionErro
 
 fn listen_udp[
     network: NetworkType = NetworkType.udp4
-](local_address: UDPAddr[network]) raises SocketError -> UDPConnection[network]:
+](local_address: UDPAddr[network]) raises ListenerError -> UDPConnection[network]:
     """Creates a new UDP listener.
 
     Args:
@@ -573,7 +579,7 @@ fn listen_udp[
 
 fn listen_udp[
     network: NetworkType = NetworkType.udp4
-](local_address: String) raises SocketError -> UDPConnection[network]:
+](local_address: String) raises ListenerError -> UDPConnection[network]:
     """Creates a new UDP listener.
 
     Args:
@@ -591,7 +597,7 @@ fn listen_udp[
 
 fn listen_udp[
     network: NetworkType = NetworkType.udp4
-](host: String, port: UInt16) raises SocketError -> UDPConnection[network]:
+](host: String, port: UInt16) raises ListenerError -> UDPConnection[network]:
     """Creates a new UDP listener.
 
     Args:
@@ -609,7 +615,7 @@ fn listen_udp[
 
 fn dial_udp[
     network: NetworkType = NetworkType.udp4
-](local_address: UDPAddr[network]) raises SocketError -> UDPConnection[network]:
+](local_address: UDPAddr[network]) raises CSocketError -> UDPConnection[network]:
     """Connects to the address on the named network. The network must be "udp", "udp4", or "udp6".
 
     Args:
@@ -626,7 +632,7 @@ fn dial_udp[
 
 fn dial_udp[
     network: NetworkType = NetworkType.udp4
-](local_address: String) raises SocketError -> UDPConnection[network]:
+](local_address: String) raises ListenerError -> UDPConnection[network]:
     """Connects to the address on the named network. The network must be "udp", "udp4", or "udp6".
 
     Args:
@@ -644,7 +650,7 @@ fn dial_udp[
 
 fn dial_udp[
     network: NetworkType = NetworkType.udp4
-](host: String, port: UInt16) raises SocketError -> UDPConnection[network]:
+](host: String, port: UInt16) raises CSocketError -> UDPConnection[network]:
     """Connects to the address on the udp network.
 
     Args:

@@ -299,45 +299,6 @@ struct SocketGetsocknameError(Movable, Stringable, Writable):
 
 
 @fieldwise_init
-struct SocketError(Movable, Stringable, Writable):
-    comptime type = Variant[
-        SocketClosedError,
-        EOF,
-        Error,
-    ]
-    var value: Self.type
-
-    @implicit
-    fn __init__(out self, value: SocketClosedError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: EOF):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
-    fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[SocketClosedError]():
-            writer.write("SocketClosedError")
-        elif self.value.isa[EOF]():
-            writer.write("EOF")
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
-
-    fn isa[T: AnyType](self) -> Bool:
-        return self.value.isa[T]()
-
-    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
-        return self.value[T]
-
-    fn __str__(self) -> String:
-        return String.write(self)
-
-
-@fieldwise_init
 struct FatalCloseError(Movable, Stringable, Writable):
     """Error type for Socket.close() that excludes EBADF.
 

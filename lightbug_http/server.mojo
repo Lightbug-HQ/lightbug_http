@@ -14,7 +14,6 @@ from lightbug_http.socket import (
     FatalCloseError,
     SocketAcceptError,
     SocketClosedError,
-    SocketError,
     SocketRecvError,
 )
 from lightbug_http.utils.error import CustomError
@@ -35,7 +34,6 @@ struct ServerError(Movable, Stringable, Writable):
         ProvisionError,
         SocketAcceptError,
         SocketRecvError,
-        SocketError,
         FatalCloseError,
         Error,
     ]
@@ -58,10 +56,6 @@ struct ServerError(Movable, Stringable, Writable):
         self.value = value^
 
     @implicit
-    fn __init__(out self, var value: SocketError):
-        self.value = value^
-
-    @implicit
     fn __init__(out self, var value: FatalCloseError):
         self.value = value^
 
@@ -78,8 +72,6 @@ struct ServerError(Movable, Stringable, Writable):
             writer.write(self.value[SocketAcceptError])
         elif self.value.isa[SocketRecvError]():
             writer.write(self.value[SocketRecvError])
-        elif self.value.isa[SocketError]():
-            writer.write(self.value[SocketError])
         elif self.value.isa[FatalCloseError]():
             writer.write(self.value[FatalCloseError])
         elif self.value.isa[Error]():
