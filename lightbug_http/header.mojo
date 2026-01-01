@@ -1,6 +1,7 @@
 from lightbug_http.http.parsing import HTTPHeader, http_parse_headers, http_parse_request, http_parse_response
 from lightbug_http.io.bytes import ByteReader, Bytes, byte, is_newline, is_space
 from lightbug_http.strings import CR, LF, BytesConstant, lineBreak
+from utils import Variant
 
 
 struct HeaderKey:
@@ -16,6 +17,154 @@ struct HeaderKey:
     comptime SERVER = "server"
     comptime SET_COOKIE = "set-cookie"
     comptime COOKIE = "cookie"
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct HeaderKeyNotFoundError(Movable, Stringable, Writable):
+    """Error raised when a header key is not found."""
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write("HeaderKeyNotFoundError: Key not found in headers")
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct InvalidHTTPRequestError(Movable, Stringable, Writable):
+    """Error raised when the HTTP request is not valid."""
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write("InvalidHTTPRequestError: Not a valid HTTP request")
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct InvalidHTTPResponseError(Movable, Stringable, Writable):
+    """Error raised when the HTTP response is not valid."""
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write("InvalidHTTPResponseError: Not a valid HTTP response")
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct IncompleteHTTPRequestError(Movable, Stringable, Writable):
+    """Error raised when the HTTP request is incomplete."""
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write("IncompleteHTTPRequestError: Incomplete HTTP request")
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct IncompleteHTTPResponseError(Movable, Stringable, Writable):
+    """Error raised when the HTTP response is incomplete."""
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write("IncompleteHTTPResponseError: Incomplete HTTP response")
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct EmptyByteReaderError(Movable, Stringable, Writable):
+    """Error raised when ByteReader has no data available."""
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write("EmptyByteReaderError: Failed to read first byte from response header")
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+
+@fieldwise_init
+struct HeadersParseRequestError(Movable, Stringable, Writable):
+    """Error variant for Headers.parse_raw_request operations.
+    Can be InvalidHTTPRequestError, IncompleteHTTPRequestError, or EmptyByteReaderError.
+    """
+    comptime type = Variant[InvalidHTTPRequestError, IncompleteHTTPRequestError, EmptyByteReaderError]
+    var value: Self.type
+
+    @implicit
+    fn __init__(out self, value: InvalidHTTPRequestError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: IncompleteHTTPRequestError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: EmptyByteReaderError):
+        self.value = value
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        if self.value.isa[InvalidHTTPRequestError]():
+            writer.write(self.value[InvalidHTTPRequestError])
+        elif self.value.isa[IncompleteHTTPRequestError]():
+            writer.write(self.value[IncompleteHTTPRequestError])
+        elif self.value.isa[EmptyByteReaderError]():
+            writer.write(self.value[EmptyByteReaderError])
+
+    fn isa[T: AnyType](self) -> Bool:
+        return self.value.isa[T]()
+
+    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
+        return self.value[T]
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+
+@fieldwise_init
+struct HeadersParseResponseError(Movable, Stringable, Writable):
+    """Error variant for Headers.parse_raw_response operations.
+    Can be InvalidHTTPResponseError, IncompleteHTTPResponseError, or EmptyByteReaderError.
+    """
+    comptime type = Variant[InvalidHTTPResponseError, IncompleteHTTPResponseError, EmptyByteReaderError]
+    var value: Self.type
+
+    @implicit
+    fn __init__(out self, value: InvalidHTTPResponseError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: IncompleteHTTPResponseError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: EmptyByteReaderError):
+        self.value = value
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        if self.value.isa[InvalidHTTPResponseError]():
+            writer.write(self.value[InvalidHTTPResponseError])
+        elif self.value.isa[IncompleteHTTPResponseError]():
+            writer.write(self.value[IncompleteHTTPResponseError])
+        elif self.value.isa[EmptyByteReaderError]():
+            writer.write(self.value[EmptyByteReaderError])
+
+    fn isa[T: AnyType](self) -> Bool:
+        return self.value.isa[T]()
+
+    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
+        return self.value[T]
+
+    fn __str__(self) -> String:
+        return String.write(self)
 
 
 @fieldwise_init
@@ -77,11 +226,11 @@ struct Headers(Copyable, Stringable, Writable):
         return key.lower() in self._inner
 
     @always_inline
-    fn __getitem__(self, key: String) raises -> String:
+    fn __getitem__(self, key: String) raises HeaderKeyNotFoundError -> String:
         try:
             return self._inner[key.lower()]
         except:
-            raise Error("KeyError: Key not found in headers: " + key)
+            raise HeaderKeyNotFoundError()
 
     @always_inline
     fn get(self, key: String) -> Optional[String]:
@@ -92,15 +241,21 @@ struct Headers(Copyable, Stringable, Writable):
         self._inner[key.lower()] = value
 
     fn content_length(self) -> Int:
+        var value: String
         try:
-            return Int(self[HeaderKey.CONTENT_LENGTH])
+            value = self[HeaderKey.CONTENT_LENGTH]
         except:
             return 0
 
-    fn parse_raw_request(mut self, mut reader: ByteReader, out result: ParsedRequestResult) raises:
+        try:
+            return Int(value)
+        except:
+            return 0
+
+    fn parse_raw_request(mut self, mut reader: ByteReader, out result: ParsedRequestResult) raises HeadersParseRequestError:
         """Parse HTTP request."""
         if self.check_if_response(reader):
-            raise Error("Headers.parse_raw: Not a valid HTTP request.")
+            raise InvalidHTTPRequestError()
 
         var method = String()
         var path = String()
@@ -122,9 +277,9 @@ struct Headers(Copyable, Stringable, Writable):
 
         if ret < 0:
             if ret == -1:
-                raise Error("Headers.parse_raw: Invalid HTTP request")
+                raise InvalidHTTPRequestError()
             else:  # ret == -2
-                raise Error("Headers.parse_raw: Incomplete HTTP request")
+                raise IncompleteHTTPRequestError()
 
         var cookies = List[String]()
         for i in range(num_headers):
@@ -139,10 +294,10 @@ struct Headers(Copyable, Stringable, Writable):
         reader.read_pos += ret
         result = ParsedRequestResult(method^, path^, String("HTTP/1.", minor_version), cookies^)
 
-    fn parse_raw_response(mut self, mut reader: ByteReader, out result: ParsedResponseResult) raises:
+    fn parse_raw_response(mut self, mut reader: ByteReader, out result: ParsedResponseResult) raises HeadersParseResponseError:
         """Parse HTTP response."""
         if not self.check_if_response(reader):
-            raise Error("Headers.parse_raw: Not a valid HTTP response.")
+            raise InvalidHTTPResponseError()
 
         var minor_version = -1
         var status = 0
@@ -164,9 +319,9 @@ struct Headers(Copyable, Stringable, Writable):
 
         if ret < 0:
             if ret == -1:
-                raise Error("Headers.parse_raw: Invalid HTTP response")
+                raise InvalidHTTPResponseError()
             else:  # ret == -2
-                raise Error("Headers.parse_raw: Incomplete HTTP response")
+                raise IncompleteHTTPResponseError()
 
         var cookies = List[String]()
         for i in range(num_headers):
@@ -182,9 +337,9 @@ struct Headers(Copyable, Stringable, Writable):
         reader.read_pos += ret
         result = ParsedResponseResult(protocol^, status, msg^, cookies^)
 
-    fn check_if_response(mut self, r: ByteReader) raises -> Bool:
+    fn check_if_response(mut self, r: ByteReader) raises EmptyByteReaderError -> Bool:
         if not r.available():
-            raise Error("Headers.parse_raw: Failed to read first byte from response header.")
+            raise EmptyByteReaderError()
 
         var buf_span = r.as_bytes()
         return (
