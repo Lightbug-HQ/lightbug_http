@@ -13,17 +13,99 @@ from utils import Variant
 struct HeaderKey:
     """Standard HTTP header key constants (lowercase for normalization)."""
 
+    # General Headers
     comptime CONNECTION = "connection"
-    comptime CONTENT_TYPE = "content-type"
-    comptime CONTENT_LENGTH = "content-length"
-    comptime CONTENT_ENCODING = "content-encoding"
-    comptime TRANSFER_ENCODING = "transfer-encoding"
     comptime DATE = "date"
-    comptime LOCATION = "location"
+    comptime TRAILER = "trailer"
+    comptime TRANSFER_ENCODING = "transfer-encoding"
+    comptime UPGRADE = "upgrade"
+    comptime VIA = "via"
+    comptime WARNING = "warning"
+
+    # Request Headers
+    comptime ACCEPT = "accept"
+    comptime ACCEPT_CHARSET = "accept-charset"
+    comptime ACCEPT_ENCODING = "accept-encoding"
+    comptime ACCEPT_LANGUAGE = "accept-language"
+    comptime AUTHORIZATION = "authorization"
+    comptime EXPECT = "expect"
+    comptime FROM = "from"
     comptime HOST = "host"
+    comptime IF_MATCH = "if-match"
+    comptime IF_MODIFIED_SINCE = "if-modified-since"
+    comptime IF_NONE_MATCH = "if-none-match"
+    comptime IF_RANGE = "if-range"
+    comptime IF_UNMODIFIED_SINCE = "if-unmodified-since"
+    comptime MAX_FORWARDS = "max-forwards"
+    comptime PROXY_AUTHORIZATION = "proxy-authorization"
+    comptime RANGE = "range"
+    comptime REFERER = "referer"
+    comptime TE = "te"
+    comptime USER_AGENT = "user-agent"
+
+    # Response Headers
+    comptime ACCEPT_RANGES = "accept-ranges"
+    comptime AGE = "age"
+    comptime ETAG = "etag"
+    comptime LOCATION = "location"
+    comptime PROXY_AUTHENTICATE = "proxy-authenticate"
+    comptime RETRY_AFTER = "retry-after"
     comptime SERVER = "server"
-    comptime SET_COOKIE = "set-cookie"
+    comptime VARY = "vary"
+    comptime WWW_AUTHENTICATE = "www-authenticate"
+
+    # Entity Headers (Content)
+    comptime ALLOW = "allow"
+    comptime CONTENT_ENCODING = "content-encoding"
+    comptime CONTENT_LANGUAGE = "content-language"
+    comptime CONTENT_LENGTH = "content-length"
+    comptime CONTENT_LOCATION = "content-location"
+    comptime CONTENT_MD5 = "content-md5"
+    comptime CONTENT_RANGE = "content-range"
+    comptime CONTENT_TYPE = "content-type"
+    comptime CONTENT_DISPOSITION = "content-disposition"
+    comptime EXPIRES = "expires"
+    comptime LAST_MODIFIED = "last-modified"
+
+    # Caching Headers
+    comptime CACHE_CONTROL = "cache-control"
+    comptime PRAGMA = "pragma"
+
+    # Cookie Headers
     comptime COOKIE = "cookie"
+    comptime SET_COOKIE = "set-cookie"
+
+    # CORS Headers
+    comptime ACCESS_CONTROL_ALLOW_ORIGIN = "access-control-allow-origin"
+    comptime ACCESS_CONTROL_ALLOW_CREDENTIALS = "access-control-allow-credentials"
+    comptime ACCESS_CONTROL_ALLOW_HEADERS = "access-control-allow-headers"
+    comptime ACCESS_CONTROL_ALLOW_METHODS = "access-control-allow-methods"
+    comptime ACCESS_CONTROL_EXPOSE_HEADERS = "access-control-expose-headers"
+    comptime ACCESS_CONTROL_MAX_AGE = "access-control-max-age"
+    comptime ACCESS_CONTROL_REQUEST_HEADERS = "access-control-request-headers"
+    comptime ACCESS_CONTROL_REQUEST_METHOD = "access-control-request-method"
+    comptime ORIGIN = "origin"
+
+    # Security Headers
+    comptime STRICT_TRANSPORT_SECURITY = "strict-transport-security"
+    comptime CONTENT_SECURITY_POLICY = "content-security-policy"
+    comptime CONTENT_SECURITY_POLICY_REPORT_ONLY = "content-security-policy-report-only"
+    comptime X_CONTENT_TYPE_OPTIONS = "x-content-type-options"
+    comptime X_FRAME_OPTIONS = "x-frame-options"
+    comptime X_XSS_PROTECTION = "x-xss-protection"
+    comptime REFERRER_POLICY = "referrer-policy"
+    comptime PERMISSIONS_POLICY = "permissions-policy"
+    comptime CROSS_ORIGIN_EMBEDDER_POLICY = "cross-origin-embedder-policy"
+    comptime CROSS_ORIGIN_EMBEDDER_POLICY_REPORT_ONLY = "cross-origin-embedder-policy-report-only"
+    comptime CROSS_ORIGIN_OPENER_POLICY = "cross-origin-opener-policy"
+    comptime CROSS_ORIGIN_OPENER_POLICY_REPORT_ONLY = "cross-origin-opener-policy-report-only"
+    comptime CROSS_ORIGIN_RESOURCE_POLICY = "cross-origin-resource-policy"
+
+    # Other Common Headers
+    comptime LINK = "link"
+    comptime KEEP_ALIVE = "keep-alive"
+    comptime PROXY_CONNECTION = "proxy-connection"
+    comptime ALT_SVC = "alt-svc"
 
 
 @fieldwise_init

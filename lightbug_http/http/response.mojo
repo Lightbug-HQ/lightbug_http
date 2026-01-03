@@ -1,10 +1,10 @@
 from lightbug_http.connection import TCPConnection, default_buffer_size
 from lightbug_http.header import ParsedResponseResult
 from lightbug_http.http.chunked import HTTPChunkedDecoder, decode
+from lightbug_http.http.date import http_date_now
 from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter, byte
 from lightbug_http.strings import CR, LF, http, lineBreak, strHttp11, whitespace
 from lightbug_http.uri import URI
-from small_time.small_time import now
 from utils import Variant
 
 
@@ -46,13 +46,80 @@ comptime ResponseParseError = Variant[
 
 
 struct StatusCode:
+    """HTTP status codes (RFC 9110)."""
+
+    # 1xx Informational
+    comptime CONTINUE = 100
+    comptime SWITCHING_PROTOCOLS = 101
+    comptime PROCESSING = 102
+    comptime EARLY_HINTS = 103
+
+    # 2xx Success
     comptime OK = 200
+    comptime CREATED = 201
+    comptime ACCEPTED = 202
+    comptime NON_AUTHORITATIVE_INFORMATION = 203
+    comptime NO_CONTENT = 204
+    comptime RESET_CONTENT = 205
+    comptime PARTIAL_CONTENT = 206
+    comptime MULTI_STATUS = 207
+    comptime ALREADY_REPORTED = 208
+    comptime IM_USED = 226
+
+    # 3xx Redirection
+    comptime MULTIPLE_CHOICES = 300
     comptime MOVED_PERMANENTLY = 301
     comptime FOUND = 302
+    comptime SEE_OTHER = 303
+    comptime NOT_MODIFIED = 304
+    comptime USE_PROXY = 305
     comptime TEMPORARY_REDIRECT = 307
     comptime PERMANENT_REDIRECT = 308
+
+    # 4xx Client Errors
+    comptime BAD_REQUEST = 400
+    comptime UNAUTHORIZED = 401
+    comptime PAYMENT_REQUIRED = 402
+    comptime FORBIDDEN = 403
     comptime NOT_FOUND = 404
-    comptime INTERNAL_ERROR = 500
+    comptime METHOD_NOT_ALLOWED = 405
+    comptime NOT_ACCEPTABLE = 406
+    comptime PROXY_AUTHENTICATION_REQUIRED = 407
+    comptime REQUEST_TIMEOUT = 408
+    comptime CONFLICT = 409
+    comptime GONE = 410
+    comptime LENGTH_REQUIRED = 411
+    comptime PRECONDITION_FAILED = 412
+    comptime REQUEST_ENTITY_TOO_LARGE = 413
+    comptime REQUEST_URI_TOO_LONG = 414
+    comptime UNSUPPORTED_MEDIA_TYPE = 415
+    comptime REQUESTED_RANGE_NOT_SATISFIABLE = 416
+    comptime EXPECTATION_FAILED = 417
+    comptime IM_A_TEAPOT = 418
+    comptime MISDIRECTED_REQUEST = 421
+    comptime UNPROCESSABLE_ENTITY = 422
+    comptime LOCKED = 423
+    comptime FAILED_DEPENDENCY = 424
+    comptime TOO_EARLY = 425
+    comptime UPGRADE_REQUIRED = 426
+    comptime PRECONDITION_REQUIRED = 428
+    comptime TOO_MANY_REQUESTS = 429
+    comptime REQUEST_HEADER_FIELDS_TOO_LARGE = 431
+    comptime UNAVAILABLE_FOR_LEGAL_REASONS = 451
+
+    # 5xx Server Errors
+    comptime INTERNAL_SERVER_ERROR = 500
+    comptime INTERNAL_ERROR = 500  # Alias for backwards compatibility
+    comptime NOT_IMPLEMENTED = 501
+    comptime BAD_GATEWAY = 502
+    comptime SERVICE_UNAVAILABLE = 503
+    comptime GATEWAY_TIMEOUT = 504
+    comptime HTTP_VERSION_NOT_SUPPORTED = 505
+    comptime VARIANT_ALSO_NEGOTIATES = 506
+    comptime INSUFFICIENT_STORAGE = 507
+    comptime LOOP_DETECTED = 508
+    comptime NOT_EXTENDED = 510
+    comptime NETWORK_AUTHENTICATION_REQUIRED = 511
 
 
 @fieldwise_init
@@ -204,8 +271,7 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
             self.set_content_length(len(body_bytes))
         if HeaderKey.DATE not in self.headers:
             try:
-                var current_time = String(now(utc=True))
-                self.headers[HeaderKey.DATE] = current_time
+                self.headers[HeaderKey.DATE] = http_date_now()
             except:
                 pass
 
@@ -233,8 +299,7 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
             self.set_content_length(len(self.body_raw))
         if HeaderKey.DATE not in self.headers:
             try:
-                var current_time = String(now(utc=True))
-                self.headers[HeaderKey.DATE] = current_time
+                self.headers[HeaderKey.DATE] = http_date_now()
             except:
                 pass
 
@@ -333,7 +398,7 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
         )
         if HeaderKey.DATE not in self.headers:
             try:
-                write_header(writer, HeaderKey.DATE, String(now(utc=True)))
+                write_header(writer, HeaderKey.DATE, http_date_now())
             except:
                 pass
         writer.write(self.headers, self.cookies, lineBreak)
