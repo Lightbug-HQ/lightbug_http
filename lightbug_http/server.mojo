@@ -120,7 +120,7 @@ struct ServerConfig(Copyable, Movable):
 
 
 @fieldwise_init
-struct BodyReadState(Copyable, Movable):
+struct BodyReadState(ImplicitlyCopyable, Copyable, Movable):
     """State for body reading phase."""
 
     var content_length: Int

@@ -93,7 +93,7 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
     fn from_parsed(
         server_addr: String,
         parsed: ParsedRequestHeaders,
-        body: Bytes,
+        var body: Bytes,
         max_uri_length: Int,
     ) raises RequestBuildError -> HTTPRequest:
         """Construct an HTTPRequest from parsed headers and body.
@@ -118,11 +118,12 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
             raise RequestBuildError(URITooLongError())
 
         var cookies = RequestCookieJar()
-        for cookie_str in parsed.cookies:
-            try:
-                cookies.parse_cookie_header(cookie_str[])
-            except e:
-                raise RequestBuildError(CookieParseError(detail=String(e)))
+        for cookie_ref in parsed.cookies:
+            if "=" in cookie_ref:
+                var key_value = cookie_ref.split("=")
+                var key = String(key_value[0])
+                var value = String(key_value[1]) if len(key_value) > 1 else String("")
+                cookies._inner[key] = value
 
         var full_uri_string = String(server_addr, parsed.path)
         var parsed_uri: URI
@@ -133,11 +134,11 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
 
         var request = HTTPRequest(
             uri=parsed_uri^,
-            headers=parsed.headers,
+            headers=parsed.headers.copy(),
             method=parsed.method,
             protocol=parsed.protocol,
             cookies=cookies^,
-            body_raw=body,
+            body=body^,
         )
 
         request.set_content_length(len(request.body_raw))
