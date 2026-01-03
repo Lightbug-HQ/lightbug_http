@@ -36,11 +36,11 @@ from lightbug_http.c.socket import (
 from lightbug_http.c.socket_error import (
     AcceptError,
     BindError,
-    CloseError,
     CloseEBADFError,
     CloseEINTRError,
     CloseEIOError,
     CloseENOSPCError,
+    CloseError,
     ConnectError,
     GetpeernameError,
     GetsocknameError,
@@ -51,10 +51,10 @@ from lightbug_http.c.socket_error import (
     SendError,
     SendtoError,
     SetsockoptError,
-    ShutdownError,
     ShutdownEINVALError,
-    SocketError as CSocketError,
+    ShutdownError,
 )
+from lightbug_http.c.socket_error import SocketError as CSocketError
 from lightbug_http.connection import default_buffer_size
 from lightbug_http.io.bytes import Bytes
 from utils import Variant
@@ -87,6 +87,7 @@ struct SocketRecvError(Movable, Stringable, Writable):
     """Error variant for socket receive operations.
     Can be RecvError from the syscall or EOF if connection closed cleanly.
     """
+
     comptime type = Variant[RecvError, EOF]
     var value: Self.type
 
@@ -119,6 +120,7 @@ struct SocketRecvfromError(Movable, Stringable, Writable):
     """Error variant for socket recvfrom operations.
     Can be RecvfromError from the syscall or EOF if connection closed cleanly.
     """
+
     comptime type = Variant[RecvfromError, EOF]
     var value: Self.type
 
@@ -151,6 +153,7 @@ struct SocketAcceptError(Movable, Stringable, Writable):
     """Error variant for socket accept operations.
     Can be AcceptError or GetpeernameError from the syscall, SocketClosedError, or InetNtopError from binary_ip_to_string.
     """
+
     comptime type = Variant[AcceptError, GetpeernameError, SocketClosedError, InetNtopError]
     var value: Self.type
 
@@ -195,6 +198,7 @@ struct SocketBindError(Movable, Stringable, Writable):
     """Error variant for socket bind operations.
     Can be BindError from bind(), SocketGetsocknameError from get_sock_name(), or InetPtonError from inet_pton.
     """
+
     comptime type = Variant[BindError, SocketGetsocknameError, InetPtonError]
     var value: Self.type
 
@@ -233,6 +237,7 @@ struct SocketConnectError(Movable, Stringable, Writable):
     """Error variant for socket connect operations.
     Can be ConnectError from the syscall or SocketAcceptError from get_peer_name.
     """
+
     comptime type = Variant[ConnectError, SocketAcceptError]
     var value: Self.type
 
@@ -265,6 +270,7 @@ struct SocketGetsocknameError(Movable, Stringable, Writable):
     """Error variant for socket getsockname operations.
     Can be GetsocknameError from the syscall, SocketClosedError, or InetNtopError from binary_ip_to_string.
     """
+
     comptime type = Variant[GetsocknameError, SocketClosedError, InetNtopError]
     var value: Self.type
 
@@ -732,7 +738,9 @@ struct Socket[
             UInt16(binary_port_to_int(peer_sockaddr_in.sin_port)),
         )
 
-    fn receive_from(self, size: Int = default_buffer_size) raises SocketRecvfromError -> Tuple[List[Byte], String, UInt16]:
+    fn receive_from(
+        self, size: Int = default_buffer_size
+    ) raises SocketRecvfromError -> Tuple[List[Byte], String, UInt16]:
         """Receive data from the socket into the buffer dest.
 
         Args:
@@ -794,7 +802,6 @@ struct Socket[
                     raise close_err[CloseEIOError]
                 elif close_err.isa[CloseENOSPCError]():
                     raise close_err[CloseENOSPCError]
-
 
         self._closed = True
 

@@ -1,7 +1,7 @@
-from lightbug_http.header import Header, HeaderKey, Headers, ParsedRequestResult, write_header
-from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter
+from lightbug_http.header import Header, HeaderKey, Headers, ParsedRequestHeaders, write_header
+from lightbug_http.io.bytes import Bytes, ByteWriter
 from lightbug_http.io.sync import Duration
-from lightbug_http.strings import CR, LF, http, lineBreak, strHttp11, whitespace
+from lightbug_http.strings import lineBreak, strHttp11, whitespace
 from lightbug_http.uri import URI
 from memory import Span
 from utils import Variant
@@ -34,16 +34,6 @@ struct URIParseError(ImplicitlyCopyable):
 
 
 @fieldwise_init
-struct HeaderParseError(ImplicitlyCopyable):
-    """Failed to parse request headers."""
-
-    var detail: String
-
-    fn message(self) -> String:
-        return String("Invalid HTTP headers: ", self.detail)
-
-
-@fieldwise_init
 struct CookieParseError(ImplicitlyCopyable):
     """Failed to parse cookies."""
 
@@ -53,28 +43,18 @@ struct CookieParseError(ImplicitlyCopyable):
         return String("Invalid cookies: ", self.detail)
 
 
-@fieldwise_init
-struct BodyReadError(ImplicitlyCopyable):
-    """Failed to read request body."""
-
-    var detail: String
-
-    fn message(self) -> String:
-        return String("Invalid request body: ", self.detail)
-
-
-comptime RequestParseError = Variant[
+comptime RequestBuildError = Variant[
     URITooLongError,
     RequestBodyTooLargeError,
     URIParseError,
-    HeaderParseError,
     CookieParseError,
-    BodyReadError,
 ]
 
 
 @fieldwise_init
 struct RequestMethod:
+    """HTTP request method constants."""
+
     var value: String
 
     comptime get = RequestMethod("GET")
@@ -91,6 +71,13 @@ comptime strSlash = "/"
 
 @fieldwise_init
 struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
+    """Represents a parsed HTTP request.
+
+    This type is constructed from already-parsed components. The server is responsible
+    for driving the parsing process (using header.mojo functions) and constructing
+    the request once all data is available.
+    """
+
     var headers: Headers
     var cookies: RequestCookieJar
     var uri: URI
@@ -103,47 +90,57 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
     var timeout: Duration
 
     @staticmethod
-    fn from_bytes(
-        addr: String, max_body_size: Int, max_uri_length: Int, b: Span[Byte]
-    ) raises RequestParseError -> HTTPRequest:
-        var reader = ByteReader(b)
-        var headers = Headers()
-        var rest: ParsedRequestResult
-        try:
-            rest = headers.parse_raw_request(reader)
-        except e:
-            raise RequestParseError(HeaderParseError(detail=String(e)))
+    fn from_parsed(
+        server_addr: String,
+        parsed: ParsedRequestHeaders,
+        body: Bytes,
+        max_uri_length: Int,
+    ) raises RequestBuildError -> HTTPRequest:
+        """Construct an HTTPRequest from parsed headers and body.
 
-        if len(rest.path.as_bytes()) > max_uri_length:
-            raise RequestParseError(URITooLongError())
+        This is the primary factory method for creating requests. The server
+        should use header.mojo's parse_request_headers() to parse the headers,
+        then read the body separately, and finally call this method.
+
+        Args:
+            server_addr: The server address (used for URI construction).
+            parsed: The parsed request headers from parse_request_headers().
+            body: The request body bytes.
+            max_uri_length: Maximum allowed URI length.
+
+        Returns:
+            A fully constructed HTTPRequest.
+
+        Raises:
+            RequestBuildError: If URI is too long, URI parsing fails, or cookie parsing fails.
+        """
+        if len(parsed.path) > max_uri_length:
+            raise RequestBuildError(URITooLongError())
 
         var cookies = RequestCookieJar()
-        try:
-            cookies.parse_cookies(headers)
-        except e:
-            raise RequestParseError(CookieParseError(detail=String(e)))
+        for cookie_str in parsed.cookies:
+            try:
+                cookies.parse_cookie_header(cookie_str[])
+            except e:
+                raise RequestBuildError(CookieParseError(detail=String(e)))
 
-        var content_length = headers.content_length()
-        if content_length > 0 and max_body_size > 0 and content_length > max_body_size:
-            raise RequestParseError(RequestBodyTooLargeError())
-
+        var full_uri_string = String(server_addr, parsed.path)
         var parsed_uri: URI
         try:
-            parsed_uri = URI.parse(String(addr, rest.path))
-        except uri_error:
-            raise RequestParseError(URIParseError())
+            parsed_uri = URI.parse(full_uri_string)
+        except:
+            raise RequestBuildError(URIParseError())
 
         var request = HTTPRequest(
             uri=parsed_uri^,
-            headers=headers^,
-            method=rest.method,
-            protocol=rest.protocol,
+            headers=parsed.headers,
+            method=parsed.method,
+            protocol=parsed.protocol,
             cookies=cookies^,
+            body_raw=body,
         )
 
-        if content_length > 0:
-            reader.skip_carriage_return()
-            request.read_body(reader, content_length, max_body_size)
+        request.set_content_length(len(request.body_raw))
 
         return request^
 
@@ -158,6 +155,11 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
         server_is_tls: Bool = False,
         timeout: Duration = Duration(),
     ):
+        """Initialize a new HTTP request.
+
+        This constructor is for building outgoing requests. For parsing incoming
+        requests, use from_parsed() instead.
+        """
         self.headers = headers^
         self.cookies = cookies.copy()
         self.method = method^
@@ -167,6 +169,7 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
         self.server_is_tls = server_is_tls
         self.timeout = timeout
         self.set_content_length(len(self.body_raw))
+
         if HeaderKey.CONNECTION not in self.headers:
             self.headers[HeaderKey.CONNECTION] = "keep-alive"
         if HeaderKey.HOST not in self.headers:
@@ -176,58 +179,26 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
                 self.headers[HeaderKey.HOST] = self.uri.host
 
     fn get_body(self) -> StringSlice[origin_of(self.body_raw)]:
+        """Get the request body as a string slice."""
         return StringSlice(unsafe_from_utf8=Span(self.body_raw))
 
     fn set_connection_close(mut self):
+        """Set the Connection header to 'close'."""
         self.headers[HeaderKey.CONNECTION] = "close"
 
-    fn set_content_length(mut self, l: Int):
-        self.headers[HeaderKey.CONTENT_LENGTH] = String(l)
+    fn set_content_length(mut self, length: Int):
+        """Set the Content-Length header."""
+        self.headers[HeaderKey.CONTENT_LENGTH] = String(length)
 
     fn connection_close(self) -> Bool:
+        """Check if the Connection header is set to 'close'."""
         var result = self.headers.get(HeaderKey.CONNECTION)
         if not result:
             return False
         return result.value() == "close"
 
-    @always_inline
-    fn read_body(mut self, mut r: ByteReader, content_length: Int, max_body_size: Int) raises RequestParseError -> None:
-        if content_length > max_body_size:
-            raise RequestParseError(RequestBodyTooLargeError())
-
-        if r.remaining() > content_length:
-            try:
-                self.body_raw = Bytes(r.read_bytes(content_length).as_bytes())
-            except OutOfBoundsError:
-                raise RequestParseError(
-                    BodyReadError(detail="Reached the end of the reader before reaching content length")
-                )
-
-            if len(self.body_raw) != content_length:
-                raise RequestParseError(
-                    BodyReadError(
-                        detail=String(
-                            "Content length mismatch, expected ",
-                            content_length,
-                            " but got ",
-                            len(self.body_raw),
-                        )
-                    )
-                )
-
-            self.set_content_length(len(self.body_raw))
-            return
-
-        # TODO: Handle content length mismatches?
-        elif r.remaining() == 0:
-            self.body_raw = Bytes()
-            self.set_content_length(0)
-            return
-
-        self.body_raw = Bytes(r.read_bytes().as_bytes())
-        self.set_content_length(len(self.body_raw))
-
     fn write_to[T: Writer, //](self, mut writer: T):
+        """Write the request in HTTP format to a writer."""
         path = self.uri.path if len(self.uri.path) > 1 else strSlash
         if len(self.uri.query_string) > 0:
             path.write("?", self.uri.query_string)
@@ -246,11 +217,7 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
         )
 
     fn encode(deinit self) -> Bytes:
-        """Encodes request as bytes.
-
-        This method consumes the data in this request and it should
-        no longer be considered valid.
-        """
+        """Encode request as bytes, consuming the request."""
         var path = self.uri.path if len(self.uri.path) > 1 else strSlash
         if len(self.uri.query_string) > 0:
             path.write("?", self.uri.query_string)

@@ -3,15 +3,8 @@ from time import sleep
 
 from lightbug_http.address import HostPort, NetworkType, ParseError, TCPAddr, UDPAddr, parse_address
 from lightbug_http.c.address import AddressFamily
-from lightbug_http.c.socket_error import (
-    AcceptError,
-    GetpeernameError,
-    RecvError,
-    RecvfromError,
-    SendError,
-    SendtoError,
-    SocketError as CSocketError,
-)
+from lightbug_http.c.socket_error import AcceptError, GetpeernameError, RecvError, RecvfromError, SendError, SendtoError
+from lightbug_http.c.socket_error import SocketError as CSocketError
 from lightbug_http.io.bytes import Bytes
 from lightbug_http.io.sync import Duration
 from lightbug_http.socket import (
@@ -39,7 +32,6 @@ comptime default_tcp_keep_alive = Duration(15 * 1000 * 1000 * 1000)  # 15 second
 """The default TCP keep-alive duration."""
 
 
-
 @fieldwise_init
 @register_passable("trivial")
 struct AddressParseError(CustomError):
@@ -62,7 +54,6 @@ struct BindFailedError(CustomError):
 @register_passable("trivial")
 struct ListenFailedError(CustomError):
     comptime message = "ListenerError: Failed to listen on socket"
-
 
 
 @fieldwise_init
@@ -502,6 +493,7 @@ struct CreateConnectionError(Movable, Stringable, Writable):
     """Error variant for create_connection operations.
     Can be CSocketError from socket creation or SocketConnectError from connect.
     """
+
     comptime type = Variant[CSocketError, SocketConnectError]
     var value: Self.type
 

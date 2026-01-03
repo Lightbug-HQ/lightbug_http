@@ -363,7 +363,9 @@ fn _inet_ntop(
     ](af, src, dst, size)
 
 
-fn inet_ntop[address_family: AddressFamily, address_length: AddressLength](ip_address: UInt32) raises InetNtopError -> String:
+fn inet_ntop[
+    address_family: AddressFamily, address_length: AddressLength
+](ip_address: UInt32) raises InetNtopError -> String:
     """Libc POSIX `inet_ntop` function.
 
     Parameters:

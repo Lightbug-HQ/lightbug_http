@@ -3,8 +3,9 @@ from hashlib.hash import Hasher
 
 from lightbug_http.header import HeaderKey, write_header
 from lightbug_http.io.bytes import ByteWriter
-from lightbug_http.cookie.cookie import InvalidCookieError
 from utils import Variant
+
+from lightbug_http.cookie.cookie import InvalidCookieError
 
 
 @fieldwise_init

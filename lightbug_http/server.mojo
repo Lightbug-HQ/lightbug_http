@@ -6,16 +6,17 @@ from lightbug_http.connection import (
     TCPConnection,
     default_buffer_size,
 )
-from lightbug_http.http.common_response import BadRequest, InternalError, URITooLong
-from lightbug_http.io.bytes import ByteReader, Bytes, BytesConstant, ByteView
-from lightbug_http.service import HTTPService
-from lightbug_http.socket import (
-    EOF,
-    FatalCloseError,
-    SocketAcceptError,
-    SocketClosedError,
-    SocketRecvError,
+from lightbug_http.header import (
+    Headers,
+    ParsedRequestHeaders,
+    RequestParseError,
+    find_header_end,
+    parse_request_headers,
 )
+from lightbug_http.http.common_response import BadRequest, InternalError, URITooLong
+from lightbug_http.io.bytes import Bytes, ByteView
+from lightbug_http.service import HTTPService
+from lightbug_http.socket import EOF, FatalCloseError, SocketAcceptError, SocketClosedError, SocketRecvError
 from lightbug_http.utils.error import CustomError
 from lightbug_http.utils.owning_list import OwningList
 from utils import Variant
@@ -25,9 +26,7 @@ from lightbug_http.http import HTTPRequest, HTTPResponse, encode
 
 @fieldwise_init
 struct ServerError(Movable, Stringable, Writable):
-    """Error variant for server operations.
-    Represents failures during listener setup, connection handling, etc.
-    """
+    """Error variant for server operations."""
 
     comptime type = Variant[
         ListenerError,
@@ -89,14 +88,25 @@ struct ServerError(Movable, Stringable, Writable):
 
 @fieldwise_init
 struct ServerConfig(Copyable, Movable):
+    """Configuration for the HTTP server."""
+
     var max_connections: Int
+    """Maximum number of concurrent connections."""
+
     var max_keepalive_requests: Int
+    """Maximum requests per keepalive connection (0 = unlimited)."""
 
     var socket_buffer_size: Int
+    """Size of socket read buffer."""
+
     var recv_buffer_max: Int
+    """Maximum total receive buffer size."""
 
     var max_request_body_size: Int
+    """Maximum request body size."""
+
     var max_request_uri_length: Int
+    """Maximum URI length."""
 
     fn __init__(out self):
         self.max_connections = 1024
@@ -109,47 +119,86 @@ struct ServerConfig(Copyable, Movable):
         self.max_request_uri_length = 8192
 
 
+@fieldwise_init
+struct BodyReadState(Copyable, Movable):
+    """State for body reading phase."""
+
+    var content_length: Int
+    """Total expected body length from Content-Length header."""
+
+    var bytes_read: Int
+    """Bytes of body read so far."""
+
+    var header_end_offset: Int
+    """Offset in recv_buffer where headers end and body begins."""
+
+
+@fieldwise_init
 struct ConnectionProvision(Movable):
-    """
-    All resources needed to handle a connection.
+    """All resources needed to handle a connection.
+
     Pre-allocated and reused (pooled) across connections.
     """
 
     var recv_buffer: Bytes
+    """Accumulated receive data."""
+
+    var parsed_headers: Optional[ParsedRequestHeaders]
+    """Parsed headers (available after header parsing completes)."""
+
     var request: Optional[HTTPRequest]
+    """Constructed request (available after body is complete)."""
+
     var response: Optional[HTTPResponse]
+    """Response to send."""
+
     var state: ConnectionState
+    """Current state in the connection state machine."""
+
+    var body_state: Optional[BodyReadState]
+    """Body reading state (only valid during READING_BODY)."""
+
+    var last_parse_len: Int
+    """Length of buffer at last parse attempt (for incremental parsing)."""
+
     var keepalive_count: Int
+    """Number of requests handled on this connection."""
+
     var should_close: Bool
+    """Whether to close connection after response."""
 
     fn __init__(out self, config: ServerConfig):
         self.recv_buffer = Bytes(capacity=config.socket_buffer_size)
+        self.parsed_headers = None
         self.request = None
         self.response = None
         self.state = ConnectionState.reading_headers()
+        self.body_state = None
+        self.last_parse_len = 0
         self.keepalive_count = 0
         self.should_close = False
 
     fn prepare_for_new_request(mut self):
         """Reset provision for next request in keepalive connection."""
+        self.parsed_headers = None
         self.request = None
         self.response = None
         self.recv_buffer.clear()
         self.state = ConnectionState.reading_headers()
+        self.body_state = None
+        self.last_parse_len = 0
         self.should_close = False
 
 
 @fieldwise_init
 @register_passable("trivial")
 struct ProvisionPoolExhaustedError(CustomError):
-    comptime message = "ProvisionError: Connection provision pool exhausted - no available provisions"
+    comptime message = "ProvisionError: Connection provision pool exhausted"
 
 
 @fieldwise_init
 struct ProvisionError(Movable, Stringable, Writable):
-    """Error variant for provision pool operations.
-    Represents failures during provision borrowing or management.
-    """
+    """Error variant for provision pool operations."""
 
     comptime type = Variant[ProvisionPoolExhaustedError]
     var value: Self.type
@@ -172,9 +221,7 @@ struct ProvisionError(Movable, Stringable, Writable):
 
 
 struct ProvisionPool(Movable):
-    """
-    Pool of ConnectionProvision objects for reuse across connections.
-    """
+    """Pool of ConnectionProvision objects for reuse across connections."""
 
     var provisions: OwningList[ConnectionProvision]
     var available: OwningList[Int]
@@ -182,12 +229,6 @@ struct ProvisionPool(Movable):
     var initialized_count: Int
 
     fn __init__(out self, capacity: Int, config: ServerConfig):
-        """Initialize the provision pool with the given capacity.
-
-        Args:
-            capacity: Maximum number of provisions in the pool.
-            config: Server configuration for initializing provisions.
-        """
         self.provisions = OwningList[ConnectionProvision](capacity=capacity)
         self.available = OwningList[Int](capacity=capacity)
         self.capacity = capacity
@@ -199,44 +240,17 @@ struct ProvisionPool(Movable):
             self.initialized_count += 1
 
     fn borrow(mut self) raises ProvisionError -> Int:
-        """Borrow a provision from the pool.
-
-        Returns:
-            Index of the borrowed provision.
-
-        Raises:
-            ProvisionError: If no provisions are available (pool exhausted).
-        """
         if len(self.available) == 0:
             raise ProvisionPoolExhaustedError()
-
         return self.available.pop()
 
     fn release(mut self, index: Int):
-        """Return a provision to the pool.
-
-        Args:
-            index: Index of the provision to return.
-        """
         self.available.append(index)
 
     fn get_ptr(mut self, index: Int) -> Pointer[ConnectionProvision, origin_of(self.provisions)]:
-        """Get a mutable pointer to a provision by index.
-
-        Args:
-            index: Index of the provision.
-
-        Returns:
-            Mutable pointer to the provision.
-        """
         return Pointer(to=self.provisions[index])
 
     fn size(self) -> Int:
-        """Get the number of provisions currently in use.
-
-        Returns:
-            Number of provisions in use.
-        """
         return self.initialized_count - len(self.available)
 
 
@@ -250,9 +264,7 @@ fn handle_connection[
     server_address: String,
     tcp_keep_alive: Bool,
 ) raises SocketRecvError:
-    """Handle a single connection through its lifecycle.
-    Only propagates SocketError for true socket failures - handles protocol
-    errors (bad requests, etc.) internally by sending error responses.
+    """Handle a single HTTP connection through its lifecycle.
 
     Args:
         conn: The TCP connection to handle.
@@ -263,7 +275,7 @@ fn handle_connection[
         tcp_keep_alive: Whether to enable TCP keep-alive.
 
     Raises:
-        SocketError: If a socket operation fails (not including clean EOF/close).
+        SocketRecvError: If a socket read operation fails (not including clean EOF/close).
     """
     while True:
         if provision.state.kind == ConnectionState.READING_HEADERS:
@@ -282,47 +294,75 @@ fn handle_connection[
                 provision.state = ConnectionState.closed()
                 break
 
+            var prev_len = len(provision.recv_buffer)
             provision.recv_buffer.extend(buffer^)
 
-            if BytesConstant.DOUBLE_CRLF in ByteView(provision.recv_buffer):
-                try:
-                    var request = HTTPRequest.from_bytes(
-                        server_address,
-                        config.max_request_body_size,
-                        config.max_request_uri_length,
-                        provision.recv_buffer,
-                    )
-
-                    var content_length = request.headers.content_length()
-
-                    provision.request = request^
-
-                    if content_length > 0:
-                        provision.state = ConnectionState.reading_body(content_length)
-                    else:
-                        provision.state = ConnectionState.processing()
-
-                except parse_err:
-                    var error_response: HTTPResponse
-                    # TODO: Inspect error to distinguish BadRequest vs URITooLong
-                    error_response = BadRequest()
-
-                    try:
-                        _ = conn.write(encode(error_response^))
-                    except write_err:
-                        pass
-                    provision.state = ConnectionState.closed()
-                    break
-
             if len(provision.recv_buffer) > config.recv_buffer_max:
-                try:
-                    _ = conn.write(encode(BadRequest()))
-                except write_err:
-                    pass
+                _send_error_response(conn, BadRequest())
                 provision.state = ConnectionState.closed()
                 break
 
+            var search_start = prev_len
+            if search_start > 3:
+                search_start -= 3  # Account for partial \r\n\r\n match
+
+            var header_end = find_header_end(
+                Span(provision.recv_buffer),
+                search_start,
+            )
+
+            if header_end:
+                var header_end_offset = header_end.value()
+                var parsed: ParsedRequestHeaders
+                try:
+                    parsed = parse_request_headers(
+                        Span(provision.recv_buffer)[:header_end_offset],
+                        provision.last_parse_len,
+                    )
+                except parse_err:
+                    if parse_err.isa[RequestParseError]():
+                        # TODO: Differentiate errors
+                        _send_error_response(conn, BadRequest())
+                    else:
+                        _send_error_response(conn, BadRequest())
+                    provision.state = ConnectionState.closed()
+                    break
+
+                if len(parsed.path) > config.max_request_uri_length:
+                    _send_error_response(conn, URITooLong())
+                    provision.state = ConnectionState.closed()
+                    break
+
+                var content_length = parsed.content_length()
+
+                if content_length > config.max_request_body_size:
+                    _send_error_response(conn, BadRequest())
+                    provision.state = ConnectionState.closed()
+                    break
+
+                var body_bytes_in_buffer = len(provision.recv_buffer) - header_end_offset
+
+                provision.parsed_headers = parsed^
+
+                if content_length > 0:
+                    provision.body_state = BodyReadState(
+                        content_length=content_length,
+                        bytes_read=body_bytes_in_buffer,
+                        header_end_offset=header_end_offset,
+                    )
+                    provision.state = ConnectionState.reading_body(content_length)
+                else:
+                    provision.state = ConnectionState.processing()
+
+            provision.last_parse_len = len(provision.recv_buffer)
+
         elif provision.state.kind == ConnectionState.READING_BODY:
+            var body_st = provision.body_state.value()
+
+            if body_st.bytes_read >= body_st.content_length:
+                provision.state = ConnectionState.processing()
+                continue
+
             var buffer = Bytes(capacity=config.socket_buffer_size)
             var bytes_read: UInt
 
@@ -339,24 +379,47 @@ fn handle_connection[
                 break
 
             provision.recv_buffer.extend(buffer^)
-            provision.state.body_state.bytes_read += Int(bytes_read)
+            body_st.bytes_read += Int(bytes_read)
+            provision.body_state = body_st
 
-            if provision.state.body_state.bytes_read >= provision.state.body_state.content_length:
-                provision.state = ConnectionState.processing()
-
-            if len(provision.recv_buffer) > config.max_request_body_size:
-                try:
-                    _ = conn.write(encode(BadRequest()))
-                except write_err:
-                    pass
+            if len(provision.recv_buffer) > config.recv_buffer_max:
+                _send_error_response(conn, BadRequest())
                 provision.state = ConnectionState.closed()
                 break
 
-        elif provision.state.kind == ConnectionState.PROCESSING:
-            var request = provision.request.take()
-            provision.should_close = (not tcp_keep_alive) or request.connection_close()
-            var response: HTTPResponse
+            if body_st.bytes_read >= body_st.content_length:
+                provision.state = ConnectionState.processing()
 
+        elif provision.state.kind == ConnectionState.PROCESSING:
+            var parsed = provision.parsed_headers.take()
+
+            var body = Bytes()
+            if provision.body_state:
+                var body_st = provision.body_state.value()
+                var body_start = body_st.header_end_offset
+                var body_end = body_start + body_st.content_length
+
+                if body_end <= len(provision.recv_buffer):
+                    body = Bytes(capacity=body_st.content_length)
+                    for i in range(body_start, body_end):
+                        body.append(provision.recv_buffer[i])
+
+            var request: HTTPRequest
+            try:
+                request = HTTPRequest.from_parsed(
+                    server_address,
+                    parsed^,
+                    body^,
+                    config.max_request_uri_length,
+                )
+            except build_err:
+                _send_error_response(conn, BadRequest())
+                provision.state = ConnectionState.closed()
+                break
+
+            provision.should_close = (not tcp_keep_alive) or request.connection_close()
+
+            var response: HTTPResponse
             try:
                 response = handler.func(request^)
             except handler_err:
@@ -379,9 +442,6 @@ fn handle_connection[
             try:
                 _ = conn.write(encode(response^))
             except write_err:
-                # Failed to write response - close connection
-                # This is a socket error but we handle it here since
-                # we're already committed to this connection's fate
                 provision.state = ConnectionState.closed()
                 break
 
@@ -396,14 +456,12 @@ fn handle_connection[
             provision.keepalive_count += 1
             provision.prepare_for_new_request()
 
-        else:  # CLOSED
+        else:
             break
 
 
 struct Server(Movable):
-    """
-    HTTP/1.1 Server implementation.
-    """
+    """HTTP/1.1 Server implementation."""
 
     var config: ServerConfig
     var _address: String
@@ -498,9 +556,10 @@ struct Server(Movable):
             try:
                 index = provision_pool.borrow()
             except provision_err:
+                # Pool exhausted - close the connection and continue
                 try:
                     conn^.teardown()
-                except teardown_err:
+                except:
                     pass
                 continue
 
@@ -514,12 +573,22 @@ struct Server(Movable):
                     self.tcp_keep_alive,
                 )
             except socket_err:
+                # Connection handling failed - just close the connection
                 pass
             finally:
+                # Always clean up the connection and return provision to pool
                 try:
                     conn^.teardown()
-                except teardown_err:
+                except:
                     pass
                 provision_pool.provisions[index].prepare_for_new_request()
                 provision_pool.provisions[index].keepalive_count = 0
                 provision_pool.release(index)
+
+
+fn _send_error_response(mut conn: TCPConnection, var response: HTTPResponse):
+    """Helper to send an error response, ignoring write errors."""
+    try:
+        _ = conn.write(encode(response^))
+    except:
+        pass  # Ignore write errors for error responses

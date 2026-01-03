@@ -2,7 +2,16 @@ from sys.ffi import CompilationTarget, c_char, c_int, c_uchar, external_call
 
 from lightbug_http.c.address import AddressFamily, AddressLength
 from lightbug_http.c.aliases import ExternalImmutUnsafePointer, ExternalMutUnsafePointer, c_void
-from lightbug_http.c.network import InetNtopError, InetPtonError, in_addr_t, inet_ntop, ntohs, sockaddr, sockaddr_in, socklen_t
+from lightbug_http.c.network import (
+    InetNtopError,
+    InetPtonError,
+    in_addr_t,
+    inet_ntop,
+    ntohs,
+    sockaddr,
+    sockaddr_in,
+    socklen_t,
+)
 from lightbug_http.c.socket import SocketType, socket
 from lightbug_http.socket import Socket
 from lightbug_http.utils.error import CustomError
@@ -337,7 +346,9 @@ struct addrinfo_unix(AnAddrInfo):
         return self.ai_next
 
 
-fn get_ip_address(mut host: String, address_family: AddressFamily, sock_type: SocketType) raises GetIPAddressError -> in_addr_t:
+fn get_ip_address(
+    mut host: String, address_family: AddressFamily, sock_type: SocketType
+) raises GetIPAddressError -> in_addr_t:
     """Returns an IP address based on the host.
     This is a Unix-specific implementation.
 
@@ -948,7 +959,9 @@ fn _getaddrinfo[
     ](nodename, servname, hints, res)
 
 
-fn getaddrinfo[T: AnAddrInfo, //](mut node: String, mut service: String, hints: T) raises GetaddrinfoError -> CAddrInfo[T]:
+fn getaddrinfo[
+    T: AnAddrInfo, //
+](mut node: String, mut service: String, hints: T) raises GetaddrinfoError -> CAddrInfo[T]:
     """Libc POSIX `getaddrinfo` function.
 
     Args:
