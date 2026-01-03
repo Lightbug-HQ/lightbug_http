@@ -15,213 +15,258 @@ struct HTTPHeader(Copyable):
         self.value_len = 0
 
 
-fn get_token_to_eol[
-    origin: ImmutOrigin
-](
-    buf: UnsafePointer[UInt8, origin],
-    buf_end: UnsafePointer[UInt8, origin],
-    mut token: String,
-    mut token_len: Int,
-    mut ret: Int,
-) -> UnsafePointer[UInt8, origin]:
-    """Get token up to end of line."""
-    var token_start = buf
-    var current = buf
+struct ParseResult[T: AnyType]:
+    """Wrapper for parsing results.
 
-    # Find non-printable character
-    while current < buf_end:
-        if not is_printable_ascii(current[]):
-            var c = current[]
+    Error codes:
+    0: Success
+    -1: Error
+    -2: Incomplete data
+    """
+
+    var value: T
+    var bytes_consumed: Int
+    var error_code: Int
+
+    fn __init__(out self, value: T, bytes_consumed: Int, error_code: Int):
+        self.value = value
+        self.bytes_consumed = bytes_consumed
+        self.error_code = error_code
+
+    fn is_ok(self) -> Bool:
+        return self.error_code == 0
+
+    fn is_incomplete(self) -> Bool:
+        return self.error_code == -2
+
+
+struct BufferView[origin: Origin]:
+    var data: Span[UInt8, Self.origin]
+    var offset: Int
+
+    fn __init__(out self, data: Span[UInt8, Self.origin]):
+        self.data = data
+        self.offset = 0
+
+    fn __init__(out self, data: Span[UInt8, Self.origin], offset: Int):
+        self.data = data
+        self.offset = offset
+
+    fn remaining(self) -> Int:
+        return len(self.data) - self.offset
+
+    fn is_empty(self) -> Bool:
+        return self.offset >= len(self.data)
+
+    fn peek(self) -> Optional[UInt8]:
+        if self.offset < len(self.data):
+            return self.data[self.offset]
+        return None
+
+    fn peek_at(self, pos: Int) -> Optional[UInt8]:
+        var abs_pos = self.offset + pos
+        if abs_pos < len(self.data):
+            return self.data[abs_pos]
+        return None
+
+    fn advance(mut self, count: Int = 1):
+        self.offset = min(self.offset + count, len(self.data))
+
+    fn get_byte(mut self) -> Optional[UInt8]:
+        if self.offset < len(self.data):
+            var byte = self.data[self.offset]
+            self.offset += 1
+            return byte
+        return None
+
+    fn slice_from_offset(self, start_offset: Int) -> Span[UInt8, Self.origin]:
+        var end = self.offset
+        if start_offset >= 0 and start_offset < end and end <= len(self.data):
+            return self.data[start_offset:end]
+        return Span[UInt8, Self.origin]()
+
+    fn create_string_from_offset(self, start_offset: Int, length: Int) -> String:
+        if start_offset >= 0 and start_offset + length <= len(self.data):
+            var ptr = self.data.unsafe_ptr() + start_offset
+            return create_string_from_ptr(ptr, length)
+        return String()
+
+
+fn get_token_to_eol[origin: Origin](mut buf: BufferView[origin], mut token: String, mut token_len: Int) -> Int:
+    var token_start = buf.offset
+
+    while not buf.is_empty():
+        var byte = buf.peek()
+        if not byte:
+            return -2
+
+        var c = byte.value()
+        if not is_printable_ascii(c):
             if (c < 0x20 and c != 0x09) or c == 0x7F:
                 break
-        current += 1
+        buf.advance()
 
-    if current >= buf_end:
-        ret = -2
-        return UnsafePointer[UInt8, origin]()
+    if buf.is_empty():
+        return -2
 
-    if current[] == BytesConstant.CR:
-        current += 1
-        if current >= buf_end or current[] != BytesConstant.LF:
-            ret = -1
-            return UnsafePointer[UInt8, origin]()
-        token_len = Int(current) - 1 - Int(token_start)
-        current += 1
-    elif current[] == BytesConstant.LF:
-        token_len = Int(current) - Int(token_start)
-        current += 1
+    var current_byte = buf.peek()
+    if not current_byte:
+        return -2
+
+    if current_byte.value() == BytesConstant.CR:
+        buf.advance()
+        var next_byte = buf.peek()
+        if not next_byte or next_byte.value() != BytesConstant.LF:
+            return -1
+        token_len = buf.offset - 1 - token_start
+        buf.advance()
+    elif current_byte.value() == BytesConstant.LF:
+        token_len = buf.offset - token_start
+        buf.advance()
     else:
-        ret = -1
-        return UnsafePointer[UInt8, origin]()
+        return -1
 
-    token = create_string_from_ptr(token_start, token_len)
-    return current
+    token = buf.create_string_from_offset(token_start, token_len)
+    return 0
 
 
-fn is_complete[
-    origin: ImmutOrigin
-](
-    buf: UnsafePointer[UInt8, origin],
-    buf_end: UnsafePointer[UInt8, origin],
-    last_len: Int,
-    mut ret: Int,
-) -> UnsafePointer[UInt8, origin]:
-    """Check if request/response is complete."""
+fn is_complete[origin: Origin](mut buf: BufferView[origin], last_len: Int) -> Int:
     var ret_cnt = 0
-    var current = buf if last_len < 3 else buf + last_len - 3
+    var start_offset = 0 if last_len < 3 else last_len - 3
+    var scan_buf = BufferView(buf.data, start_offset)
 
-    while current < buf_end:
-        if current[] == BytesConstant.CR:
-            current += 1
-            if current >= buf_end:
-                ret = -2
-                return UnsafePointer[UInt8, origin]()
-            if current[] != BytesConstant.LF:
-                ret = -1
-                return UnsafePointer[UInt8, origin]()
-            current += 1
+    while not scan_buf.is_empty():
+        var byte = scan_buf.get_byte()
+        if not byte:
+            return -2
+
+        if byte.value() == BytesConstant.CR:
+            var next = scan_buf.peek()
+            if not next:
+                return -2
+            if next.value() != BytesConstant.LF:
+                return -1
+            scan_buf.advance()
             ret_cnt += 1
-        elif current[] == BytesConstant.LF:
-            current += 1
+        elif byte.value() == BytesConstant.LF:
             ret_cnt += 1
         else:
             ret_cnt = 0
-            current += 1
 
         if ret_cnt == 2:
-            return current
+            return 0
 
-    ret = -2
-    return UnsafePointer[UInt8, origin]()
+    return -2
 
 
 fn parse_token[
-    origin: ImmutOrigin
-](
-    buf: UnsafePointer[UInt8, origin],
-    buf_end: UnsafePointer[UInt8, origin],
-    mut token: String,
-    mut token_len: Int,
-    next_char: UInt8,
-    mut ret: Int,
-) -> UnsafePointer[UInt8, origin]:
-    """Parse a token until next_char is found."""
-    var buf_start = buf
-    var current = buf
+    origin: Origin
+](mut buf: BufferView[origin], mut token: String, mut token_len: Int, next_char: UInt8,) -> Int:
+    var buf_start = buf.offset
 
-    while current < buf_end:
-        if current[] == next_char:
-            token_len = Int(current) - Int(buf_start)
-            token = create_string_from_ptr(buf_start, token_len)
-            return current
-        elif not is_token_char(current[]):
-            ret = -1
-            return UnsafePointer[UInt8, origin]()
-        current += 1
+    while not buf.is_empty():
+        var byte = buf.peek()
+        if not byte:
+            return -2
 
-    ret = -2
-    return UnsafePointer[UInt8, origin]()
+        if byte.value() == next_char:
+            token_len = buf.offset - buf_start
+            token = buf.create_string_from_offset(buf_start, token_len)
+            return 0
+        elif not is_token_char(byte.value()):
+            return -1
+        buf.advance()
+
+    return -2
 
 
-fn parse_http_version[
-    origin: ImmutOrigin
-](
-    buf: UnsafePointer[UInt8, origin],
-    buf_end: UnsafePointer[UInt8, origin],
-    mut minor_version: Int,
-    mut ret: Int,
-) -> UnsafePointer[UInt8, origin]:
-    """Parse HTTP version."""
-    if Int(buf_end) - Int(buf) < 9:
-        ret = -2
-        return UnsafePointer[UInt8, origin]()
+fn parse_http_version[origin: Origin](mut buf: BufferView[origin], mut minor_version: Int) -> Int:
+    if buf.remaining() < 9:
+        return -2
 
-    var current = buf
-    if (
-        current[] != BytesConstant.H
-        or current[1] != BytesConstant.T
-        or current[2] != BytesConstant.T
-        or current[3] != BytesConstant.P
-        or current[4] != BytesConstant.SLASH
-        or current[5] != BytesConstant.ONE
-        or current[6] != BytesConstant.DOT
-    ):
-        ret = -1
-        return UnsafePointer[UInt8, origin]()
+    var checks = List[UInt8](capacity=7)
+    checks.append(BytesConstant.H)
+    checks.append(BytesConstant.T)
+    checks.append(BytesConstant.T)
+    checks.append(BytesConstant.P)
+    checks.append(BytesConstant.SLASH)
+    checks.append(BytesConstant.ONE)
+    checks.append(BytesConstant.DOT)
 
-    current += 7
+    for i in range(len(checks)):
+        var byte = buf.get_byte()
+        if not byte or byte.value() != checks[i]:
+            return -1
 
-    # Parse minor version
-    if current[] < BytesConstant.ZERO or current[] > BytesConstant.NINE:
-        ret = -1
-        return UnsafePointer[UInt8, origin]()
+    var version_byte = buf.peek()
+    if not version_byte:
+        return -2
 
-    minor_version = Int(current[] - BytesConstant.ZERO)
-    return current + 1
+    if version_byte.value() < BytesConstant.ZERO or version_byte.value() > BytesConstant.NINE:
+        return -1
+
+    minor_version = Int(version_byte.value() - BytesConstant.ZERO)
+    buf.advance()
+    return 0
 
 
 fn parse_headers[
-    buf_origin: ImmutOrigin,
-    header_origin: MutOrigin,
+    buf_origin: Origin, header_origin: MutOrigin
 ](
-    buf: UnsafePointer[UInt8, buf_origin],
-    buf_end: UnsafePointer[UInt8, buf_origin],
+    mut buf: BufferView[buf_origin],
     headers: Span[HTTPHeader, header_origin],
     mut num_headers: Int,
     max_headers: Int,
-    mut ret: Int,
-) -> UnsafePointer[UInt8, buf_origin]:
-    """Parse HTTP headers."""
-    var current = buf
+) -> Int:
+    while not buf.is_empty():
+        var byte = buf.peek()
+        if not byte:
+            return -2
 
-    while current < buf_end:
-        # Check for end of headers (empty line)
-        if current[] == BytesConstant.CR:
-            current += 1
-            if current >= buf_end:
-                ret = -2
-                return UnsafePointer[UInt8, buf_origin]()
-            if current[] != BytesConstant.LF:
-                ret = -1
-                return UnsafePointer[UInt8, buf_origin]()
-            current += 1
-            break
-        elif current[] == BytesConstant.LF:
-            current += 1
-            break
+        if byte.value() == BytesConstant.CR:
+            buf.advance()
+            var next = buf.peek()
+            if not next:
+                return -2
+            if next.value() != BytesConstant.LF:
+                return -1
+            buf.advance()
+            return 0
+        elif byte.value() == BytesConstant.LF:
+            buf.advance()
+            return 0
 
-        # Not end of headers, so we must be parsing a header
         if num_headers >= max_headers:
-            ret = -1
-            return UnsafePointer[UInt8, buf_origin]()
+            return -1
 
-        if num_headers == 0 or (current[] != BytesConstant.whitespace and current[] != BytesConstant.TAB):
+        if num_headers == 0 or (byte.value() != BytesConstant.whitespace and byte.value() != BytesConstant.TAB):
             var name = String()
-            var name_len = Int()
-            current = parse_token(current, buf_end, name, name_len, BytesConstant.COLON, ret)
-            if current == UnsafePointer[UInt8, buf_origin]() or name_len == 0:
-                ret = -1
-                return UnsafePointer[UInt8, buf_origin]()
+            var name_len = 0
+            var ret = parse_token(buf, name, name_len, BytesConstant.COLON)
+            if ret != 0 or name_len == 0:
+                return -1 if ret == 0 else ret
 
             headers[num_headers].name = name
             headers[num_headers].name_len = name_len
-            current += 1  # Skip ':'
+            buf.advance()
 
-            # Skip whitespace
-            while current < buf_end and (current[] == BytesConstant.whitespace or current[] == BytesConstant.TAB):
-                current += 1
+            while not buf.is_empty():
+                var ws = buf.peek()
+                if not ws:
+                    break
+                if ws.value() != BytesConstant.whitespace and ws.value() != BytesConstant.TAB:
+                    break
+                buf.advance()
         else:
             headers[num_headers].name = String()
             headers[num_headers].name_len = 0
 
-        # Parse header value
         var value = String()
-        var value_len = Int()
-        current = get_token_to_eol(current, buf_end, value, value_len, ret)
-        if current == UnsafePointer[UInt8, buf_origin]():
-            return UnsafePointer[UInt8, buf_origin]()
+        var value_len = 0
+        var ret = get_token_to_eol(buf, value, value_len)
+        if ret != 0:
+            return ret
 
-        # Trim trailing whitespace from value
         while value_len > 0:
             var c = value[value_len - 1]
             ref c_byte = c.as_bytes()[0]
@@ -229,12 +274,11 @@ fn parse_headers[
                 break
             value_len -= 1
 
-        # Truncate the string to the trimmed length
         headers[num_headers].value = String(value[:value_len]) if value_len < len(value) else value
         headers[num_headers].value_len = value_len
         num_headers += 1
 
-    return current
+    return -2
 
 
 fn http_parse_request[
@@ -249,98 +293,113 @@ fn http_parse_request[
     mut num_headers: Int,
     last_len: Int,
 ) -> Int:
-    """Parse HTTP request."""
-    var buf_end = buf_start + len
     var max_headers = num_headers
-    var ret: Int = 0
-    var current = buf_start
 
     method = String()
-    method_len = 0
+    var method_len = 0
     path = String()
     minor_version = -1
     num_headers = 0
 
-    # Check if request is complete (only if we have previous data)
+    var buf_span = Span[UInt8, buf_origin](ptr=buf_start, length=len)
+    var buf = BufferView(buf_span)
+
     if last_len != 0:
-        var complete = is_complete(buf_start, buf_end, last_len, ret)
-        if complete == UnsafePointer[UInt8, buf_origin]():
+        var ret = is_complete(buf, last_len)
+        if ret != 0:
             return ret
 
-    # Skip initial empty lines (for tolerance)
-    while current < buf_end:
-        if current[] == BytesConstant.CR:
-            current += 1
-            if current >= buf_end:
-                return -2
-            if current[] != BytesConstant.LF:
-                break
-            current += 1
-        elif current[] == BytesConstant.LF:
-            current += 1
-        else:
-            break  # Start of actual request
+    while not buf.is_empty():
+        var byte = buf.peek()
+        if not byte:
+            return -2
 
-    current = parse_token(current, buf_end, method, method_len, BytesConstant.whitespace, ret)
-    if current == UnsafePointer[UInt8, buf_origin]():
+        if byte.value() == BytesConstant.CR:
+            buf.advance()
+            var next = buf.peek()
+            if not next:
+                return -2
+            if next.value() != BytesConstant.LF:
+                break
+            buf.advance()
+        elif byte.value() == BytesConstant.LF:
+            buf.advance()
+        else:
+            break
+
+    var ret = parse_token(buf, method, method_len, BytesConstant.whitespace)
+    if ret != 0:
         return ret
 
-    # Skip the space
-    current += 1
+    buf.advance()
 
-    while current < buf_end and current[] == BytesConstant.whitespace:
-        current += 1
+    while not buf.is_empty():
+        var byte = buf.peek()
+        if not byte or byte.value() != BytesConstant.whitespace:
+            break
+        buf.advance()
 
-    var path_start = current
-    while current < buf_end and current[] != BytesConstant.whitespace:
-        # Accept printable ASCII (32-126) and high-bit characters (>= 128)
-        # Reject control characters (< 32) and DEL (127)
-        if not is_printable_ascii(current[]):
-            var c = current[]
-            if c < 0x20 or c == 0x7F:
+    var path_start = buf.offset
+    while not buf.is_empty():
+        var byte = buf.peek()
+        if not byte:
+            return -2
+
+        if byte.value() == BytesConstant.whitespace:
+            break
+
+        if not is_printable_ascii(byte.value()):
+            if byte.value() < 0x20 or byte.value() == 0x7F:
                 return -1
-            # Otherwise, accept high-bit characters (>= 128)
-        current += 1
+        buf.advance()
 
-    if current >= buf_end:
+    if buf.is_empty():
         return -2
 
-    path_len = Int(current) - Int(path_start)
-    path = create_string_from_ptr(path_start, path_len)
+    path_len = buf.offset - path_start
+    path = buf.create_string_from_offset(path_start, path_len)
 
-    while current < buf_end and current[] == BytesConstant.whitespace:
-        current += 1
+    while not buf.is_empty():
+        var byte = buf.peek()
+        if not byte or byte.value() != BytesConstant.whitespace:
+            break
+        buf.advance()
 
-    if current >= buf_end:
+    if buf.is_empty():
         return -2
 
     if method_len == 0 or path_len == 0:
         return -1
 
-    current = parse_http_version(current, buf_end, minor_version, ret)
-    if current == UnsafePointer[UInt8, buf_origin]():
+    ret = parse_http_version(buf, minor_version)
+    if ret != 0:
         return ret
 
-    if current >= buf_end:
+    if buf.is_empty():
         return -2
 
-    if current[] == BytesConstant.CR:
-        current += 1
-        if current >= buf_end:
+    var byte = buf.peek()
+    if not byte:
+        return -2
+
+    if byte.value() == BytesConstant.CR:
+        buf.advance()
+        var next = buf.peek()
+        if not next:
             return -2
-        if current[] != BytesConstant.LF:
+        if next.value() != BytesConstant.LF:
             return -1
-        current += 1
-    elif current[] == BytesConstant.LF:
-        current += 1
+        buf.advance()
+    elif byte.value() == BytesConstant.LF:
+        buf.advance()
     else:
         return -1
 
-    current = parse_headers(current, buf_end, headers, num_headers, max_headers, ret)
-    if current == UnsafePointer[UInt8, buf_origin]():
+    ret = parse_headers(buf, headers, num_headers, max_headers)
+    if ret != 0:
         return ret
 
-    return Int(current) - Int(buf_start)
+    return buf.offset
 
 
 fn http_parse_response[
@@ -355,53 +414,52 @@ fn http_parse_response[
     mut num_headers: Int,
     last_len: Int,
 ) -> Int:
-    """Parse HTTP response."""
-    var buf_end = buf_start + len
     var max_headers = num_headers
-    var ret: Int = 0
-    var current = buf_start
 
     minor_version = -1
     status = 0
     msg = String()
-    msg_len = 0
+    var msg_len = 0
     num_headers = 0
 
+    var buf_span = Span[UInt8, buf_origin](ptr=buf_start, length=len)
+    var buf = BufferView(buf_span)
+
     if last_len != 0:
-        var complete = is_complete(buf_start, buf_end, last_len, ret)
-        if complete == UnsafePointer[UInt8, buf_origin]():
+        var ret = is_complete(buf, last_len)
+        if ret != 0:
             return ret
 
-    current = parse_http_version(current, buf_end, minor_version, ret)
-    if current == UnsafePointer[UInt8, buf_origin]():
+    var ret = parse_http_version(buf, minor_version)
+    if ret != 0:
         return ret
 
-    if current[] != BytesConstant.whitespace:
+    var byte = buf.peek()
+    if not byte or byte.value() != BytesConstant.whitespace:
         return -1
 
-    while current < buf_end and current[] == BytesConstant.whitespace:
-        current += 1
+    while not buf.is_empty():
+        byte = buf.peek()
+        if not byte or byte.value() != BytesConstant.whitespace:
+            break
+        buf.advance()
 
-    # Parse status code (3 digits)
-    if Int(buf_end) - Int(current) < 4:
+    if buf.remaining() < 4:
         return -2
 
     status = 0
-
-    @parameter
     for _ in range(3):
-        if current[] < BytesConstant.ZERO or current[] > BytesConstant.NINE:
+        byte = buf.get_byte()
+        if not byte:
+            return -2
+        if byte.value() < BytesConstant.ZERO or byte.value() > BytesConstant.NINE:
             return -1
-        status = status * 10 + Int(current[] - BytesConstant.ZERO)
-        current += 1
+        status = status * 10 + Int(byte.value() - BytesConstant.ZERO)
 
-    # Get message including preceding space
-    # var msg_start = current
-    current = get_token_to_eol(current, buf_end, msg, msg_len, ret)
-    if current == UnsafePointer[UInt8, buf_origin]():
+    ret = get_token_to_eol(buf, msg, msg_len)
+    if ret != 0:
         return ret
 
-    # Remove preceding spaces from message
     if msg_len > 0 and msg[0] == " ":
         var i = 0
         while i < msg_len and msg[i] == " ":
@@ -409,14 +467,13 @@ fn http_parse_response[
         msg = String(msg[i:])
         msg_len -= i
     elif msg_len > 0 and msg[0] != String(" "):
-        # Garbage found after status code
         return -1
 
-    current = parse_headers(current, buf_end, headers, num_headers, max_headers, ret)
-    if current == UnsafePointer[UInt8, buf_origin]():
+    ret = parse_headers(buf, headers, num_headers, max_headers)
+    if ret != 0:
         return ret
 
-    return Int(current) - Int(buf_start)
+    return buf.offset
 
 
 fn http_parse_headers[
@@ -428,20 +485,19 @@ fn http_parse_headers[
     mut num_headers: Int,
     last_len: Int,
 ) -> Int:
-    """Parse only headers (for standalone header parsing)."""
-    var buf_end = buf_start + len
     var max_headers = num_headers
-    var ret: Int = 0
-
     num_headers = 0
 
+    var buf_span = Span[UInt8, buf_origin](ptr=buf_start, length=len)
+    var buf = BufferView(buf_span)
+
     if last_len != 0:
-        var complete = is_complete(buf_start, buf_end, last_len, ret)
-        if complete == UnsafePointer[UInt8, buf_origin]():
+        var ret = is_complete(buf, last_len)
+        if ret != 0:
             return ret
 
-    var current = parse_headers(buf_start, buf_end, headers, num_headers, max_headers, ret)
-    if current == UnsafePointer[UInt8, buf_origin]():
+    var ret = parse_headers(buf, headers, num_headers, max_headers)
+    if ret != 0:
         return ret
 
-    return Int(current) - Int(buf_start)
+    return buf.offset
