@@ -358,7 +358,6 @@ fn parse_request_headers(
         else:  # ret == -2
             raise RequestParseError(IncompleteHTTPRequestError())
 
-    # Build headers dict and extract cookies
     var headers = Headers()
     var cookies = List[String]()
 

@@ -71,8 +71,8 @@ struct HTTPParseError(Movable, Stringable, Writable):
         return String.write(self)
 
 
-fn safe_peek[origin: ImmutOrigin](reader: ByteReader[origin]) -> Optional[UInt8]:
-    """Safely peek at current byte without raising."""
+fn try_peek[origin: ImmutOrigin](reader: ByteReader[origin]) -> Optional[UInt8]:
+    """Try to peek at current byte, returns None if unavailable."""
     if reader.available():
         try:
             return reader.peek()
@@ -81,16 +81,16 @@ fn safe_peek[origin: ImmutOrigin](reader: ByteReader[origin]) -> Optional[UInt8]
     return None
 
 
-fn safe_peek_at[origin: ImmutOrigin](reader: ByteReader[origin], offset: Int) -> Optional[UInt8]:
-    """Peek at byte at relative offset from current position."""
+fn try_peek_at[origin: ImmutOrigin](reader: ByteReader[origin], offset: Int) -> Optional[UInt8]:
+    """Try to peek at byte at relative offset, returns None if out of bounds."""
     var abs_pos = reader.read_pos + offset
     if abs_pos < len(reader._inner):
         return reader._inner[abs_pos]
     return None
 
 
-fn safe_get_byte[origin: ImmutOrigin](mut reader: ByteReader[origin]) -> Optional[UInt8]:
-    """Get current byte and advance, returns None instead of raising."""
+fn try_get_byte[origin: ImmutOrigin](mut reader: ByteReader[origin]) -> Optional[UInt8]:
+    """Try to get current byte and advance, returns None if unavailable."""
     if reader.available():
         var byte = reader._inner[reader.read_pos]
         reader.increment()
@@ -112,7 +112,7 @@ fn get_token_to_eol[
     var token_start = buf.read_pos
 
     while buf.available():
-        var byte = safe_peek(buf)
+        var byte = try_peek(buf)
         if not byte:
             raise IncompleteError()
 
@@ -125,13 +125,13 @@ fn get_token_to_eol[
     if not buf.available():
         raise IncompleteError()
 
-    var current_byte = safe_peek(buf)
+    var current_byte = try_peek(buf)
     if not current_byte:
         raise IncompleteError()
 
     if current_byte.value() == BytesConstant.CR:
         buf.increment()
-        var next_byte = safe_peek(buf)
+        var next_byte = try_peek(buf)
         if not next_byte or next_byte.value() != BytesConstant.LF:
             raise ParseError()
         token_len = buf.read_pos - 1 - token_start
@@ -153,12 +153,12 @@ fn is_complete[origin: ImmutOrigin](mut buf: ByteReader[origin], last_len: Int) 
     scan_buf.read_pos = start_offset
 
     while scan_buf.available():
-        var byte = safe_get_byte(scan_buf)
+        var byte = try_get_byte(scan_buf)
         if not byte:
             raise IncompleteError()
 
         if byte.value() == BytesConstant.CR:
-            var next = safe_peek(scan_buf)
+            var next = try_peek(scan_buf)
             if not next:
                 raise IncompleteError()
             if next.value() != BytesConstant.LF:
@@ -182,7 +182,7 @@ fn parse_token[
     var buf_start = buf.read_pos
 
     while buf.available():
-        var byte = safe_peek(buf)
+        var byte = try_peek(buf)
         if not byte:
             raise IncompleteError()
 
@@ -211,11 +211,11 @@ fn parse_http_version[origin: ImmutOrigin](mut buf: ByteReader[origin], mut mino
     checks.append(BytesConstant.DOT)
 
     for i in range(len(checks)):
-        var byte = safe_get_byte(buf)
+        var byte = try_get_byte(buf)
         if not byte or byte.value() != checks[i]:
             raise ParseError()
 
-    var version_byte = safe_peek(buf)
+    var version_byte = try_peek(buf)
     if not version_byte:
         raise IncompleteError()
 
@@ -235,13 +235,13 @@ fn parse_headers[
     max_headers: Int,
 ) raises HTTPParseError:
     while buf.available():
-        var byte = safe_peek(buf)
+        var byte = try_peek(buf)
         if not byte:
             raise IncompleteError()
 
         if byte.value() == BytesConstant.CR:
             buf.increment()
-            var next = safe_peek(buf)
+            var next = try_peek(buf)
             if not next:
                 raise IncompleteError()
             if next.value() != BytesConstant.LF:
@@ -267,7 +267,7 @@ fn parse_headers[
             buf.increment()
 
             while buf.available():
-                var ws = safe_peek(buf)
+                var ws = try_peek(buf)
                 if not ws:
                     break
                 if ws.value() != BytesConstant.whitespace and ws.value() != BytesConstant.TAB:
@@ -324,13 +324,13 @@ fn http_parse_request[
             is_complete(buf, last_len)
 
         while buf.available():
-            var byte = safe_peek(buf)
+            var byte = try_peek(buf)
             if not byte:
                 return -2
 
             if byte.value() == BytesConstant.CR:
                 buf.increment()
-                var next = safe_peek(buf)
+                var next = try_peek(buf)
                 if not next:
                     return -2
                 if next.value() != BytesConstant.LF:
@@ -345,14 +345,14 @@ fn http_parse_request[
         buf.increment()
 
         while buf.available():
-            var byte = safe_peek(buf)
+            var byte = try_peek(buf)
             if not byte or byte.value() != BytesConstant.whitespace:
                 break
             buf.increment()
 
         var path_start = buf.read_pos
         while buf.available():
-            var byte = safe_peek(buf)
+            var byte = try_peek(buf)
             if not byte:
                 return -2
 
@@ -371,7 +371,7 @@ fn http_parse_request[
         path = create_string_from_reader(buf, path_start, path_len)
 
         while buf.available():
-            var byte = safe_peek(buf)
+            var byte = try_peek(buf)
             if not byte or byte.value() != BytesConstant.whitespace:
                 break
             buf.increment()
@@ -387,13 +387,13 @@ fn http_parse_request[
         if not buf.available():
             return -2
 
-        var byte = safe_peek(buf)
+        var byte = try_peek(buf)
         if not byte:
             return -2
 
         if byte.value() == BytesConstant.CR:
             buf.increment()
-            var next = safe_peek(buf)
+            var next = try_peek(buf)
             if not next:
                 return -2
             if next.value() != BytesConstant.LF:
@@ -444,12 +444,12 @@ fn http_parse_response[
 
         parse_http_version(buf, minor_version)
 
-        var byte = safe_peek(buf)
+        var byte = try_peek(buf)
         if not byte or byte.value() != BytesConstant.whitespace:
             return -1
 
         while buf.available():
-            byte = safe_peek(buf)
+            byte = try_peek(buf)
             if not byte or byte.value() != BytesConstant.whitespace:
                 break
             buf.increment()
@@ -459,7 +459,7 @@ fn http_parse_response[
 
         status = 0
         for _ in range(3):
-            byte = safe_get_byte(buf)
+            byte = try_get_byte(buf)
             if not byte:
                 return -2
             if byte.value() < BytesConstant.ZERO or byte.value() > BytesConstant.NINE:
