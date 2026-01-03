@@ -295,7 +295,7 @@ fn parse_headers[
     raise IncompleteError()
 
 
-fn http_parse_request[
+fn http_parse_request_headers[
     buf_origin: ImmutOrigin, header_origin: MutOrigin
 ](
     buf_start: UnsafePointer[UInt8, buf_origin],
@@ -307,7 +307,7 @@ fn http_parse_request[
     mut num_headers: Int,
     last_len: Int,
 ) -> Int:
-    """Parse HTTP request. Returns bytes consumed or negative error code."""
+    """Parse HTTP request headers. Returns bytes consumed or negative error code."""
     var max_headers = num_headers
 
     method = String()
@@ -414,7 +414,7 @@ fn http_parse_request[
             return -1
 
 
-fn http_parse_response[
+fn http_parse_response_headers[
     buf_origin: ImmutOrigin, header_origin: MutOrigin
 ](
     buf_start: UnsafePointer[UInt8, buf_origin],
@@ -426,7 +426,7 @@ fn http_parse_response[
     mut num_headers: Int,
     last_len: Int,
 ) -> Int:
-    """Parse HTTP response. Returns bytes consumed or negative error code."""
+    """Parse HTTP response headers. Returns bytes consumed or negative error code."""
     var max_headers = num_headers
 
     minor_version = -1

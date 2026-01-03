@@ -1,4 +1,9 @@
-from lightbug_http.http.parsing import HTTPHeader, http_parse_headers, http_parse_request, http_parse_response
+from lightbug_http.http.parsing import (
+    HTTPHeader,
+    http_parse_headers,
+    http_parse_request_headers,
+    http_parse_response_headers,
+)
 from testing import TestSuite, assert_equal, assert_false, assert_true
 
 
@@ -44,7 +49,7 @@ fn parse_request_test[
         buf_ptr[i] = buf[i]
 
     result.num_headers = 4
-    result.ret = http_parse_request(
+    result.ret = http_parse_request_headers(
         buf_ptr,
         len(buf),
         result.method,
@@ -73,7 +78,7 @@ fn parse_response_test[
         buf_ptr[i] = buf[i]
 
     result.num_headers = 4
-    result.ret = http_parse_response(
+    result.ret = http_parse_response_headers(
         buf_ptr,
         len(buf),
         result.minor_version,

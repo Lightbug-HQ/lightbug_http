@@ -1,4 +1,9 @@
-from lightbug_http.http.parsing import HTTPHeader, http_parse_headers, http_parse_request, http_parse_response
+from lightbug_http.http.parsing import (
+    HTTPHeader,
+    http_parse_headers,
+    http_parse_request_headers,
+    http_parse_response_headers,
+)
 from lightbug_http.io.bytes import ByteReader, Bytes, byte, is_newline, is_space
 from lightbug_http.strings import CR, LF, BytesConstant, lineBreak
 from memory import Span
@@ -341,7 +346,7 @@ fn parse_request_headers(
     var headers_array = InlineArray[HTTPHeader, 100](fill=HTTPHeader())
     var num_headers = max_headers
 
-    var ret = http_parse_request(
+    var ret = http_parse_request_headers(
         buffer.unsafe_ptr(),
         len(buffer),
         method,
@@ -420,7 +425,7 @@ fn parse_response_headers(
     var headers_array = InlineArray[HTTPHeader, 100](fill=HTTPHeader())
     var num_headers = max_headers
 
-    var ret = http_parse_response(
+    var ret = http_parse_response_headers(
         buffer.unsafe_ptr(),
         len(buffer),
         minor_version,
