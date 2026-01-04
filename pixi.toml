@@ -17,7 +17,7 @@ test = { cmd = "bash scripts/mojo_tests.sh tests/lightbug_http" }
 integration_tests_py = { cmd = "bash scripts/integration_test.sh" }
 integration_tests_external = { cmd = "bash scripts/mojo_tests.sh tests/integration" }
 integration_tests_udp = { cmd = "bash scripts/udp_test.sh" }
-httplint = { cmd = "bash scripts/httplint_test.sh" }
+http_conformance = { cmd = "bash scripts/http_conformance_test.sh" }
 
 [feature.bench.tasks]
 bench = { cmd = "mojo -I . benchmark/bench.mojo" }
@@ -61,9 +61,11 @@ isort = ">=7.0.0,<8"
 requests = ">=2.32.5,<3"
 fastapi = ">=0.127.0,<0.128"
 python = ">=3.10"
+poetry = ">=1.8.0,<2"
 
 [feature.integration-tests.pypi-dependencies]
-httplint = "*"
+httpx = ">=0.24.0"
+abnf = ">=2.0.0"
 
 [environments]
 default = { solve-group = "default" }
