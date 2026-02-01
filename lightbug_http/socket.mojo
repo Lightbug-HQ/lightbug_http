@@ -507,7 +507,7 @@ struct Socket[
         Raises:
             ListenError: If listening for a connection fails.
         """
-        listen(self.fd, backlog)
+        listen(self.fd, Int32(backlog))
 
     fn bind(mut self, ip_address: String, port: UInt16) raises SocketBindError:
         """Bind the socket to address. The socket must not already be bound. (The format of address depends on the address family).

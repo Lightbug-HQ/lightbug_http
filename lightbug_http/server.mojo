@@ -1,3 +1,4 @@
+from lightbug_http.address import NetworkType
 from lightbug_http.connection import (
     ConnectionState,
     ListenConfig,
@@ -263,7 +264,7 @@ struct ProvisionPool(Movable):
 fn handle_connection[
     T: HTTPService
 ](
-    mut conn: TCPConnection,
+    mut conn: TCPConnection[NetworkType.tcp4],
     mut provision: ConnectionProvision,
     mut handler: T,
     config: ServerConfig,
@@ -523,7 +524,7 @@ struct Server(Movable):
         Raises:
             ServerError: If listener setup fails or serving encounters fatal errors.
         """
-        var listener: NoTLSListener
+        var listener: NoTLSListener[NetworkType.tcp4]
         try:
             listener = ListenConfig().listen(address)
         except listener_err:
@@ -536,7 +537,7 @@ struct Server(Movable):
         except server_err:
             raise server_err^
 
-    fn serve[T: HTTPService](self, ln: NoTLSListener, mut handler: T) raises ServerError:
+    fn serve[T: HTTPService](self, ln: NoTLSListener[NetworkType.tcp4], mut handler: T) raises ServerError:
         """Serve HTTP requests from an existing listener.
 
         Parameters:
@@ -552,7 +553,7 @@ struct Server(Movable):
         var provision_pool = ProvisionPool(self.config.max_connections, self.config)
 
         while True:
-            var conn: TCPConnection
+            var conn: TCPConnection[NetworkType.tcp4]
             try:
                 conn = ln.accept()
             except listener_err:
@@ -592,7 +593,7 @@ struct Server(Movable):
                 provision_pool.release(index)
 
 
-fn _send_error_response(mut conn: TCPConnection, var response: HTTPResponse):
+fn _send_error_response(mut conn: TCPConnection[NetworkType.tcp4], var response: HTTPResponse):
     """Helper to send an error response, ignoring write errors."""
     try:
         _ = conn.write(encode(response^))

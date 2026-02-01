@@ -146,18 +146,18 @@ struct ListenerError(Movable, Stringable, Writable):
         return String.write(self)
 
 
-struct NoTLSListener(Movable):
+struct NoTLSListener[network: NetworkType = NetworkType.tcp4](Movable):
     """A TCP listener that listens for incoming connections and can accept them."""
 
-    var socket: TCPSocket[TCPAddr]
+    var socket: TCPSocket[TCPAddr[Self.network]]
 
-    fn __init__(out self, var socket: TCPSocket[TCPAddr]):
+    fn __init__(out self, var socket: TCPSocket[TCPAddr[Self.network]]):
         self.socket = socket^
 
     fn __init__(out self) raises CSocketError:
-        self.socket = Socket[TCPAddr]()
+        self.socket = Socket[TCPAddr[Self.network]]()
 
-    fn accept(self) raises SocketAcceptError -> TCPConnection:
+    fn accept(self) raises SocketAcceptError -> TCPConnection[Self.network]:
         """Accept an incoming TCP connection.
 
         Returns:
@@ -192,7 +192,7 @@ struct NoTLSListener(Movable):
         """
         self.socket^.teardown()
 
-    fn addr(self) -> TCPAddr:
+    fn addr(self) -> TCPAddr[Self.network]:
         return self.socket.local_address
 
 
@@ -204,7 +204,7 @@ struct ListenConfig:
 
     fn listen[
         network: NetworkType = NetworkType.tcp4
-    ](self, address: StringSlice) raises ListenerError -> NoTLSListener:
+    ](self, address: StringSlice) raises ListenerError -> NoTLSListener[network]:
         """Create a TCP listener on the specified address.
 
         Parameters:
@@ -225,9 +225,9 @@ struct ListenConfig:
         except ParseError:
             raise AddressParseError()
 
-        var socket: Socket[TCPAddr]
+        var socket: Socket[TCPAddr[network]]
         try:
-            socket = Socket[TCPAddr]()
+            socket = Socket[TCPAddr[network]]()
         except socket_err:
             raise SocketCreationError()
 
@@ -240,7 +240,7 @@ struct ListenConfig:
                 # Socket option failure is not fatal, just continue
                 pass
 
-        var addr = TCPAddr(ip=local.host^, port=local.port)
+        var addr = TCPAddr[network](ip=local.host^, port=local.port)
         var bind_success = False
         var bind_fail_logged = False
         while not bind_success:
@@ -332,10 +332,10 @@ struct ConnectionState(Copyable):
         return ConnectionState(Self.CLOSED, RequestBodyState(0, 0))
 
 
-struct TCPConnection:
-    var socket: TCPSocket[TCPAddr]
+struct TCPConnection[network: NetworkType = NetworkType.tcp4]:
+    var socket: TCPSocket[TCPAddr[Self.network]]
 
-    fn __init__(out self, var socket: TCPSocket[TCPAddr]):
+    fn __init__(out self, var socket: TCPSocket[TCPAddr[Self.network]]):
         self.socket = socket^
 
     fn read(self, mut buf: Bytes) raises SocketRecvError -> UInt:
@@ -394,10 +394,10 @@ struct TCPConnection:
         return self.socket._closed
 
     # TODO: Switch to property or return ref when trait supports attributes.
-    fn local_addr(self) -> TCPAddr:
+    fn local_addr(self) -> TCPAddr[Self.network]:
         return self.socket.local_address
 
-    fn remote_addr(self) -> TCPAddr:
+    fn remote_addr(self) -> TCPAddr[Self.network]:
         return self.socket.remote_address
 
 
@@ -545,7 +545,7 @@ struct CreateConnectionError(Movable, Stringable, Writable):
         return String.write(self)
 
 
-fn create_connection(mut host: String, port: UInt16) raises CreateConnectionError -> TCPConnection:
+fn create_connection(mut host: String, port: UInt16) raises CreateConnectionError -> TCPConnection[NetworkType.tcp4]:
     """Connect to a server using a TCP socket.
 
     Args:
@@ -558,7 +558,7 @@ fn create_connection(mut host: String, port: UInt16) raises CreateConnectionErro
     Raises:
         CreateConnectionError: If socket creation or connection fails.
     """
-    var socket = Socket[TCPAddr, address_family = AddressFamily.AF_INET]()
+    var socket = Socket[TCPAddr[NetworkType.tcp4], address_family = AddressFamily.AF_INET]()
     try:
         socket.connect(host, port)
     except connect_err:

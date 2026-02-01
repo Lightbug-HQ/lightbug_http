@@ -270,10 +270,7 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
         if HeaderKey.CONTENT_LENGTH not in self.headers:
             self.set_content_length(len(body_bytes))
         if HeaderKey.DATE not in self.headers:
-            try:
-                self.headers[HeaderKey.DATE] = http_date_now()
-            except:
-                pass
+            self.headers[HeaderKey.DATE] = http_date_now()
 
     fn __init__(
         out self,
@@ -298,10 +295,7 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
         if HeaderKey.CONTENT_LENGTH not in self.headers:
             self.set_content_length(len(self.body_raw))
         if HeaderKey.DATE not in self.headers:
-            try:
-                self.headers[HeaderKey.DATE] = http_date_now()
-            except:
-                pass
+            self.headers[HeaderKey.DATE] = http_date_now()
 
     fn __len__(self) -> Int:
         return len(self.body_raw)
@@ -397,10 +391,7 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
             lineBreak,
         )
         if HeaderKey.DATE not in self.headers:
-            try:
-                write_header(writer, HeaderKey.DATE, http_date_now())
-            except:
-                pass
+            write_header(writer, HeaderKey.DATE, http_date_now())
         writer.write(self.headers, self.cookies, lineBreak)
         writer.consuming_write(self.body_raw^)
         return writer^.consume()

@@ -252,6 +252,3 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
 
     fn __isnot__(self, other: HTTPRequest) -> Bool:
         return not self.__eq__(other)
-
-    fn __isnot__(self, other: None) -> Bool:
-        return self.get_body() or self.uri.request_uri
