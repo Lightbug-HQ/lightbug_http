@@ -3,13 +3,12 @@ from time import sleep
 
 from lightbug_http.address import HostPort, NetworkType, ParseError, TCPAddr, UDPAddr, parse_address
 from lightbug_http.c.address import AddressFamily
-from lightbug_http.c.socket_error import AcceptError, GetpeernameError, RecvError, RecvfromError, SendError, SendtoError
+from lightbug_http.c.socket_error import AcceptError, GetpeernameError, RecvError, RecvfromError, SendError, SendtoError, ShutdownEINVALError
 from lightbug_http.c.socket_error import SocketError as CSocketError
 from lightbug_http.io.bytes import Bytes
 from lightbug_http.io.sync import Duration
 from lightbug_http.socket import (
     EOF,
-    EINVALError,
     FatalCloseError,
     Socket,
     SocketAcceptError,
@@ -176,11 +175,11 @@ struct NoTLSListener[network: NetworkType = NetworkType.tcp4](Movable):
         """
         return self.socket.close()
 
-    fn shutdown(mut self) raises EINVALError:
+    fn shutdown(mut self) raises ShutdownEINVALError:
         """Shutdown the listener socket.
 
         Raises:
-            EINVALError: If shutdown fails.
+            ShutdownEINVALError: If shutdown fails.
         """
         return self.socket.shutdown()
 
@@ -374,11 +373,11 @@ struct TCPConnection[network: NetworkType = NetworkType.tcp4]:
         """
         self.socket.close()
 
-    fn shutdown(mut self) raises EINVALError:
+    fn shutdown(mut self) raises ShutdownEINVALError:
         """Shutdown the TCP connection.
 
         Raises:
-            EINVALError: If shutdown fails.
+            ShutdownEINVALError: If shutdown fails.
         """
         self.socket.shutdown()
 
@@ -486,11 +485,11 @@ struct UDPConnection[
         """
         self.socket.close()
 
-    fn shutdown(mut self) raises EINVALError:
+    fn shutdown(mut self) raises ShutdownEINVALError:
         """Shutdown the UDP connection.
 
         Raises:
-            EINVALError: If shutdown fails.
+            ShutdownEINVALError: If shutdown fails.
         """
         self.socket.shutdown()
 
@@ -558,7 +557,12 @@ fn create_connection(mut host: String, port: UInt16) raises CreateConnectionErro
     Raises:
         CreateConnectionError: If socket creation or connection fails.
     """
-    var socket = Socket[TCPAddr[NetworkType.tcp4], address_family = AddressFamily.AF_INET]()
+    var socket: Socket[TCPAddr[NetworkType.tcp4]]
+    try:
+        socket = Socket[TCPAddr[NetworkType.tcp4]]()
+    except socket_err:
+        raise socket_err^
+
     try:
         socket.connect(host, port)
     except connect_err:

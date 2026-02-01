@@ -374,7 +374,7 @@ fn get_ip_address(
         try:
             result = getaddrinfo(host, service, hints)
         except getaddrinfo_err:
-            raise getaddrinfo_err^
+            raise getaddrinfo_err
 
         if not result.unsafe_ptr()[].ai_addr:
             raise GetaddrinfoNullAddrError()
@@ -398,7 +398,7 @@ fn get_ip_address(
         try:
             result = getaddrinfo(host, service, hints)
         except getaddrinfo_err:
-            raise getaddrinfo_err^
+            raise getaddrinfo_err
 
         if not result.unsafe_ptr()[].ai_addr:
             raise GetaddrinfoNullAddrError()
