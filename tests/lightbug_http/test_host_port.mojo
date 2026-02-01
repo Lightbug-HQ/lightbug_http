@@ -158,12 +158,7 @@ fn test_split_host_port_error_missing_port_ipv6() raises:
 
 
 fn test_split_host_port_error_port_out_of_range() raises:
-    with assert_raises(
-        contains=(
-            "Failed to parse port: Port number out of range (0-65535)."
-            " Received: 70000"
-        )
-    ):
+    with assert_raises(contains=("Port number out of range (0-65535)")):
         _ = parse_address[NetworkType.tcp4]("192.168.1.1:70000")
 
 

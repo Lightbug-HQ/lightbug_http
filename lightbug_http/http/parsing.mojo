@@ -282,7 +282,7 @@ fn parse_headers[
         get_token_to_eol(buf, value, value_len)
 
         while value_len > 0:
-            var c = value[value_len - 1]
+            var c = value[value_len - 1 : value_len]
             ref c_byte = c.as_bytes()[0]
             if c_byte != BytesConstant.whitespace and c_byte != BytesConstant.TAB:
                 break
@@ -468,13 +468,13 @@ fn http_parse_response_headers[
 
         get_token_to_eol(buf, msg, msg_len)
 
-        if msg_len > 0 and msg[0] == " ":
+        if msg_len > 0 and msg[0:1] == " ":
             var i = 0
-            while i < msg_len and msg[i] == " ":
+            while i < msg_len and msg[i : i + 1] == " ":
                 i += 1
             msg = String(msg[i:])
             msg_len -= i
-        elif msg_len > 0 and msg[0] != String(" "):
+        elif msg_len > 0 and msg[0:1] != String(" "):
             return -1
 
         parse_headers(buf, headers, num_headers, max_headers)

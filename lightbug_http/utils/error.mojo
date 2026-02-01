@@ -6,9 +6,3 @@ trait CustomError(Movable, Stringable, Writable):
     """
 
     comptime message: String
-
-    fn write_to[W: Writer, //](self, mut writer: W):
-        writer.write(Self.message)
-
-    fn __str__(self) -> String:
-        return Self.message

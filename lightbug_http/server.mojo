@@ -195,6 +195,12 @@ struct ConnectionProvision(Movable):
 struct ProvisionPoolExhaustedError(CustomError):
     comptime message = "ProvisionError: Connection provision pool exhausted"
 
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write(self.message)
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
 
 @fieldwise_init
 struct ProvisionError(Movable, Stringable, Writable):

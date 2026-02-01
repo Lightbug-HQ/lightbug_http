@@ -60,7 +60,7 @@ fn format_http_date(time: SmallTime) raises -> String:
     var k = y % 100  # Year of century
     var j = y // 100  # Zero-based century
 
-    var h = (q + ((13 * (m + 1)) // 5) + k + (k // 4) + (j // 4) - (2 * j)) % 7
+    var h = (UInt(q) + ((13 * (UInt(m) + 1)) // 5) + k + (k // 4) + (j // 4) - (2 * j)) % 7
 
     # Convert to 0=Sunday format
     var day_of_week = (h + 6) % 7
@@ -81,13 +81,20 @@ fn format_http_date(time: SmallTime) raises -> String:
         second_str = "0" + second_str
 
     return String(
-        day_names[day_of_week], ", ",
-        day_str, " ",
-        month_names[month - 1], " ",
-        String(year), " ",
-        hour_str, ":",
-        minute_str, ":",
-        second_str, " GMT"
+        day_names[day_of_week],
+        ", ",
+        day_str,
+        " ",
+        month_names[month - 1],
+        " ",
+        String(year),
+        " ",
+        hour_str,
+        ":",
+        minute_str,
+        ":",
+        second_str,
+        " GMT",
     )
 
 

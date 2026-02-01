@@ -434,11 +434,23 @@ fn is_ipv6(network: NetworkType) -> Bool:
 struct ParseEmptyAddressError(CustomError):
     comptime message = "ParseError: Failed to parse address: received empty address string."
 
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write(Self.message)
+
+    fn __str__(self) -> String:
+        return Self.message
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct ParseMissingClosingBracketError(CustomError):
     comptime message = "ParseError: Failed to parse ipv6 address: missing ']'"
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write(Self.message)
+
+    fn __str__(self) -> String:
+        return Self.message
 
 
 @fieldwise_init
@@ -446,11 +458,23 @@ struct ParseMissingClosingBracketError(CustomError):
 struct ParseMissingPortError(CustomError):
     comptime message = "ParseError: Failed to parse ipv6 address: missing port in address"
 
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write(Self.message)
+
+    fn __str__(self) -> String:
+        return Self.message
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct ParseUnexpectedBracketError(CustomError):
     comptime message = "ParseError: Address failed bracket validation, unexpectedly contained brackets"
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write(Self.message)
+
+    fn __str__(self) -> String:
+        return Self.message
 
 
 @fieldwise_init
@@ -458,11 +482,23 @@ struct ParseUnexpectedBracketError(CustomError):
 struct ParseEmptyPortError(CustomError):
     comptime message = "ParseError: Failed to parse port: port string is empty."
 
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write(Self.message)
+
+    fn __str__(self) -> String:
+        return Self.message
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct ParseInvalidPortNumberError(CustomError):
     comptime message = "ParseError: Failed to parse port: invalid integer value."
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write(Self.message)
+
+    fn __str__(self) -> String:
+        return Self.message
 
 
 @fieldwise_init
@@ -470,11 +506,23 @@ struct ParseInvalidPortNumberError(CustomError):
 struct ParsePortOutOfRangeError(CustomError):
     comptime message = "ParseError: Failed to parse port: Port number out of range (0-65535)."
 
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write(Self.message)
+
+    fn __str__(self) -> String:
+        return Self.message
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct ParseMissingSeparatorError(CustomError):
     comptime message = "ParseError: Failed to parse address: missing port separator ':' in address."
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write(Self.message)
+
+    fn __str__(self) -> String:
+        return Self.message
 
 
 @fieldwise_init
@@ -482,11 +530,23 @@ struct ParseMissingSeparatorError(CustomError):
 struct ParseTooManyColonsError(CustomError):
     comptime message = "ParseError: Failed to parse address: too many colons in address"
 
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write(Self.message)
+
+    fn __str__(self) -> String:
+        return Self.message
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct ParseIPProtocolPortError(CustomError):
     comptime message = "ParseError: IP protocol addresses should not include ports"
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write(Self.message)
+
+    fn __str__(self) -> String:
+        return Self.message
 
 
 # ===== ADDRESS ERROR STRUCTS =====
@@ -497,11 +557,23 @@ struct ParseIPProtocolPortError(CustomError):
 struct GetaddrinfoNullAddrError(CustomError):
     comptime message = "GetaddrinfoError: Failed to get IP address because the response's `ai_addr` was null."
 
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write(Self.message)
+
+    fn __str__(self) -> String:
+        return Self.message
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct GetaddrinfoError(CustomError):
     comptime message = "GetaddrinfoError: Failed to resolve address information."
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write(Self.message)
+
+    fn __str__(self) -> String:
+        return Self.message
 
 
 # ===== VARIANT ERROR TYPES =====
@@ -636,7 +708,7 @@ fn parse_ipv6_bracketed_address[
     Returns:
         Tuple of (host, colon_index_offset).
     """
-    if address[0] != "[":
+    if address[0:1] != "[":
         return address, UInt16(0)
 
     var end_bracket_index = address.find("]")
@@ -647,7 +719,7 @@ fn parse_ipv6_bracketed_address[
         raise ParseMissingPortError()
 
     var colon_index = end_bracket_index + 1
-    if address[colon_index] != ":":
+    if address[colon_index : colon_index + 1] != ":":
         raise ParseMissingPortError()
 
     return address[1:end_bracket_index], UInt16(end_bracket_index + 1)
@@ -738,7 +810,10 @@ fn parse_address[
     var host: StringSlice[origin]
     var port: UInt16
 
-    if address[0] == "[":
+    # TODO (Mikhail): StringSlice does byte level slicing, so this can be
+    # invalid for multi-byte UTF-8 characters. Perhaps we instead assert that it's
+    # an ascii string instead.
+    if address[0:1] == "[":
         var bracket_offset: UInt16
         (host, bracket_offset) = parse_ipv6_bracketed_address(address)
         validate_no_brackets(address, bracket_offset)
@@ -808,7 +883,7 @@ struct _CAddrInfoIterator[
     mut: Bool,
     //,
     T: AnAddrInfo,
-    origin: Origin[mut],
+    origin: Origin[mut=mut],
 ](ImplicitlyCopyable, Iterable, Iterator):
     """Iterator for List.
 
@@ -820,7 +895,7 @@ struct _CAddrInfoIterator[
 
     comptime Element = Self.T  # FIXME(MOCO-2068): shouldn't be needed.
 
-    comptime IteratorType[iterable_mut: Bool, //, iterable_origin: Origin[iterable_mut]]: Iterator = Self
+    comptime IteratorType[iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]]: Iterator = Self
 
     var index: Int
     var src: Pointer[CAddrInfo[Self.T], Self.origin]
@@ -864,9 +939,9 @@ struct CAddrInfo[T: AnAddrInfo](Iterable):
     the struct and free the pointer while you're still using it.
     """
 
-    comptime IteratorType[iterable_mut: Bool, //, iterable_origin: Origin[iterable_mut]]: Iterator = _CAddrInfoIterator[
-        Self.T, iterable_origin
-    ]
+    comptime IteratorType[
+        iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
+    ]: Iterator = _CAddrInfoIterator[Self.T, iterable_origin]
     var ptr: ExternalMutUnsafePointer[Self.T]
 
     fn unsafe_ptr[
@@ -885,7 +960,6 @@ struct CAddrInfo[T: AnAddrInfo](Iterable):
 
     fn __del__(deinit self):
         if self.ptr:
-            print("Freeing addrinfo memory...")
             freeaddrinfo(self.ptr)
 
     fn __iter__(ref self) -> Self.IteratorType[origin_of(self)]:

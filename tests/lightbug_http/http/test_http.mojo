@@ -43,7 +43,7 @@ def test_encode_http_request():
     )
 
     var as_str = String(req)
-    var req_encoded = String(bytes=encode(req^))
+    var req_encoded = String(unsafe_from_utf8=encode(req^))
 
     var expected = "GET /foobar?baz HTTP/1.1\r\nconnection: keep-alive\r\ncontent-length: 12\r\nhost: localhost:8080\r\ncookie: session_id=123; token=abc\r\n\r\nHello world!"
 
@@ -75,7 +75,7 @@ def test_encode_http_response():
         ),
     )
     var as_str = String(res)
-    var res_encoded = String(bytes=encode(res^))
+    var res_encoded = String(unsafe_from_utf8=encode(res^))
     var expected_full = "HTTP/1.1 200 OK\r\nserver: lightbug_http\r\ncontent-type: application/octet-stream\r\nconnection: keep-alive\r\ncontent-length: 13\r\ndate: 2024-06-02T13:41:50.766880+00:00\r\nset-cookie: session_id=123; Path=/api; Secure\r\nset-cookie: session_id=abc; Max-Age=600; Path=/; Secure\r\nset-cookie: token=123; Domain=localhost; Path=/api; HttpOnly\r\n\r\nHello, World!"
 
     testing.assert_equal(res_encoded, expected_full)

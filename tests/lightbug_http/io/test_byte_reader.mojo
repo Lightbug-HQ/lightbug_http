@@ -32,7 +32,7 @@ def test_read_until():
     var result: List[Byte] = [72, 101, 108, 108, 111]
     testing.assert_equal(r.read_pos, 0)
     testing.assert_equal(
-        String(bytes=r.read_until(ord(",")).as_bytes()), String(bytes=result)
+        String(unsafe_from_utf8=r.read_until(ord(",")).as_bytes()), String(unsafe_from_utf8=result)
     )
     testing.assert_equal(r.read_pos, 5)
 
@@ -55,7 +55,7 @@ def test_read_bytes():
         33,
     ]
     testing.assert_equal(
-        String(bytes=r.read_bytes().as_bytes()), String(bytes=result)
+        String(unsafe_from_utf8=r.read_bytes().as_bytes()), String(unsafe_from_utf8=result)
     )
 
     r = ByteReader(example.as_bytes())
@@ -65,11 +65,11 @@ def test_read_bytes():
         bytes = r.read_bytes(7).as_bytes()
     except EndOfReaderError:
         raise Error("Did not expect EndOfReaderError here.")
-    testing.assert_equal(String(bytes=bytes), String(bytes=result2))
+    testing.assert_equal(String(unsafe_from_utf8=bytes), String(unsafe_from_utf8=result2))
 
     var result3: List[Byte] = [87, 111, 114, 108, 100, 33]
     testing.assert_equal(
-        String(bytes=r.read_bytes().as_bytes()), String(bytes=result3)
+        String(unsafe_from_utf8=r.read_bytes().as_bytes()), String(unsafe_from_utf8=result3)
     )
 
 
@@ -78,7 +78,7 @@ def test_read_word():
     var result: List[Byte] = [72, 101, 108, 108, 111, 44]
     testing.assert_equal(r.read_pos, 0)
     testing.assert_equal(
-        String(bytes=r.read_word().as_bytes()), String(bytes=result)
+        String(unsafe_from_utf8=r.read_word().as_bytes()), String(unsafe_from_utf8=result)
     )
     testing.assert_equal(r.read_pos, 6)
 
@@ -103,7 +103,7 @@ def test_read_line():
     ]
     testing.assert_equal(r.read_pos, 0)
     testing.assert_equal(
-        String(bytes=r.read_line().as_bytes()), String(bytes=result)
+        String(unsafe_from_utf8=r.read_line().as_bytes()), String(unsafe_from_utf8=result)
     )
     testing.assert_equal(r.read_pos, 13)
 
@@ -113,11 +113,11 @@ def test_read_line():
     var result3: List[Byte] = [87, 111, 114, 108, 100]
     testing.assert_equal(r2.read_pos, 0)
     testing.assert_equal(
-        String(bytes=r2.read_line().as_bytes()), String(bytes=result2)
+        String(unsafe_from_utf8=r2.read_line().as_bytes()), String(unsafe_from_utf8=result2)
     )
     testing.assert_equal(r2.read_pos, 7)
     testing.assert_equal(
-        String(bytes=r2.read_line().as_bytes()), String(bytes=result3)
+        String(unsafe_from_utf8=r2.read_line().as_bytes()), String(unsafe_from_utf8=result3)
     )
     testing.assert_equal(r2.read_pos, 13)
 
@@ -128,7 +128,7 @@ def test_skip_whitespace():
     r.skip_whitespace()
     testing.assert_equal(r.read_pos, 1)
     testing.assert_equal(
-        String(bytes=r.read_word().as_bytes()), String(bytes=result)
+        String(unsafe_from_utf8=r.read_word().as_bytes()), String(unsafe_from_utf8=result)
     )
 
 
@@ -143,7 +143,7 @@ def test_skip_carriage_return():
         bytes = r.read_bytes(4).as_bytes()
     except EndOfReaderError:
         raise Error("Did not expect EndOfReaderError here.")
-    testing.assert_equal(String(bytes=bytes), String(bytes=result))
+    testing.assert_equal(String(unsafe_from_utf8=bytes), String(unsafe_from_utf8=result))
 
 
 def test_consume():
@@ -163,7 +163,7 @@ def test_consume():
         100,
         33,
     ]
-    testing.assert_equal(String(bytes=r^.consume()), String(bytes=result))
+    testing.assert_equal(String(unsafe_from_utf8=r^.consume()), String(unsafe_from_utf8=result))
 
 
 def main():

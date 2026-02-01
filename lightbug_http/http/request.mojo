@@ -3,7 +3,6 @@ from lightbug_http.io.bytes import Bytes, ByteWriter
 from lightbug_http.io.sync import Duration
 from lightbug_http.strings import lineBreak, strHttp11, whitespace
 from lightbug_http.uri import URI
-from memory import Span
 from utils import Variant
 
 from lightbug_http.cookie import RequestCookieJar

@@ -19,7 +19,7 @@ def test_consuming_write():
     w.consuming_write(List[Byte](my_string.as_bytes()))
     var result = w^.consume()
 
-    testing.assert_equal(String(bytes=result^), "Hello World")
+    testing.assert_equal(String(unsafe_from_utf8=result^), "Hello World")
 
 
 def test_write():
@@ -41,7 +41,7 @@ def test_write():
         100,
         33,
     ]
-    testing.assert_equal(String(bytes=w^.consume()), String(bytes=Span(result)))
+    testing.assert_equal(String(unsafe_from_utf8=w^.consume()), String(unsafe_from_utf8=Span(result)))
 
 
 def main():

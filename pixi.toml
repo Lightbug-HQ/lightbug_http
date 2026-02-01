@@ -1,6 +1,6 @@
 [workspace]
 authors = ["saviorand"]
-channels = ["conda-forge", "https://conda.modular.com/max-nightly", "https://repo.prefix.dev/modular-community"]
+channels = ["conda-forge", "https://conda.modular.com/max", "https://repo.prefix.dev/modular-community", "https://repo.prefix.dev/mojo-community"]
 description = "Simple and fast HTTP framework for Mojo!"
 platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
 license = "MIT"
@@ -25,7 +25,7 @@ bench_server = { cmd = "bash scripts/bench_server.sh" }
 
 [feature.util.tasks]
 # Linting and Formatting
-lint_docs = "python3 scripts/check-docstrings.py"
+lint_docs = "mojo doc --Werror --diagnose-missing-doc-strings -o /dev/null ./lightbug_http"
 mojo_format = "mojo format lightbug_http --line-length 120"
 sort_imports = "isort **/*.mojo -m 3 --line-length 120 --lines-after-imports 2 --trailing-comma"
 format = [{ task = "mojo_format" }, { task = "sort_imports" }]
@@ -36,23 +36,24 @@ build_and_publish = [{ task = "build" }, { task = "publish" }]
 
 [package]
 name = "lightbug_http"
-version = "0.25.7.1"
+version = "0.26.1.0"
 
 [package.build]
 backend = { name = "pixi-build-mojo", version = "*" }
 
 [dependencies]
-mojo = ">=0.26.1.0.dev2025122405,<0.27"
-small_time = { path = "../../small-time" }
+mojo = ">=0.26.1.0,<0.26.2.0"
+small_time = ">=26.1.0,<26.2.0"
 
 [package.host-dependencies]
-mojo-compiler = ">=0.25.7.0,<0.26.1.0"
+mojo-compiler = ">=0.26.1.0,<0.26.2.0"
 
 [package.build-dependencies]
-mojo-compiler = ">=0.25.7.0,<0.26.1.0"
+mojo-compiler = ">=0.26.1.0,<0.26.2.0"
 
 [package.run-dependencies]
-mojo-compiler = ">=0.25.7.0,<0.26.1.0"
+mojo-compiler = ">=0.26.1.0,<0.26.2.0"
+small_time = ">=26.1.0,<26.2.0"
 
 [feature.util.dependencies]
 isort = ">=7.0.0,<8"

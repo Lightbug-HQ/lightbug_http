@@ -37,11 +37,23 @@ comptime default_tcp_keep_alive = Duration(15 * 1000 * 1000 * 1000)  # 15 second
 struct AddressParseError(CustomError):
     comptime message = "ListenerError: Failed to parse listen address"
 
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write(Self.message)
+
+    fn __str__(self) -> String:
+        return Self.message
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct SocketCreationError(CustomError):
     comptime message = "ListenerError: Failed to create socket"
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write(Self.message)
+
+    fn __str__(self) -> String:
+        return Self.message
 
 
 @fieldwise_init
@@ -49,11 +61,23 @@ struct SocketCreationError(CustomError):
 struct BindFailedError(CustomError):
     comptime message = "ListenerError: Failed to bind socket to address"
 
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write(Self.message)
+
+    fn __str__(self) -> String:
+        return Self.message
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct ListenFailedError(CustomError):
     comptime message = "ListenerError: Failed to listen on socket"
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write(Self.message)
+
+    fn __str__(self) -> String:
+        return Self.message
 
 
 @fieldwise_init
@@ -258,7 +282,7 @@ struct ListenConfig:
 
 
 @fieldwise_init
-struct RequestBodyState(Copyable, Movable):
+struct RequestBodyState(Copyable):
     """State for reading request body."""
 
     var content_length: Int
@@ -266,7 +290,7 @@ struct RequestBodyState(Copyable, Movable):
 
 
 @fieldwise_init
-struct ConnectionState(Copyable, Movable):
+struct ConnectionState(Copyable):
     """
     State machine for connection processing.
 

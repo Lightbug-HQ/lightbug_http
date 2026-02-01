@@ -41,7 +41,7 @@ fn test_string_literal_to_bytes() raises:
     ]
 
     for c in cases.items():
-        testing.assert_equal(c.key, String(bytes=c.value))
+        testing.assert_equal(c.key, String(unsafe_from_utf8=c.value))
 
 
 fn test_string_to_bytes() raises:
@@ -83,7 +83,7 @@ fn test_string_to_bytes() raises:
     ]
 
     for c in cases.items():
-        testing.assert_equal(c.key, String(bytes=c.value))
+        testing.assert_equal(c.key, String(unsafe_from_utf8=c.value))
 
 
 def main():

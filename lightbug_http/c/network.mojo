@@ -16,17 +16,35 @@ from utils import StaticTuple, Variant
 struct InetNtopEAFNOSUPPORTError(CustomError):
     comptime message = "inet_ntop Error (EAFNOSUPPORT): `*src` was not an `AF_INET` or `AF_INET6` family address."
 
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write(Self.message)
+
+    fn __str__(self) -> String:
+        return Self.message
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct InetNtopENOSPCError(CustomError):
     comptime message = "inet_ntop Error (ENOSPC): The buffer size was not large enough to store the presentation form of the address."
 
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write(Self.message)
+
+    fn __str__(self) -> String:
+        return Self.message
+
 
 @fieldwise_init
 @register_passable("trivial")
 struct InetPtonInvalidAddressError(CustomError):
     comptime message = "inet_pton Error: The input is not a valid address."
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write(Self.message)
+
+    fn __str__(self) -> String:
+        return Self.message
 
 
 # ===== VARIANT ERROR TYPES =====

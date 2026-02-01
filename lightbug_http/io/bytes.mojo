@@ -40,6 +40,14 @@ struct ByteWriter(Writer):
         """
         self._inner.extend(bytes)
 
+    fn write_string(mut self, s: StringSlice) -> None:
+        """Writes the contents of `s` into the internal buffer.
+
+        Args:
+            s: The string to write.
+        """
+        self._inner.extend(s.as_bytes())
+
     fn write[*Ts: Writable](mut self, *args: *Ts) -> None:
         """Write data to the `Writer`.
 
@@ -104,7 +112,7 @@ struct ByteView[origin: ImmutOrigin](Boolable, Copyable, Equatable, Sized, Strin
         return Self(self._inner[slc])
 
     fn __str__(self) -> String:
-        return String(bytes=self._inner)
+        return String(unsafe_from_utf8=self._inner)
 
     fn __eq__(self, other: Self) -> Bool:
         # both empty
