@@ -94,19 +94,22 @@ def test_decoding_http_response():
         "Hello, World!"
     ).as_bytes()
 
-    var response = HTTPResponse.from_bytes(res)
-    var expected_cookie_key = ResponseCookieKey("session_id", "", "/")
+    try:
+        var response = HTTPResponse.from_bytes(res)
+        var expected_cookie_key = ResponseCookieKey("session_id", "", "/")
 
-    assert_equal(1, len(response.cookies))
-    assert_true(
-        expected_cookie_key in response.cookies,
-        msg="request should contain a session_id header",
-    )
-    var session_id = response.cookies.get(expected_cookie_key)
-    assert_true(session_id is not None)
-    assert_equal(session_id.value().path.value(), "/")
-    assert_equal(200, response.status_code)
-    assert_equal("OK", response.status_text)
+        assert_equal(1, len(response.cookies))
+        assert_true(
+            expected_cookie_key in response.cookies,
+            msg="request should contain a session_id header",
+        )
+        var session_id = response.cookies.get(expected_cookie_key)
+        assert_true(session_id is not None)
+        assert_equal(session_id.value().path.value(), "/")
+        assert_equal(200, response.status_code)
+        assert_equal("OK", response.status_text)
+    except e:
+        raise Error("Failed to parse HTTP response: " + String(e))
 
 
 # def test_http_version_parse():

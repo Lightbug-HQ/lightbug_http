@@ -1,4 +1,4 @@
-from lightbug_http.http.chunked import HTTPChunkedDecoder, decode
+from lightbug_http.http.chunked import HTTPChunkedDecoder
 from testing import TestSuite, assert_equal, assert_false, assert_true
 
 
@@ -19,7 +19,7 @@ fn chunked_at_once_test(
     #        buf_ptr[i] = buf[i]
 
     #    var bufsz = len(buf)
-    var result = decode(decoder, buf)
+    var result = decoder.decode(buf)
     var ret = result[0]
     var new_bufsz = result[1]
 
@@ -53,8 +53,8 @@ fn chunked_per_byte_test(
     for i in range(bytes_to_consume - 1):
         buf.unsafe_ptr()[bytes_ready] = encoded_bytes[i]
         buf._len += 1
-        var result = decode(
-            decoder, Span(buf)[bytes_ready : bytes_ready + 1]
+        var result = decoder.decode(
+            Span(buf)[bytes_ready : bytes_ready + 1]
         )
         var ret = result[0]
         var new_bufsz = result[1]
@@ -72,11 +72,10 @@ fn chunked_per_byte_test(
         ] = encoded_bytes[i]
 
     #    var bufsz = len(encoded) - (bytes_to_consume - 1)
-    var result = decode(
-        decoder,
+    var result = decoder.decode(
         Span(buf)[
             bytes_ready : bytes_ready + len(encoded) - (bytes_to_consume - 1)
-        ],
+        ]
     )
     var ret = result[0]
     var new_bufsz = result[1]
@@ -100,7 +99,7 @@ fn chunked_failure_test(line: Int, encoded: String, expected: Int) raises:
     #        buf_ptr[i] = buf[i]
 
     #    var bufsz = len(buf)
-    var result = decode(decoder, buf)
+    var result = decoder.decode(buf)
     var ret = result[0]
     assert_equal(ret, expected)
 
@@ -112,7 +111,7 @@ fn chunked_failure_test(line: Int, encoded: String, expected: Int) raises:
     for i in range(len(encoded)):
         buf_ptr[0] = encoded_bytes[i]
         #    bufsz = 1
-        result = decode(decoder, buf_ptr)
+        result = decoder.decode(buf_ptr)
         ret = result[0]
         if ret == -1:
             assert_equal(ret, expected)
@@ -244,7 +243,7 @@ fn test_chunked_leftdata() raises:
     #        buf_ptr[i] = buf[i]
 
     #    var bufsz = len(buf)
-    var result = decode(decoder, buf)
+    var result = decoder.decode(buf)
     var ret = result[0]
     var new_bufsz = result[1]
 
