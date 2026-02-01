@@ -1,11 +1,14 @@
-from lightbug_http.header import Header, Headers
+from lightbug_http.header import Header, Headers, parse_request_headers
 from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter
-from lightbug_http.server import default_max_request_body_size, default_max_request_uri_length
 from lightbug_http.uri import URI
 from memory import Span
 
 from benchmark import *
 from lightbug_http.http import HTTPRequest, HTTPResponse, encode
+
+# Constants from ServerConfig defaults
+comptime default_max_request_body_size = 4 * 1024 * 1024  # 4MB
+comptime default_max_request_uri_length = 8192
 
 
 comptime headers = "GET /index.html HTTP/1.1\r\nHost: example.com\r\nUser-Agent: Mozilla/5.0\r\nContent-Type: text/html\r\nContent-Length: 1234\r\nConnection: close\r\nTrailer: end-of-message\r\n\r\n"
@@ -89,12 +92,16 @@ fn lightbug_benchmark_request_parse(mut b: Bencher):
     @parameter
     fn request_parse():
         try:
-            _ = HTTPRequest.from_bytes(
-                "127.0.0.1/path",
-                default_max_request_body_size,
-                default_max_request_uri_length,
-                Request.as_bytes(),
-            )
+            var parsed = parse_request_headers(Span(Request.as_bytes()))
+            try:
+                _ = HTTPRequest.from_parsed(
+                    "127.0.0.1/path",
+                    parsed^,
+                    Bytes(),  # body is separate in new API
+                    default_max_request_uri_length,
+                )
+            except:
+                pass
         except:
             pass
 
@@ -140,9 +147,7 @@ fn lightbug_benchmark_header_parse(mut b: Bencher):
     @parameter
     fn header_parse():
         try:
-            var header = Headers()
-            var reader = ByteReader(headers.as_bytes())
-            _ = header.parse_raw_request(reader)
+            _ = parse_request_headers(Span(headers.as_bytes()))
         except e:
             print("failed", e)
 
