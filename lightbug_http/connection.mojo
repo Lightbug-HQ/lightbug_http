@@ -414,7 +414,7 @@ struct UDPConnection[
     fn __init__(out self, var socket: Self._sock_type):
         self.socket = socket^
 
-    fn read_from(mut self, size: Int = default_buffer_size) raises SocketRecvfromError -> Tuple[Bytes, String, UInt16]:
+    fn read_from(mut self, size: Int = default_buffer_size) raises -> Tuple[Bytes, String, UInt16]:
         """Reads data from the underlying file descriptor.
 
         Args:
@@ -429,7 +429,7 @@ struct UDPConnection[
 
         return self.socket.receive_from(size)
 
-    fn read_from(mut self, mut dest: Bytes) raises SocketRecvfromError -> Tuple[UInt, String, UInt16]:
+    fn read_from(mut self, mut dest: Bytes) raises -> Tuple[UInt, String, UInt16]:
         """Reads data from the underlying file descriptor.
 
         Args:
@@ -573,6 +573,6 @@ fn create_connection(mut host: String, port: UInt16) raises CreateConnectionErro
             # Shutdown failure is not critical here - connection already failed
             pass
         # Propagate the original connection error with type info
-        raise connect_err^
+        raise CreateConnectionError(String(connect_err))
 
     return TCPConnection(socket^)

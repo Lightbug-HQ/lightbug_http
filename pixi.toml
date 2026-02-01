@@ -47,9 +47,11 @@ small_time = ">=26.1.0,<26.2.0"
 
 [package.host-dependencies]
 mojo-compiler = ">=0.26.1.0,<0.26.2.0"
+small_time = ">=26.1.0,<26.2.0"
 
 [package.build-dependencies]
 mojo-compiler = ">=0.26.1.0,<0.26.2.0"
+small_time = ">=26.1.0,<26.2.0"
 
 [package.run-dependencies]
 mojo-compiler = ">=0.26.1.0,<0.26.2.0"

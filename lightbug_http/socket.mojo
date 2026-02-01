@@ -608,7 +608,7 @@ struct Socket[
         """
         setsockopt(self.fd, SOL_SOCKET, option_name.value, option_value)
 
-    fn connect(mut self, mut ip_address: String, port: UInt16) raises SocketConnectError -> None:
+    fn connect(mut self, mut ip_address: String, port: UInt16) raises -> None:
         """Connect to a remote socket at address.
 
         Args:
@@ -616,7 +616,7 @@ struct Socket[
             port: The port number to connect to.
 
         Raises:
-            SocketConnectError: If connecting to the remote socket fails.
+            Error: If connecting to the remote socket fails.
         """
         var ip = get_ip_address(ip_address, Self.address_family, Self.sock_type)
         var remote_address = SocketAddress(address_family=Self.address_family, port=port, binary_ip=ip)
@@ -628,7 +628,7 @@ struct Socket[
     fn send(self, buffer: Span[Byte]) raises SendError -> UInt:
         return send(self.fd, buffer, UInt(len(buffer)), 0)
 
-    fn send_to(self, src: Span[Byte], mut host: String, port: UInt16) raises SendtoError -> UInt:
+    fn send_to(self, src: Span[Byte], mut host: String, port: UInt16) raises -> UInt:
         """Send data to the a remote address by connecting to the remote socket before sending.
         The socket must be not already be connected to a remote socket.
 
@@ -641,7 +641,7 @@ struct Socket[
             The number of bytes sent.
 
         Raises:
-            SendtoError: If sending the data fails.
+            Error: If sending the data fails.
         """
         var ip = get_ip_address(host, Self.address_family, Self.sock_type)
         var remote_address = SocketAddress(address_family=Self.address_family, port=port, binary_ip=ip)
@@ -703,7 +703,7 @@ struct Socket[
         """
         return self._receive(buffer)
 
-    fn _receive_from(self, mut buffer: Bytes) raises SocketRecvfromError -> Tuple[UInt, String, UInt16]:
+    fn _receive_from(self, mut buffer: Bytes) raises -> Tuple[UInt, String, UInt16]:
         """Receive data from the socket into the buffer.
 
         Args:
@@ -729,18 +729,19 @@ struct Socket[
         buffer._len += Int(bytes_received)
 
         if bytes_received == 0:
-            raise EOF()
+            raise Error("EOF")
 
         ref peer_sockaddr_in = remote_address.as_sockaddr_in()
+        var ip_str = binary_ip_to_string[Self.address_family](peer_sockaddr_in.sin_addr.s_addr)
         return (
             bytes_received,
-            binary_ip_to_string[Self.address_family](peer_sockaddr_in.sin_addr.s_addr),
+            ip_str,
             UInt16(binary_port_to_int(peer_sockaddr_in.sin_port)),
         )
 
     fn receive_from(
         self, size: Int = default_buffer_size
-    ) raises SocketRecvfromError -> Tuple[List[Byte], String, UInt16]:
+    ) raises -> Tuple[List[Byte], String, UInt16]:
         """Receive data from the socket into the buffer dest.
 
         Args:
@@ -757,7 +758,7 @@ struct Socket[
         _, host, port = self._receive_from(buffer)
         return buffer^, host, port
 
-    fn receive_from(self, mut dest: List[Byte]) raises SocketRecvfromError -> Tuple[UInt, String, UInt16]:
+    fn receive_from(self, mut dest: List[Byte]) raises -> Tuple[UInt, String, UInt16]:
         """Receive data from the socket into the buffer dest.
 
         Args:
@@ -823,11 +824,11 @@ comptime UDPSocket[address: Addr] = Socket[
     sock_type = SocketType.SOCK_DGRAM,
     address_family = AddressFamily.AF_INET,
 ]
-comptime UDP4Socket = UDPSocket[UDPAddr]
+comptime UDP4Socket = UDPSocket[UDPAddr[NetworkType.udp4]]
 comptime TCPSocket[address: Addr] = Socket[
     address=address,
     sock_type = SocketType.SOCK_STREAM,
     address_family = AddressFamily.AF_INET,
 ]
-comptime TCP4Socket = TCPSocket[TCPAddr]
+comptime TCP4Socket = TCPSocket[TCPAddr[NetworkType.tcp4]]
 comptime TCP6Socket = TCPSocket[TCPAddr[NetworkType.tcp6]]

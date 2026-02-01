@@ -116,7 +116,7 @@ struct Cookie(Copyable):
         self.name = existing.name^
         self.value = existing.value^
         self.max_age = existing.max_age^
-        self.expires = existing.expires^
+        self.expires = existing.expires.copy()
         self.domain = existing.domain^
         self.path = existing.path^
         self.secure = existing.secure

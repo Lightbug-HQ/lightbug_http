@@ -1,6 +1,6 @@
 from lightbug_http.connection import TCPConnection, default_buffer_size
-from lightbug_http.header import ParsedResponseResult
-from lightbug_http.http.chunked import HTTPChunkedDecoder, decode
+from lightbug_http.header import ParsedResponseHeaders, parse_response_headers
+from lightbug_http.http.chunked import HTTPChunkedDecoder
 from lightbug_http.http.date import http_date_now
 from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter, byte
 from lightbug_http.strings import CR, LF, http, lineBreak, strHttp11, whitespace
@@ -134,51 +134,67 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
 
     @staticmethod
     fn from_bytes(b: Span[Byte]) raises ResponseParseError -> HTTPResponse:
-        var reader = ByteReader(b)
-        var headers = Headers()
         var cookies = ResponseCookieJar()
 
-        var properties: ParsedResponseResult
+        var properties: ParsedResponseHeaders
         try:
-            properties = headers.parse_raw_response(reader)
-            cookies.from_headers(properties.cookies^)
-            reader.skip_carriage_return()
+            properties = parse_response_headers(b)
         except parse_err:
             raise ResponseParseError(ResponseHeaderParseError(detail=String(parse_err)))
 
         try:
+            cookies.from_headers(properties.cookies^)
+        except cookie_err:
+            raise ResponseParseError(ResponseHeaderParseError(detail=String(cookie_err)))
+
+        # Create reader at the position after headers
+        var reader = ByteReader(b)
+        try:
+            _ = reader.read_bytes(properties.bytes_consumed)
+        except bounds_err:
+            raise ResponseParseError(ResponseBodyReadError(detail=String(bounds_err)))
+
+        try:
             return HTTPResponse(
                 reader=reader,
-                headers=headers^,
+                headers=properties.headers^,
                 cookies=cookies^,
                 protocol=properties.protocol^,
                 status_code=properties.status,
-                status_text=properties.msg^,
+                status_text=properties.status_message^,
             )
         except body_err:
             raise ResponseParseError(ResponseBodyReadError(detail=String(body_err)))
 
     @staticmethod
     fn from_bytes(b: Span[Byte], conn: TCPConnection) raises ResponseParseError -> HTTPResponse:
-        var reader = ByteReader(b)
-        var headers = Headers()
         var cookies = ResponseCookieJar()
 
-        var properties: ParsedResponseResult
+        var properties: ParsedResponseHeaders
         try:
-            properties = headers.parse_raw_response(reader)
-            cookies.from_headers(properties.cookies^)
-            reader.skip_carriage_return()
+            properties = parse_response_headers(b)
         except parse_err:
             raise ResponseParseError(ResponseHeaderParseError(detail=String(parse_err)))
 
+        try:
+            cookies.from_headers(properties.cookies^)
+        except cookie_err:
+            raise ResponseParseError(ResponseHeaderParseError(detail=String(cookie_err)))
+
+        # Create reader at the position after headers
+        var reader = ByteReader(b)
+        try:
+            _ = reader.read_bytes(properties.bytes_consumed)
+        except bounds_err:
+            raise ResponseParseError(ResponseBodyReadError(detail=String(bounds_err)))
+
         var response = HTTPResponse(
             Bytes(),
-            headers=headers^,
+            headers=properties.headers^,
             cookies=cookies^,
             protocol=properties.protocol^,
             status_code=properties.status,
-            status_text=properties.msg^,
+            status_text=properties.status_message^,
         )
 
         var transfer_encoding = response.headers.get(HeaderKey.TRANSFER_ENCODING)
@@ -203,12 +219,13 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
                         break
 
                     # buff.clear()  # TODO: Should this be cleared? This was commented out before.
-                # response.read_chunks(b)
-                # Decode chunks
-                response._decode_chunks(decoder, b^)
-                return response^
-            except chunk_err:
-                raise ResponseParseError(ChunkedEncodingError(detail=String(chunk_err)))
+            except read_err:
+                raise ResponseParseError(ResponseBodyReadError(detail=String(read_err)))
+
+            # response.read_chunks(b)
+            # Decode chunks
+            response._decode_chunks(decoder, b^)
+            return response^
 
         try:
             response.read_body(reader)
@@ -229,7 +246,7 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
         #     buf_ptr[i] = chunks[i]
 
         # var bufsz = len(chunks)
-        var result = decode(decoder, Span(chunks))
+        var result = decoder.decode(Span(chunks))
         var ret = result[0]
         var decoded_size = result[1]
 
@@ -323,8 +340,11 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
 
     @always_inline
     fn content_length(self) -> Int:
+        var header_val = self.headers.get(HeaderKey.CONTENT_LENGTH)
+        if not header_val:
+            return 0
         try:
-            return Int(self.headers[HeaderKey.CONTENT_LENGTH])
+            return Int(header_val.value())
         except:
             return 0
 
@@ -338,9 +358,12 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
         )
 
     @always_inline
-    fn read_body(mut self, mut r: ByteReader) raises -> None:
-        self.body_raw = Bytes(r.read_bytes(self.content_length()).as_bytes())
-        self.set_content_length(len(self.body_raw))
+    fn read_body(mut self, mut r: ByteReader) raises:
+        try:
+            self.body_raw = Bytes(r.read_bytes(self.content_length()).as_bytes())
+            self.set_content_length(len(self.body_raw))
+        except e:
+            raise Error(String(e))
 
     fn read_chunks(mut self, chunks: Span[Byte]) raises:
         var reader = ByteReader(chunks)
@@ -348,10 +371,13 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
             var size = atol(String(reader.read_line()), 16)
             if size == 0:
                 break
-            var data = reader.read_bytes(size).as_bytes()
-            reader.skip_carriage_return()
-            self.set_content_length(self.content_length() + len(data))
-            self.body_raw.extend(data)
+            try:
+                var data = reader.read_bytes(size).as_bytes()
+                reader.skip_carriage_return()
+                self.set_content_length(self.content_length() + len(data))
+                self.body_raw.extend(data)
+            except e:
+                raise Error(String(e))
 
     fn write_to[T: Writer](self, mut writer: T):
         writer.write(

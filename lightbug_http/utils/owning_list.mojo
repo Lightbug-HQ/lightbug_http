@@ -124,12 +124,12 @@ struct OwningList[T: Movable & ImplicitlyDestructible](Boolable, Movable, Sized)
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    fn __contains__[U: EqualityComparable & Movable, //](self: OwningList[U, *_], value: U) -> Bool:
+    fn __contains__[U: Equatable & Movable, //](self: OwningList[U, *_], value: U) -> Bool:
         """Verify if a given value is present in the list.
 
         Parameters:
             U: The type of the elements in the list. Must implement the
-              traits `EqualityComparable`, `Copyable`, and `Movable`.
+              traits `Equatable`, `Copyable`, and `Movable`.
 
         Args:
             value: The value to find.
@@ -137,8 +137,8 @@ struct OwningList[T: Movable & ImplicitlyDestructible](Boolable, Movable, Sized)
         Returns:
             True if the value is contained in the list, False otherwise.
         """
-        for i in self:
-            if i[] == value:
+        for i in range(len(self)):
+            if self[i] == value:
                 return True
         return False
 
@@ -304,7 +304,7 @@ struct OwningList[T: Movable & ImplicitlyDestructible](Boolable, Movable, Sized)
             earlier_idx -= 1
             later_idx -= 1
 
-    fn extend(mut self, var other: OwningList[T, *_]):
+    fn extend(mut self, var other: OwningList[Self.T, *_]):
         """Extends this list by consuming the elements of `other`.
 
         Args:
@@ -404,7 +404,7 @@ struct OwningList[T: Movable & ImplicitlyDestructible](Boolable, Movable, Sized)
 
     # TODO: Remove explicit self type when issue 1876 is resolved.
     fn index[
-        C: EqualityComparable & Movable, //
+        C: Equatable & Movable, //
     ](ref self: OwningList[C, *_], value: C, start: Int = 0, stop: Optional[Int] = None,) raises -> Int:
         """
         Returns the index of the first occurrence of a value in a list
@@ -424,7 +424,7 @@ struct OwningList[T: Movable & ImplicitlyDestructible](Boolable, Movable, Sized)
 
         Parameters:
             C: The type of the elements in the list. Must implement the
-                `EqualityComparable & Movable` trait.
+                `Equatable & Movable` trait.
 
         Returns:
             The index of the first occurrence of the value in the list.
@@ -460,14 +460,14 @@ struct OwningList[T: Movable & ImplicitlyDestructible](Boolable, Movable, Sized)
             (self.data + i).destroy_pointee()
         self.size = 0
 
-    fn steal_data(mut self) -> UnsafePointer[Self.T]:
+    fn steal_data(mut self) -> UnsafePointer[Self.T, MutExternalOrigin]:
         """Take ownership of the underlying pointer from the list.
 
         Returns:
             The underlying data.
         """
         var ptr = self.data
-        self.data = UnsafePointer[Self.T]()
+        self.data = UnsafePointer[Self.T, MutExternalOrigin]()
         self.size = 0
         self.capacity = 0
         return ptr
@@ -497,7 +497,7 @@ struct OwningList[T: Movable & ImplicitlyDestructible](Boolable, Movable, Sized)
         return (self.data + normalized_idx)[]
 
     @always_inline
-    fn unsafe_ptr(self) -> UnsafePointer[Self.T]:
+    fn unsafe_ptr(self) -> UnsafePointer[Self.T, MutExternalOrigin]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
@@ -510,7 +510,9 @@ fn _clip(value: Int, start: Int, end: Int) -> Int:
     return max(start, min(value, end))
 
 
-fn _move_pointee_into_many_elements[T: Movable](dest: UnsafePointer[T], src: UnsafePointer[T], size: Int):
+fn _move_pointee_into_many_elements[T: Movable, dest_origin: MutOrigin, src_origin: MutOrigin](
+    dest: UnsafePointer[T, dest_origin], src: UnsafePointer[T, src_origin], size: Int
+):
     for i in range(size):
         (dest + i).init_pointee_move_from(src + i)
         # (src + i).move_pointee_into(dest + i)
