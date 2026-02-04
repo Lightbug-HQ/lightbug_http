@@ -93,11 +93,10 @@ struct HTTPChunkedDecoder(Defaultable):
                 self._state = DecoderState.IN_CHUNK_EXT
 
             elif self._state == DecoderState.IN_CHUNK_EXT:
-                ref byte = buf[src]
                 while src < buffer_len:
-                    if byte == BytesConstant.CR:
+                    if buf[src] == BytesConstant.CR:
                         break
-                    elif byte == BytesConstant.LF:
+                    elif buf[src] == BytesConstant.LF:
                         return (-1, dst)
                     src += 1
 
@@ -169,16 +168,15 @@ struct HTTPChunkedDecoder(Defaultable):
                 self._state = DecoderState.IN_CHUNK_SIZE
 
             elif self._state == DecoderState.IN_TRAILERS_LINE_HEAD:
-                ref byte = buf[src]
                 while src < buffer_len:
-                    if byte != BytesConstant.CR:
+                    if buf[src] != BytesConstant.CR:
                         break
                     src += 1
 
                 if src >= buffer_len:
                     break
 
-                if byte == BytesConstant.LF:
+                if buf[src] == BytesConstant.LF:
                     src += 1
                     ret = buffer_len - src
                     break
