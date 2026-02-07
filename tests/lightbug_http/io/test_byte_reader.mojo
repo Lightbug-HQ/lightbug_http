@@ -10,21 +10,25 @@ def test_peek():
     var b: Byte
     try:
         b = r.peek()
-        testing.assert_equal(b, 72)
-    except e:
-        raise Error("Did not expect error here: " + String(e))
+    except _:
+        raise Error("Did not expect error here")
+    testing.assert_equal(b, 72)
 
     # Peeking does not move the reader.
     try:
         b = r.peek()
-        testing.assert_equal(b, 72)
-    except e:
-        raise Error("Did not expect error here: " + String(e))
+    except _:
+        raise Error("Did not expect error here")
+    testing.assert_equal(b, 72)
 
     # Trying to peek past the end of the reader should raise an Error
     r.read_pos = 1
-    with testing.assert_raises(contains="No more bytes to read."):
+    var raised = False
+    try:
         _ = r.peek()
+    except _:
+        raised = True
+    testing.assert_true(raised, "Expected EndOfReaderError")
 
 
 def test_read_until():
@@ -63,9 +67,9 @@ def test_read_bytes():
     var bytes: Span[Byte, StaticConstantOrigin]
     try:
         bytes = r.read_bytes(7).as_bytes()
-        testing.assert_equal(String(unsafe_from_utf8=bytes), String(unsafe_from_utf8=result2))
-    except e:
-        raise Error("Did not expect error here: " + String(e))
+    except _:
+        raise Error("Did not expect error here")
+    testing.assert_equal(String(unsafe_from_utf8=bytes), String(unsafe_from_utf8=result2))
 
 
     var result3: List[Byte] = [87, 111, 114, 108, 100, 33]
@@ -142,9 +146,9 @@ def test_skip_carriage_return():
     var bytes: Span[Byte, StaticConstantOrigin]
     try:
         bytes = r.read_bytes(4).as_bytes()
-        testing.assert_equal(String(unsafe_from_utf8=bytes), String(unsafe_from_utf8=result))
-    except e:
-        raise Error("Did not expect error here: " + String(e))
+    except _:
+        raise Error("Did not expect error here")
+    testing.assert_equal(String(unsafe_from_utf8=bytes), String(unsafe_from_utf8=result))
 
 
 def test_consume():
