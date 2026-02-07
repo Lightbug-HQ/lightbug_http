@@ -16,7 +16,6 @@ test = { cmd = "bash scripts/mojo_tests.sh tests/lightbug_http" }
 [feature.integration-tests.tasks]
 integration_tests_py = { cmd = "bash scripts/integration_test.sh" }
 integration_tests_external = { cmd = "bash scripts/mojo_tests.sh tests/integration" }
-integration_tests_udp = { cmd = "bash scripts/udp_test.sh" }
 http_conformance = { cmd = "bash scripts/http_conformance_test.sh" }
 
 [feature.bench.tasks]
