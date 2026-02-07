@@ -18,7 +18,7 @@ struct Printer(HTTPService):
         if HeaderKey.CONTENT_TYPE in req.headers:
             print("Request Content-Type:", req.headers[HeaderKey.CONTENT_TYPE])
         if req.body_raw:
-            print("Request Body:", StringSlice(unsafe_from_utf8=req.body_raw))
+            print("Request Body:", StringSlice(unsafe_from_utf8=Span(req.body_raw)))
 
         return OK(req.body_raw)
 
@@ -47,7 +47,7 @@ struct ExampleRouter(HTTPService):
         elif req.uri.path == "/second":
             print("I'm on /second!")
         elif req.uri.path == "/echo":
-            print(StringSlice(unsafe_from_utf8=req.body_raw))
+            print(StringSlice(unsafe_from_utf8=Span(req.body_raw)))
 
         return OK(req.body_raw)
 

@@ -213,7 +213,7 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
             self.headers,
             self.cookies,
             lineBreak,
-            StringSlice(unsafe_from_utf8=self.body_raw),
+            StringSlice(unsafe_from_utf8=Span(self.body_raw)),
         )
 
     fn encode(deinit self) -> Bytes:
