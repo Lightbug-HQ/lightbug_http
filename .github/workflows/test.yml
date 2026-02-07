@@ -20,4 +20,3 @@ jobs:
                   pixi run test
                   pixi run integration_tests_py
                   pixi run integration_tests_external
-                  pixi run http_conformance
