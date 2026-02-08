@@ -739,9 +739,7 @@ struct Socket[
             UInt16(binary_port_to_int(peer_sockaddr_in.sin_port)),
         )
 
-    fn receive_from(
-        self, size: Int = default_buffer_size
-    ) raises -> Tuple[List[Byte], String, UInt16]:
+    fn receive_from(self, size: Int = default_buffer_size) raises -> Tuple[List[Byte], String, UInt16]:
         """Receive data from the socket into the buffer dest.
 
         Args:

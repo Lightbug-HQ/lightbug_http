@@ -4,6 +4,7 @@ from lightbug_http.io.bytes import Bytes
 
 from lightbug_http.http import HTTPRequest, StatusCode
 
+
 # Constants from ServerConfig defaults
 comptime default_max_request_body_size = 4 * 1024 * 1024  # 4MB
 comptime default_max_request_uri_length = 8192

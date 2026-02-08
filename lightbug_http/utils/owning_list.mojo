@@ -510,9 +510,9 @@ fn _clip(value: Int, start: Int, end: Int) -> Int:
     return max(start, min(value, end))
 
 
-fn _move_pointee_into_many_elements[T: Movable, dest_origin: MutOrigin, src_origin: MutOrigin](
-    dest: UnsafePointer[T, dest_origin], src: UnsafePointer[T, src_origin], size: Int
-):
+fn _move_pointee_into_many_elements[
+    T: Movable, dest_origin: MutOrigin, src_origin: MutOrigin
+](dest: UnsafePointer[T, dest_origin], src: UnsafePointer[T, src_origin], size: Int):
     for i in range(size):
         (dest + i).init_pointee_move_from(src + i)
         # (src + i).move_pointee_into(dest + i)

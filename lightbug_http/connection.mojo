@@ -3,7 +3,15 @@ from time import sleep
 
 from lightbug_http.address import HostPort, NetworkType, ParseError, TCPAddr, UDPAddr, parse_address
 from lightbug_http.c.address import AddressFamily
-from lightbug_http.c.socket_error import AcceptError, GetpeernameError, RecvError, RecvfromError, SendError, SendtoError, ShutdownEINVALError
+from lightbug_http.c.socket_error import (
+    AcceptError,
+    GetpeernameError,
+    RecvError,
+    RecvfromError,
+    SendError,
+    SendtoError,
+    ShutdownEINVALError,
+)
 from lightbug_http.c.socket_error import SocketError as CSocketError
 from lightbug_http.io.bytes import Bytes
 from lightbug_http.io.sync import Duration

@@ -6,6 +6,7 @@ from memory import Span
 from benchmark import *
 from lightbug_http.http import HTTPRequest, HTTPResponse, encode
 
+
 # Constants from ServerConfig defaults
 comptime default_max_request_body_size = 4 * 1024 * 1024  # 4MB
 comptime default_max_request_uri_length = 8192
