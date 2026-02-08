@@ -8,9 +8,6 @@ from memory import stack_allocation
 from utils import StaticTuple, Variant
 
 
-# ===== NETWORK ERROR STRUCTS =====
-
-
 @fieldwise_init
 @register_passable("trivial")
 struct InetNtopEAFNOSUPPORTError(CustomError):
@@ -45,9 +42,6 @@ struct InetPtonInvalidAddressError(CustomError):
 
     fn __str__(self) -> String:
         return Self.message
-
-
-# ===== VARIANT ERROR TYPES =====
 
 
 @fieldwise_init
@@ -208,7 +202,6 @@ comptime in_port_t = c_ushort
 """Used to represent port numbers."""
 
 
-# --- ( Network Related Structs )-----------------------------------------------
 @fieldwise_init
 @register_passable("trivial")
 struct in_addr:
@@ -307,19 +300,9 @@ struct SocketAddress(Movable):
     fn unsafe_ptr[
         origin: Origin, address_space: AddressSpace, //
     ](ref [origin, address_space]self) -> UnsafePointer[sockaddr, origin, address_space=address_space]:
-        """Retrieves a pointer to the underlying memory.
-
-        Parameters:
-            origin: The origin of the `SocketAddress`.
-            address_space: The `AddressSpace` of the `SocketAddress`.
-
-        Returns:
-            The pointer to the underlying memory.
-        """
         return self.addr.unsafe_mut_cast[origin.mut]().unsafe_origin_cast[origin]().address_space_cast[address_space]()
 
     fn as_sockaddr_in(mut self) -> ref [origin_of(self)] sockaddr_in:
-        """Cast the underlying sockaddr pointer to sockaddr_in and return a reference to it."""
         return self.unsafe_ptr().bitcast[sockaddr_in]()[]
 
 
@@ -411,7 +394,6 @@ fn inet_ntop[
     """
     var dst = List[Byte](capacity=address_length.value + 1)
 
-    # `inet_ntop` returns NULL on error.
     var result = _inet_ntop(
         address_family.value,
         UnsafePointer(to=ip_address).bitcast[c_void](),
@@ -430,7 +412,6 @@ fn inet_ntop[
                 errno,
             )
 
-    # Copy the dst contents into a new String.
     return String(unsafe_from_utf8_ptr=dst.unsafe_ptr())
 
 

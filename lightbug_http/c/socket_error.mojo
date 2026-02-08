@@ -10,9 +10,6 @@ from lightbug_http.utils.error import CustomError
 from utils import Variant
 
 
-# ===== ERROR STRUCTS (one per function+errno combination) =====
-
-
 # Accept errors
 @fieldwise_init
 @register_passable("trivial")
@@ -1586,9 +1583,6 @@ struct SocketEPROTONOSUPPORTError(CustomError):
 
     fn __str__(self) -> String:
         return Self.message
-
-
-# ===== VARIANT ERROR TYPES (one per function) =====
 
 
 @fieldwise_init

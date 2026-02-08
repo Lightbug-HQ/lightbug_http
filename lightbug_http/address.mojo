@@ -426,7 +426,6 @@ fn is_ipv6(network: NetworkType) -> Bool:
     return network in (NetworkType.tcp6, NetworkType.udp6, NetworkType.ip6)
 
 
-# ===== PARSE ERROR STRUCTS =====
 
 
 @fieldwise_init
@@ -549,7 +548,6 @@ struct ParseIPProtocolPortError(CustomError):
         return Self.message
 
 
-# ===== ADDRESS ERROR STRUCTS =====
 
 
 @fieldwise_init
@@ -575,8 +573,6 @@ struct GetaddrinfoError(CustomError):
     fn __str__(self) -> String:
         return Self.message
 
-
-# ===== VARIANT ERROR TYPES =====
 
 
 @fieldwise_init

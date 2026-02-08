@@ -592,7 +592,6 @@ fn getpeername(file_descriptor: FileDescriptor) raises GetpeernameError -> Socke
         elif errno == errno.ENOTSOCK:
             raise GetpeernameENOTSOCKError()
 
-    # Cast sockaddr struct to sockaddr_in
     return remote_address^
 
 
