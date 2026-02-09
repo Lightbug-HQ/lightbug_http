@@ -1,7 +1,7 @@
-from lightbug_http.http import HTTPRequest, HTTPResponse, OK, NotFound
-from lightbug_http.io.bytes import Bytes, bytes
-from lightbug_http.strings import to_string
 from lightbug_http.header import HeaderKey
+from lightbug_http.io.bytes import Bytes
+
+from lightbug_http.http import OK, HTTPRequest, HTTPResponse, NotFound
 
 
 trait HTTPService:
@@ -18,7 +18,7 @@ struct Printer(HTTPService):
         if HeaderKey.CONTENT_TYPE in req.headers:
             print("Request Content-Type:", req.headers[HeaderKey.CONTENT_TYPE])
         if req.body_raw:
-            print("Request Body:", to_string(req.body_raw.copy()))
+            print("Request Body:", StringSlice(unsafe_from_utf8=Span(req.body_raw)))
 
         return OK(req.body_raw)
 
@@ -47,7 +47,7 @@ struct ExampleRouter(HTTPService):
         elif req.uri.path == "/second":
             print("I'm on /second!")
         elif req.uri.path == "/echo":
-            print(to_string(req.body_raw.copy()))
+            print(StringSlice(unsafe_from_utf8=Span(req.body_raw)))
 
         return OK(req.body_raw)
 

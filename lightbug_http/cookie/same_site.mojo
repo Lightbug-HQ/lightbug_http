@@ -1,14 +1,14 @@
 @fieldwise_init
-struct SameSite(Stringable, Copyable, Movable):
+struct SameSite(Copyable, Stringable):
     var value: UInt8
 
-    alias none = SameSite(0)
-    alias lax = SameSite(1)
-    alias strict = SameSite(2)
+    comptime none = SameSite(0)
+    comptime lax = SameSite(1)
+    comptime strict = SameSite(2)
 
-    alias NONE = "none"
-    alias LAX = "lax"
-    alias STRICT = "strict"
+    comptime NONE = "none"
+    comptime LAX = "lax"
+    comptime STRICT = "strict"
 
     @staticmethod
     fn from_string(str: String) -> Optional[Self]:

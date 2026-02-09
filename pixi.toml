@@ -1,15 +1,14 @@
 [workspace]
 authors = ["saviorand"]
-channels = ["conda-forge", "https://conda.modular.com/max", "https://repo.prefix.dev/modular-community"]
+channels = ["conda-forge", "https://conda.modular.com/max", "https://repo.prefix.dev/modular-community", "https://repo.prefix.dev/mojo-community"]
 description = "Simple and fast HTTP framework for Mojo!"
-name = "lightbug_http"
 platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
-version = "0.25.7"
-
-[tasks]
-build = { cmd = "rattler-build build --recipe recipes -c https://conda.modular.com/max -c conda-forge --skip-existing=all", env = {MODULAR_MOJO_IMPORT_PATH = "$CONDA_PREFIX/lib/mojo"} }
-publish = { cmd = "bash scripts/publish.sh", env = { PREFIX_API_KEY = "$PREFIX_API_KEY" } }
-format = { cmd = "mojo format -l 120 lightbug_http" }
+license = "MIT"
+license-file = "LICENSE"
+readme = "README.md"
+homepage = "https://github.com/Lightbug-HQ/lightbug_http"
+repository = "https://github.com/Lightbug-HQ/lightbug_http"
+preview = ["pixi-build"]
 
 [feature.unit-tests.tasks]
 test = { cmd = "bash scripts/mojo_tests.sh tests/lightbug_http" }
@@ -17,22 +16,61 @@ test = { cmd = "bash scripts/mojo_tests.sh tests/lightbug_http" }
 [feature.integration-tests.tasks]
 integration_tests_py = { cmd = "bash scripts/integration_test.sh" }
 integration_tests_external = { cmd = "bash scripts/mojo_tests.sh tests/integration" }
-integration_tests_udp = { cmd = "bash scripts/udp_test.sh" }
 
 [feature.bench.tasks]
 bench = { cmd = "mojo -I . benchmark/bench.mojo" }
 bench_server = { cmd = "bash scripts/bench_server.sh" }
 
+[feature.util.tasks]
+# Linting and Formatting
+lint_docs = "mojo doc --Werror --diagnose-missing-doc-strings -o /dev/null ./lightbug_http"
+mojo_format = "mojo format lightbug_http --line-length 120"
+sort_imports = "isort **/*.mojo -m 3 --line-length 120 --lines-after-imports 2 --trailing-comma"
+format = [{ task = "mojo_format" }, { task = "sort_imports" }]
+
+build = { cmd = "pixi build -o ." }
+publish = { cmd = "find . -name 'lightbug_http-*.conda' | xargs pixi upload https://prefix.dev/api/v1/upload/mojo-community" }
+build_and_publish = [{ task = "build" }, { task = "publish" }]
+
+[package]
+name = "lightbug_http"
+version = "0.26.1.0"
+
+[package.build]
+backend = { name = "pixi-build-mojo", version = "*" }
+
 [dependencies]
-mojo = ">=0.25.7,<0.26"
-rattler-build = ">=0.27.0,<1"
+mojo = ">=0.26.1.0,<0.26.2.0"
+small_time = ">=26.1.0,<26.2.0"
+
+[package.host-dependencies]
+mojo-compiler = ">=0.26.1.0,<0.26.2.0"
+small_time = ">=26.1.0,<26.2.0"
+
+[package.build-dependencies]
+mojo-compiler = ">=0.26.1.0,<0.26.2.0"
+small_time = ">=26.1.0,<26.2.0"
+
+[package.run-dependencies]
+mojo-compiler = ">=0.26.1.0,<0.26.2.0"
+small_time = ">=26.1.0,<26.2.0"
+
+[feature.util.dependencies]
+isort = ">=7.0.0,<8"
 
 [feature.integration-tests.dependencies]
-requests = ">=2.32.3,<3"
-fastapi = ">=0.116,<0.117"
+requests = ">=2.32.5,<3"
+fastapi = ">=0.127.0,<0.128"
+python = ">=3.10"
+poetry = ">=1.8.0,<2"
+
+[feature.integration-tests.pypi-dependencies]
+httpx = ">=0.24.0"
+abnf = ">=2.0.0"
 
 [environments]
 default = { solve-group = "default" }
 unit-tests = { features = ["unit-tests"], solve-group = "default" }
 integration-tests = { features = ["integration-tests"], solve-group = "default" }
 bench = { features = ["bench"], solve-group = "default" }
+util = { features = ["util"], solve-group = "default" }
