@@ -1,10 +1,10 @@
+from collections import Optional
+from collections._asan_annotations import __sanitizer_annotate_contiguous_container
 from os import abort
 from sys import size_of
 from sys.intrinsics import _type_is_eq
 
-from memory import Pointer, LegacyUnsafePointer, memcpy, Span
-
-from collections import Optional
+from memory import Pointer, Span, memcpy
 
 
 # ===-----------------------------------------------------------------------===#
@@ -12,54 +12,55 @@ from collections import Optional
 # ===-----------------------------------------------------------------------===#
 
 
-@fieldwise_init
-struct _OwningListIter[
-    list_mutability: Bool, //,
-    T: Movable,
-    list_origin: Origin[list_mutability],
-    forward: Bool = True,
-](Copyable, Movable):
-    """Iterator for List.
+# @fieldwise_init
+# struct _OwningListIter[
+#     list_mutability: Bool,
+#     //,
+#     T: Movable,
+#     list_origin: Origin[list_mutability],
+#     forward: Bool = True,
+# ](Copyable, Movable):
+#     """Iterator for List.
 
-    Parameters:
-        list_mutability: Whether the reference to the list is mutable.
-        T: The type of the elements in the list.
-        list_origin: The origin of the List
-        forward: The iteration direction. `False` is backwards.
-    """
+#     Parameters:
+#         list_mutability: Whether the reference to the list is mutable.
+#         T: The type of the elements in the list.
+#         list_origin: The origin of the List
+#         forward: The iteration direction. `False` is backwards.
+#     """
 
-    alias list_type = OwningList[T]
+#     alias list_type = OwningList[T]
 
-    var index: Int
-    var src: Pointer[Self.list_type, list_origin]
+#     var index: Int
+#     var src: Pointer[Self.list_type, list_origin]
 
-    fn __iter__(self) -> Self:
-        return self.copy()
+#     fn __iter__(self) -> Self:
+#         return self.copy()
 
-    fn __next__(
-        mut self,
-    ) -> Pointer[T, list_origin]:
-        @parameter
-        if forward:
-            self.index += 1
-            return Pointer(to=self.src[][self.index - 1])
-        else:
-            self.index -= 1
-            return Pointer(to=self.src[][self.index])
+#     fn __next__(
+#         mut self,
+#     ) -> Pointer[T, list_origin]:
+#         @parameter
+#         if forward:
+#             self.index += 1
+#             return Pointer(to=self.src[][self.index - 1])
+#         else:
+#             self.index -= 1
+#             return Pointer(to=self.src[][self.index])
 
-    @always_inline
-    fn __has_next__(self) -> Bool:
-        return self.__len__() > 0
+#     @always_inline
+#     fn __has_next__(self) -> Bool:
+#         return self.__len__() > 0
 
-    fn __len__(self) -> Int:
-        @parameter
-        if forward:
-            return len(self.src[]) - self.index
-        else:
-            return self.index
+#     fn __len__(self) -> Int:
+#         @parameter
+#         if forward:
+#             return len(self.src[]) - self.index
+#         else:
+#             return self.index
 
 
-struct OwningList[T: Movable](Movable, Sized, Boolable):
+struct OwningList[T: Movable & ImplicitlyDestructible](Boolable, Movable, Sized):
     """The `List` type is a dynamically-allocated list.
 
     It supports pushing and popping from the back resizing the underlying
@@ -70,12 +71,28 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
     """
 
     # Fields
-    var data: LegacyUnsafePointer[T]
+    var data: UnsafePointer[Self.T, MutExternalOrigin]
     """The underlying storage for the list."""
     var size: Int
     """The number of elements in the list."""
     var capacity: Int
     """The amount of elements that can fit in the list without resizing it."""
+
+    fn _annotate_new(self):
+        __sanitizer_annotate_contiguous_container(
+            beg=self.data.bitcast[NoneType](),
+            end=(self.data + self.capacity).bitcast[NoneType](),
+            old_mid=(self.data + self.capacity).bitcast[NoneType](),
+            new_mid=(self.data + self.size).bitcast[NoneType](),
+        )
+
+    fn _annotate_delete(self):
+        __sanitizer_annotate_contiguous_container(
+            beg=self.data.bitcast[NoneType](),
+            end=(self.data + self.capacity).bitcast[NoneType](),
+            old_mid=(self.data + self.size).bitcast[NoneType](),
+            new_mid=(self.data + self.capacity).bitcast[NoneType](),
+        )
 
     # ===-------------------------------------------------------------------===#
     # Life cycle methods
@@ -83,7 +100,7 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
 
     fn __init__(out self):
         """Constructs an empty list."""
-        self.data = LegacyUnsafePointer[T]()
+        self.data = UnsafePointer[Self.T, MutExternalOrigin]()
         self.size = 0
         self.capacity = 0
 
@@ -93,19 +110,9 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
         Args:
             capacity: The requested capacity of the list.
         """
-        self.data = LegacyUnsafePointer[T].alloc(capacity)
+        self.data = alloc[Self.T](count=capacity)
         self.size = 0
         self.capacity = capacity
-
-    fn __moveinit__(out self, deinit existing: Self):
-        """Move data of an existing list into a new one.
-
-        Args:
-            existing: The existing list.
-        """
-        self.data = existing.data
-        self.size = existing.size
-        self.capacity = existing.capacity
 
     fn __del__(deinit self):
         """Destroy all elements in the list and free its memory."""
@@ -117,12 +124,12 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    fn __contains__[U: EqualityComparable & Movable, //](self: OwningList[U, *_], value: U) -> Bool:
+    fn __contains__[U: Equatable & Movable, //](self: OwningList[U, *_], value: U) -> Bool:
         """Verify if a given value is present in the list.
 
         Parameters:
             U: The type of the elements in the list. Must implement the
-              traits `EqualityComparable`, `Copyable`, and `Movable`.
+              traits `Equatable`, `Copyable`, and `Movable`.
 
         Args:
             value: The value to find.
@@ -130,18 +137,18 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
         Returns:
             True if the value is contained in the list, False otherwise.
         """
-        for i in self:
-            if i[] == value:
+        for i in range(len(self)):
+            if self[i] == value:
                 return True
         return False
 
-    fn __iter__(ref self) -> _OwningListIter[T, origin_of(self)]:
-        """Iterate over elements of the list, returning immutable references.
+    # fn __iter__(ref self) -> _OwningListIter[T, origin_of(self)]:
+    #     """Iterate over elements of the list, returning immutable references.
 
-        Returns:
-            An iterator of immutable references to the list elements.
-        """
-        return _OwningListIter(0, Pointer(to=self))
+    #     Returns:
+    #         An iterator of immutable references to the list elements.
+    #     """
+    #     return _OwningListIter(0, Pointer(to=self))
 
     # ===-------------------------------------------------------------------===#
     # Trait implementations
@@ -237,23 +244,27 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
         Returns:
             The bytecount of the List.
         """
-        return len(self) * size_of[T]()
+        return len(self) * size_of[Self.T]()
 
+    @no_inline
     fn _realloc(mut self, new_capacity: Int):
-        var new_data = LegacyUnsafePointer[T].alloc(new_capacity)
+        var new_data = alloc[Self.T](new_capacity)
 
-        _move_pointee_into_many_elements(
-            dest=new_data,
-            src=self.data,
-            size=self.size,
-        )
+        @parameter
+        if Self.T.__moveinit__is_trivial:
+            memcpy(dest=new_data, src=self.data, count=len(self))
+        else:
+            for i in range(len(self)):
+                (new_data + i).init_pointee_move_from(self.data + i)
 
         if self.data:
+            self._annotate_delete()
             self.data.free()
         self.data = new_data
         self.capacity = new_capacity
+        self._annotate_new()
 
-    fn append(mut self, var value: T):
+    fn append(mut self, var value: Self.T):
         """Appends a value to this list.
 
         Args:
@@ -264,7 +275,7 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
         (self.data + self.size).init_pointee_move(value^)
         self.size += 1
 
-    fn insert(mut self, i: Int, var value: T):
+    fn insert(mut self, i: Int, var value: Self.T):
         """Inserts a value to the list at the given index.
         `a.insert(len(a), value)` is equivalent to `a.append(value)`.
 
@@ -293,7 +304,7 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
             earlier_idx -= 1
             later_idx -= 1
 
-    fn extend(mut self, var other: OwningList[T, *_]):
+    fn extend(mut self, var other: OwningList[Self.T, *_]):
         """Extends this list by consuming the elements of `other`.
 
         Args:
@@ -333,7 +344,7 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
         # list.
         self.size = final_size
 
-    fn pop(mut self, i: Int = -1) -> T:
+    fn pop(mut self, i: Int = -1) -> Self.T:
         """Pops a value from the list at the given index.
 
         Args:
@@ -393,7 +404,7 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
 
     # TODO: Remove explicit self type when issue 1876 is resolved.
     fn index[
-        C: EqualityComparable & Movable, //
+        C: Equatable & Movable, //
     ](ref self: OwningList[C, *_], value: C, start: Int = 0, stop: Optional[Int] = None,) raises -> Int:
         """
         Returns the index of the first occurrence of a value in a list
@@ -413,7 +424,7 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
 
         Parameters:
             C: The type of the elements in the list. Must implement the
-                `EqualityComparable & Movable` trait.
+                `Equatable & Movable` trait.
 
         Returns:
             The index of the first occurrence of the value in the list.
@@ -449,19 +460,19 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
             (self.data + i).destroy_pointee()
         self.size = 0
 
-    fn steal_data(mut self) -> LegacyUnsafePointer[T]:
+    fn steal_data(mut self) -> UnsafePointer[Self.T, MutExternalOrigin]:
         """Take ownership of the underlying pointer from the list.
 
         Returns:
             The underlying data.
         """
         var ptr = self.data
-        self.data = LegacyUnsafePointer[T]()
+        self.data = UnsafePointer[Self.T, MutExternalOrigin]()
         self.size = 0
         self.capacity = 0
         return ptr
 
-    fn __getitem__(ref self, idx: Int) -> ref [self] T:
+    fn __getitem__(ref self, idx: Int) -> ref [self] Self.T:
         """Gets the list element at the given index.
 
         Args:
@@ -486,11 +497,11 @@ struct OwningList[T: Movable](Movable, Sized, Boolable):
         return (self.data + normalized_idx)[]
 
     @always_inline
-    fn unsafe_ptr(self) -> LegacyUnsafePointer[T]:
+    fn unsafe_ptr(self) -> UnsafePointer[Self.T, MutExternalOrigin]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
-            The LegacyUnsafePointer to the underlying memory.
+            The UnsafePointer to the underlying memory.
         """
         return self.data
 
@@ -499,7 +510,9 @@ fn _clip(value: Int, start: Int, end: Int) -> Int:
     return max(start, min(value, end))
 
 
-fn _move_pointee_into_many_elements[T: Movable](dest: LegacyUnsafePointer[T], src: LegacyUnsafePointer[T], size: Int):
+fn _move_pointee_into_many_elements[
+    T: Movable, dest_origin: MutOrigin, src_origin: MutOrigin
+](dest: UnsafePointer[T, dest_origin], src: UnsafePointer[T, src_origin], size: Int):
     for i in range(size):
         (dest + i).init_pointee_move_from(src + i)
         # (src + i).move_pointee_into(dest + i)

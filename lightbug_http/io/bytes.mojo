@@ -1,24 +1,23 @@
-from memory.span import Span, _SpanIter
-from lightbug_http.strings import BytesConstant
+from sys import size_of
+
 from lightbug_http.connection import default_buffer_size
+from lightbug_http.strings import BytesConstant
+from memory import memcpy
+from memory.span import ContiguousSlice, _SpanIter
 
 
-alias Bytes = List[Byte]
+comptime Bytes = List[Byte]
 
 
 @always_inline
-fn byte(s: String) -> Byte:
-    return ord(s)
-
-
-@always_inline
-fn bytes(s: String) -> Bytes:
-    return Bytes(s.as_bytes())
+fn byte[s: StringSlice]() -> Byte:
+    __comptime_assert len(s) == 1, "StringSlice must be of length 1 to convert to Byte."
+    return s.as_bytes()[0]
 
 
 @always_inline
 fn is_newline(b: Byte) -> Bool:
-    return b == BytesConstant.nChar or b == BytesConstant.rChar
+    return b == BytesConstant.LF or b == BytesConstant.CR
 
 
 @always_inline
@@ -41,6 +40,14 @@ struct ByteWriter(Writer):
         """
         self._inner.extend(bytes)
 
+    fn write_string(mut self, s: StringSlice) -> None:
+        """Writes the contents of `s` into the internal buffer.
+
+        Args:
+            s: The string to write.
+        """
+        self._inner.extend(s.as_bytes())
+
     fn write[*Ts: Writable](mut self, *args: *Ts) -> None:
         """Write data to the `Writer`.
 
@@ -59,34 +66,24 @@ struct ByteWriter(Writer):
     fn consuming_write(mut self, var b: Bytes):
         self._inner.extend(b^)
 
-    @always_inline
-    fn write_byte(mut self, b: Byte):
-        self._inner.append(b)
-
-    fn consume(var self) -> Bytes:
-        var ret = self._inner^
-        self._inner = Bytes()
-        return ret^
+    fn consume(deinit self) -> Bytes:
+        return self._inner^
 
 
-alias EndOfReaderError = "No more bytes to read."
-alias OutOfBoundsError = "Tried to read past the end of the ByteReader."
-
-
-struct ByteView[origin: Origin](Sized, Stringable):
+struct ByteView[origin: ImmutOrigin](Boolable, Copyable, Equatable, Sized, Stringable):
     """Convenience wrapper around a Span of Bytes."""
 
-    var _inner: Span[Byte, origin]
+    var _inner: Span[Byte, Self.origin]
 
     @implicit
-    fn __init__(out self, b: Span[Byte, origin]):
+    fn __init__(out self, b: Span[Byte, Self.origin]):
         self._inner = b
 
     fn __len__(self) -> Int:
         return len(self._inner)
 
     fn __bool__(self) -> Bool:
-        return self._inner.__bool__()
+        return Bool(self._inner)
 
     fn __contains__(self, b: Byte) -> Bool:
         for i in range(len(self._inner)):
@@ -94,7 +91,7 @@ struct ByteView[origin: Origin](Sized, Stringable):
                 return True
         return False
 
-    fn __contains__(self, b: Bytes) -> Bool:
+    fn __contains__(self, b: Span[Byte]) -> Bool:
         if len(b) > len(self._inner):
             return False
 
@@ -111,11 +108,11 @@ struct ByteView[origin: Origin](Sized, Stringable):
     fn __getitem__(self, index: Int) -> Byte:
         return self._inner[index]
 
-    fn __getitem__(self, slc: Slice) -> Self:
+    fn __getitem__(self, slc: ContiguousSlice) -> Self:
         return Self(self._inner[slc])
 
     fn __str__(self) -> String:
-        return String(StringSlice(unsafe_from_utf8=self._inner))
+        return String(unsafe_from_utf8=self._inner)
 
     fn __eq__(self, other: Self) -> Bool:
         # both empty
@@ -152,13 +149,10 @@ struct ByteView[origin: Origin](Sized, Stringable):
                 return False
         return True
 
-    fn __ne__(self, other: Self) -> Bool:
-        return not self == other
-
     fn __ne__(self, other: Span[Byte]) -> Bool:
         return not self == other
 
-    fn __iter__(self) -> _SpanIter[Byte, origin]:
+    fn __iter__(self) -> _SpanIter[Byte, Self.origin]:
         return self._inner.__iter__()
 
     fn find(self, target: Byte) -> Int:
@@ -176,38 +170,51 @@ struct ByteView[origin: Origin](Sized, Stringable):
 
         return -1
 
-    fn rfind(self, target: Byte) -> Int:
-        """Finds the index of the last occurrence of a byte in a byte span.
-
-        Args:
-            target: The byte to find.
-
-        Returns:
-            The index of the last occurrence of the byte in the span, or -1 if not found.
-        """
-        # Start from the end and work backwards
-        var i = len(self) - 1
-        while i >= 0:
-            if self[i] == target:
-                return i
-            i -= 1
-
-        return -1
-
-    fn to_bytes(self) -> Bytes:
-        return Bytes(self._inner)
+    fn as_bytes(self) -> Span[Byte, Self.origin]:
+        return self._inner
 
 
-struct ByteReader[origin: Origin](Sized):
-    var _inner: Span[Byte, origin]
+@fieldwise_init
+struct OutOfBoundsError(Stringable, Writable):
+    var message: String
+
+    fn __init__(out self):
+        self.message = "Tried to read past the end of the ByteReader."
+
+    fn write_to[W: Writer, //](self, mut writer: W) -> None:
+        writer.write(self.message)
+
+    fn __str__(self) -> String:
+        return self.message.copy()
+
+
+@fieldwise_init
+struct EndOfReaderError(Stringable, Writable):
+    var message: String
+
+    fn __init__(out self):
+        self.message = "No more bytes to read."
+
+    fn write_to[W: Writer, //](self, mut writer: W) -> None:
+        writer.write(self.message)
+
+    fn __str__(self) -> String:
+        return self.message.copy()
+
+
+struct ByteReader[origin: ImmutOrigin](Copyable, Sized):
+    var _inner: Span[Byte, Self.origin]
     var read_pos: Int
 
-    fn __init__(out self, b: Span[Byte, origin]):
+    fn __init__(out self, b: Span[Byte, Self.origin]):
         self._inner = b
         self.read_pos = 0
 
     fn copy(self) -> Self:
         return ByteReader(self._inner[self.read_pos :])
+
+    fn as_bytes(self) -> Span[Byte, Self.origin]:
+        return self._inner[self.read_pos :]
 
     fn __contains__(self, b: Byte) -> Bool:
         for i in range(self.read_pos, len(self._inner)):
@@ -222,24 +229,29 @@ struct ByteReader[origin: Origin](Sized):
     fn __len__(self) -> Int:
         return len(self._inner) - self.read_pos
 
-    fn peek(self) raises -> Byte:
+    fn remaining(self) -> Int:
+        return len(self._inner) - self.read_pos
+
+    fn peek(self) raises EndOfReaderError -> Byte:
         if not self.available():
-            raise EndOfReaderError
+            raise EndOfReaderError()
         return self._inner[self.read_pos]
 
-    fn read_bytes(mut self, n: Int = -1) raises -> ByteView[origin]:
-        var count = n
+    fn read_bytes(mut self) -> ByteView[Self.origin]:
+        var count = len(self)
         var start = self.read_pos
-        if n == -1:
-            count = len(self)
-
-        if start + count > len(self._inner):
-            raise OutOfBoundsError
-
         self.read_pos += count
         return self._inner[start : start + count]
 
-    fn read_until(mut self, char: Byte) -> ByteView[origin]:
+    fn read_bytes(mut self, n: Int) raises OutOfBoundsError -> ByteView[Self.origin]:
+        if self.read_pos + n > len(self._inner):
+            raise OutOfBoundsError()
+        var count = n
+        var start = self.read_pos
+        self.read_pos += count
+        return self._inner[start : start + count]
+
+    fn read_until(mut self, char: Byte) -> ByteView[Self.origin]:
         var start = self.read_pos
         for i in range(start, len(self._inner)):
             if self._inner[i] == char:
@@ -249,10 +261,10 @@ struct ByteReader[origin: Origin](Sized):
         return self._inner[start : self.read_pos]
 
     @always_inline
-    fn read_word(mut self) -> ByteView[origin]:
+    fn read_word(mut self) -> ByteView[Self.origin]:
         return self.read_until(BytesConstant.whitespace)
 
-    fn read_line(mut self) -> ByteView[origin]:
+    fn read_line(mut self) -> ByteView[Self.origin]:
         var start = self.read_pos
         for i in range(start, len(self._inner)):
             if is_newline(self._inner[i]):
@@ -264,7 +276,7 @@ struct ByteReader[origin: Origin](Sized):
         if not self.available():
             return ret
 
-        if self._inner[self.read_pos] == BytesConstant.rChar:
+        if self._inner[self.read_pos] == BytesConstant.CR:
             self.increment(2)
         else:
             self.increment()
@@ -281,7 +293,7 @@ struct ByteReader[origin: Origin](Sized):
     @always_inline
     fn skip_carriage_return(mut self):
         for i in range(self.read_pos, len(self._inner)):
-            if self._inner[i] == BytesConstant.rChar:
+            if self._inner[i] == BytesConstant.CR:
                 self.increment(2)
             else:
                 break
@@ -293,3 +305,66 @@ struct ByteReader[origin: Origin](Sized):
     @always_inline
     fn consume(var self, bytes_len: Int = -1) -> Bytes:
         return Bytes(self^._inner[self.read_pos : self.read_pos + len(self) + 1])
+
+
+fn memmove[
+    T: Copyable, dest_origin: MutOrigin, src_origin: MutOrigin
+](dest: UnsafePointer[T, dest_origin], src: UnsafePointer[T, src_origin], count: Int,):
+    """
+    Copies count elements from src to dest, handling overlapping memory regions safely.
+    """
+    if count <= 0:
+        return
+
+    if dest == src:
+        return
+
+    # Check if memory regions overlap
+    var dest_addr = Int(dest)
+    var src_addr = Int(src)
+    var element_size = size_of[T]()
+    var total_bytes = count * element_size
+
+    var dest_end = dest_addr + total_bytes
+    var src_end = src_addr + total_bytes
+
+    # Check for overlap: regions overlap if one starts before the other ends
+    var overlaps = (dest_addr < src_end) and (src_addr < dest_end)
+
+    if not overlaps:
+        # No overlap - use fast memcpy
+        memcpy(dest=dest, src=src, count=count)
+    elif dest_addr < src_addr:
+        # Destination is before source - copy forwards (left to right)
+        for i in range(count):
+            (dest + i).init_pointee_copy((src + i)[])
+    else:
+        # Destination is after source - copy backwards (right to left)
+        var i = count - 1
+        while i >= 0:
+            (dest + i).init_pointee_copy((src + i)[])
+            i -= 1
+
+
+fn create_string_from_ptr[origin: ImmutOrigin](ptr: UnsafePointer[UInt8, origin], length: Int) -> String:
+    """Create a String from a pointer and length.
+
+    Copies raw bytes directly into the String. NOTE: may result in invalid UTF-8 for bytes >= 0x80.
+    """
+    if length <= 0:
+        return String()
+
+    # Copy raw bytes directly - this preserves the exact bytes from HTTP messages
+    var result = String()
+    # var buf = List[UInt8](capacity=length)
+    # for i in range(length):
+    #     buf.append(ptr[i])
+
+    result.write_bytes(Span(ptr=ptr, length=length))
+
+    return result^
+
+
+fn bufis(s: String, t: String) -> Bool:
+    """Check if string s equals t."""
+    return s == t

@@ -1,16 +1,7 @@
-from collections import Optional, Dict
 from hashlib.hash import Hasher
-from lightbug_http.io.bytes import Bytes, bytes, ByteReader
-from lightbug_http.strings import (
-    find_all,
-    strSlash,
-    strHttp11,
-    strHttp10,
-    strHttp,
-    http,
-    strHttps,
-    https,
-)
+
+from lightbug_http.io.bytes import ByteReader, Bytes, ByteView
+from lightbug_http.strings import find_all, http, https, strHttp10, strHttp11
 
 
 fn unquote[expand_plus: Bool = False](input_str: String, disallowed_escapes: List[String] = List[String]()) -> String:
@@ -28,7 +19,7 @@ fn unquote[expand_plus: Bool = False](input_str: String, disallowed_escapes: Lis
     var str_bytes = List[UInt8]()
     while current_idx < len(percent_idxs):
         var slice_end = percent_idxs[current_idx]
-        sub_strings.append(encoded_str[slice_start:slice_end])
+        sub_strings.append(String(encoded_str[slice_start:slice_end]))
 
         var current_offset = slice_end
         while current_idx < len(percent_idxs):
@@ -63,42 +54,41 @@ fn unquote[expand_plus: Bool = False](input_str: String, disallowed_escapes: Lis
         slice_start = current_offset
         current_idx += 1
 
-    sub_strings.append(encoded_str[slice_start:])
+    sub_strings.append(String(encoded_str[slice_start:]))
 
     return StaticString("").join(sub_strings)
 
 
-alias QueryMap = Dict[String, String]
+comptime QueryMap = Dict[String, String]
 
 
 struct QueryDelimiters:
-    alias STRING_START = "?"
-    alias ITEM = "&"
-    alias ITEM_ASSIGN = "="
-    alias PLUS_ESCAPED_SPACE = "+"
+    comptime STRING_START = "?"
+    comptime ITEM = "&"
+    comptime ITEM_ASSIGN = "="
+    comptime PLUS_ESCAPED_SPACE = "+"
 
 
 struct URIDelimiters:
-    alias SCHEMA = "://"
-    alias PATH = strSlash
-    alias ROOT_PATH = strSlash
-    alias CHAR_ESCAPE = "%"
-    alias AUTHORITY = "@"
-    alias QUERY = "?"
-    alias SCHEME = ":"
+    comptime SCHEMA = "://"
+    comptime PATH = "/"
+    comptime ROOT_PATH = "/"
+    comptime CHAR_ESCAPE = "%"
+    comptime AUTHORITY = "@"
+    comptime QUERY = "?"
+    comptime SCHEME = ":"
 
 
 struct PortBounds:
-    # For port parsing
-    alias NINE: UInt8 = ord("9")
-    alias ZERO: UInt8 = ord("0")
+    comptime NINE: UInt8 = ord("9")
+    comptime ZERO: UInt8 = ord("0")
 
 
 @fieldwise_init
-struct Scheme(Hashable, EqualityComparable, Representable, Stringable, Writable, ImplicitlyCopyable, Movable):
-    var value: String
-    alias HTTP = Self("http")
-    alias HTTPS = Self("https")
+struct Scheme(Equatable, Hashable, ImplicitlyCopyable, Representable, Stringable, Writable):
+    var value: UInt8
+    comptime HTTP = Self(0)
+    comptime HTTPS = Self(1)
 
     fn __hash__[H: Hasher](self, mut hasher: H):
         hasher.update(self.value)
@@ -106,21 +96,34 @@ struct Scheme(Hashable, EqualityComparable, Representable, Stringable, Writable,
     fn __eq__(self, other: Self) -> Bool:
         return self.value == other.value
 
-    fn __ne__(self, other: Self) -> Bool:
-        return self.value != other.value
-
-    fn write_to[W: Writer, //](self, mut writer: W) -> None:
-        writer.write("Scheme(value=", repr(self.value), ")")
+    fn write_to[W: Writer, //](self, mut writer: W):
+        if self == Self.HTTP:
+            writer.write("HTTP")
+        else:
+            writer.write("HTTPS")
 
     fn __repr__(self) -> String:
-        return String.write(self)
+        return String.write("Scheme(", self, ")")
 
     fn __str__(self) -> String:
-        return self.value.upper()
+        return String.write(self)
+
+
+struct URIParseError(Stringable, Writable):
+    var message: String
+
+    fn __init__(out self, var message: String):
+        self.message = message^
+
+    fn write_to[W: Writer, //](self, mut writer: W) -> None:
+        writer.write(self.message)
+
+    fn __str__(self) -> String:
+        return self.message.copy()
 
 
 @fieldwise_init
-struct URI(Writable, Stringable, Representable, Copyable, Movable):
+struct URI(Copyable, Representable, Stringable, Writable):
     var _original_path: String
     var scheme: String
     var path: String
@@ -137,7 +140,7 @@ struct URI(Writable, Stringable, Representable, Copyable, Movable):
     var password: String
 
     @staticmethod
-    fn parse(var uri: String) raises -> URI:
+    fn parse(var uri: String) raises URIParseError -> URI:
         """Parses a URI which is defined using the following format.
 
         `[scheme:][//[user_info@]host][/]path[?query][#fragment]`
@@ -149,8 +152,21 @@ struct URI(Writable, Stringable, Representable, Copyable, Movable):
         var scheme: String = "http"
         if "://" in uri:
             scheme = String(reader.read_until(ord(URIDelimiters.SCHEME)))
-            if reader.read_bytes(3) != "://".as_bytes():
-                raise Error("URI.parse: Invalid URI format, scheme should be followed by `://`. Received: " + uri)
+            var scheme_delimiter: ByteView[origin_of(uri)]
+            try:
+                scheme_delimiter = reader.read_bytes(3)
+            except EndOfReaderError:
+                raise URIParseError(
+                    "URI.parse: Incomplete URI, expected scheme delimiter after scheme but reached the end of the URI."
+                )
+
+            if scheme_delimiter != "://".as_bytes():
+                raise URIParseError(
+                    String(
+                        "URI.parse: Invalid URI format, scheme should be followed by `://`. Received: ",
+                        uri,
+                    )
+                )
 
         # Parse the user info, if exists.
         # TODO (@thatstoasty): Store the user information (username and password) if it exists.
@@ -175,7 +191,16 @@ struct URI(Writable, Stringable, Representable, Copyable, Movable):
                 if b < PortBounds.ZERO or b > PortBounds.NINE:
                     break
                 port_end += 1
-            port = UInt16(atol(String(host_and_port[colon + 1 : port_end])))
+
+            try:
+                port = UInt16(atol(String(host_and_port[colon + 1 : port_end])))
+            except conversion_err:
+                raise URIParseError(
+                    String(
+                        "URI.parse: Failed to convert port number from a String to Integer, received: ",
+                        uri,
+                    )
+                )
         else:
             host = String(host_and_port)
 
@@ -186,21 +211,55 @@ struct URI(Writable, Stringable, Representable, Copyable, Movable):
         if not original_path_bytes:
             original_path = "/"
         else:
-            original_path = unquote(String(original_path_bytes), disallowed_escapes=List(String("/")))
+            original_path = unquote(String(original_path_bytes), disallowed_escapes=["/"])
+
+        var result = URI(
+            _original_path=original_path,
+            scheme=scheme,
+            path=original_path,
+            query_string="",
+            queries=QueryMap(),
+            _hash="",
+            host=host,
+            port=port,
+            full_uri=uri,
+            request_uri=original_path,
+            username="",
+            password="",
+        )
 
         # Parse the path
+        var path_delimiter: Byte
+        try:
+            path_delimiter = reader.peek()
+        except EndOfReaderError:
+            return result^
+
         var path: String = "/"
         var request_uri: String = "/"
-        if reader.available() and reader.peek() == ord(URIDelimiters.PATH):
+        if path_delimiter == ord(URIDelimiters.PATH):
             # Copy the remaining bytes to read the request uri.
             var request_uri_reader = reader.copy()
             request_uri = String(request_uri_reader.read_bytes())
+
             # Read until the query string, or the end if there is none.
-            path = unquote(String(reader.read_until(ord(URIDelimiters.QUERY))), disallowed_escapes=List(String("/")))
+            path = unquote(
+                String(reader.read_until(ord(URIDelimiters.QUERY))),
+                disallowed_escapes=["/"],
+            )
+
+        result.request_uri = request_uri
+        result.path = path
 
         # Parse query
+        var query_delimiter: Byte
+        try:
+            query_delimiter = reader.peek()
+        except EndOfReaderError:
+            return result^
+
         var query: String = ""
-        if reader.available() and reader.peek() == ord(URIDelimiters.QUERY):
+        if query_delimiter == ord(URIDelimiters.QUERY):
             # TODO: Handle fragments for anchors
             query = String(reader.read_bytes()[1:])
 
@@ -217,20 +276,9 @@ struct URI(Writable, Stringable, Representable, Copyable, Movable):
                     if len(key_val) == 2:
                         queries[key] = unquote[expand_plus=True](String(key_val[1]))
 
-        return URI(
-            _original_path=original_path,
-            scheme=scheme,
-            path=path,
-            query_string=query,
-            queries=queries^,
-            _hash="",
-            host=host,
-            port=port,
-            full_uri=uri,
-            request_uri=request_uri,
-            username="",
-            password="",
-        )
+        result.queries = queries^
+        result.query_string = query^
+        return result^
 
     fn __str__(self) -> String:
         var result = String.write(self.scheme, URIDelimiters.SCHEMA, self.host, self.path)

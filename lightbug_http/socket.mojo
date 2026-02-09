@@ -1,86 +1,385 @@
-from memory import stack_allocation
-from utils import StaticTuple
-from sys import size_of, external_call
+from sys.ffi import c_uint
 from sys.info import CompilationTarget
-from memory import Pointer, LegacyUnsafePointer
-from lightbug_http._libc import (
-    socket,
+
+from lightbug_http.address import (
+    Addr,
+    NetworkType,
+    TCPAddr,
+    UDPAddr,
+    binary_ip_to_string,
+    binary_port_to_int,
+    get_ip_address,
+)
+from lightbug_http.c.address import AddressFamily, AddressLength
+from lightbug_http.c.network import InetNtopError, InetPtonError, SocketAddress, inet_pton
+from lightbug_http.c.socket import (
+    SOL_SOCKET,
+    ShutdownOption,
+    SocketOption,
+    SocketType,
+    accept,
+    bind,
+    close,
     connect,
+    getpeername,
+    getsockname,
+    getsockopt,
+    listen,
     recv,
     recvfrom,
     send,
     sendto,
-    shutdown,
-    inet_pton,
-    inet_ntop,
-    htons,
-    ntohs,
-    gai_strerror,
-    bind,
-    listen,
-    accept,
     setsockopt,
-    getsockopt,
-    getsockname,
-    getpeername,
-    close,
-    sockaddr,
-    sockaddr_in,
-    addrinfo,
-    socklen_t,
-    c_void,
-    c_uint,
-    c_char,
-    c_int,
-    in_addr,
-    SHUT_RDWR,
-    SOL_SOCKET,
-    AddressFamily,
-    AddressLength,
-    SOCK_STREAM,
-    SO_REUSEADDR,
-    SO_RCVTIMEO,
-    CloseInvalidDescriptorError,
-    ShutdownInvalidArgumentError,
+    shutdown,
+    socket,
 )
-from lightbug_http.io.bytes import Bytes
-from lightbug_http.address import (
-    NetworkType,
-    Addr,
-    binary_port_to_int,
-    binary_ip_to_string,
-    addrinfo_macos,
-    addrinfo_unix,
+from lightbug_http.c.socket_error import (
+    AcceptError,
+    BindError,
+    CloseEBADFError,
+    CloseEINTRError,
+    CloseEIOError,
+    CloseENOSPCError,
+    CloseError,
+    ConnectError,
+    GetpeernameError,
+    GetsocknameError,
+    GetsockoptError,
+    ListenError,
+    RecvError,
+    RecvfromError,
+    SendError,
+    SendtoError,
+    SetsockoptError,
+    ShutdownEINVALError,
+    ShutdownError,
 )
+from lightbug_http.c.socket_error import SocketError as CSocketError
 from lightbug_http.connection import default_buffer_size
-from lightbug_http._logger import logger
+from lightbug_http.io.bytes import Bytes
+from utils import Variant
 
 
-alias SocketClosedError = "Socket: Socket is already closed"
+@fieldwise_init
+@register_passable("trivial")
+struct SocketClosedError(Movable):
+    pass
 
 
-struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily = AddressFamily.AF_INET](
-    Representable, Stringable, Writable
-):
+@fieldwise_init
+@register_passable("trivial")
+struct EOF(Movable):
+    pass
+
+
+@fieldwise_init
+@register_passable("trivial")
+struct InvalidCloseErrorConversionError(Movable, Stringable, Writable):
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write("InvalidCloseErrorConversionError: Cannot convert EBADF to FatalCloseError")
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+
+@fieldwise_init
+struct SocketRecvError(Movable, Stringable, Writable):
+    """Error variant for socket receive operations.
+    Can be RecvError from the syscall or EOF if connection closed cleanly.
+    """
+
+    comptime type = Variant[RecvError, EOF]
+    var value: Self.type
+
+    @implicit
+    fn __init__(out self, var value: RecvError):
+        self.value = value^
+
+    @implicit
+    fn __init__(out self, value: EOF):
+        self.value = value
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        if self.value.isa[RecvError]():
+            writer.write(self.value[RecvError])
+        elif self.value.isa[EOF]():
+            writer.write("EOF")
+
+    fn isa[T: AnyType](self) -> Bool:
+        return self.value.isa[T]()
+
+    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
+        return self.value[T]
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+
+@fieldwise_init
+struct SocketRecvfromError(Movable, Stringable, Writable):
+    """Error variant for socket recvfrom operations.
+    Can be RecvfromError from the syscall or EOF if connection closed cleanly.
+    """
+
+    comptime type = Variant[RecvfromError, EOF]
+    var value: Self.type
+
+    @implicit
+    fn __init__(out self, var value: RecvfromError):
+        self.value = value^
+
+    @implicit
+    fn __init__(out self, value: EOF):
+        self.value = value
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        if self.value.isa[RecvfromError]():
+            writer.write(self.value[RecvfromError])
+        elif self.value.isa[EOF]():
+            writer.write("EOF")
+
+    fn isa[T: AnyType](self) -> Bool:
+        return self.value.isa[T]()
+
+    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
+        return self.value[T]
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+
+@fieldwise_init
+struct SocketAcceptError(Movable, Stringable, Writable):
+    """Error variant for socket accept operations.
+    Can be AcceptError or GetpeernameError from the syscall, SocketClosedError, or InetNtopError from binary_ip_to_string.
+    """
+
+    comptime type = Variant[AcceptError, GetpeernameError, SocketClosedError, InetNtopError]
+    var value: Self.type
+
+    @implicit
+    fn __init__(out self, var value: AcceptError):
+        self.value = value^
+
+    @implicit
+    fn __init__(out self, var value: GetpeernameError):
+        self.value = value^
+
+    @implicit
+    fn __init__(out self, value: SocketClosedError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, var value: InetNtopError):
+        self.value = value^
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        if self.value.isa[AcceptError]():
+            writer.write(self.value[AcceptError])
+        elif self.value.isa[GetpeernameError]():
+            writer.write(self.value[GetpeernameError])
+        elif self.value.isa[SocketClosedError]():
+            writer.write("SocketClosedError")
+        elif self.value.isa[InetNtopError]():
+            writer.write(self.value[InetNtopError])
+
+    fn isa[T: AnyType](self) -> Bool:
+        return self.value.isa[T]()
+
+    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
+        return self.value[T]
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+
+@fieldwise_init
+struct SocketBindError(Movable, Stringable, Writable):
+    """Error variant for socket bind operations.
+    Can be BindError from bind(), SocketGetsocknameError from get_sock_name(), or InetPtonError from inet_pton.
+    """
+
+    comptime type = Variant[BindError, SocketGetsocknameError, InetPtonError]
+    var value: Self.type
+
+    @implicit
+    fn __init__(out self, var value: BindError):
+        self.value = value^
+
+    @implicit
+    fn __init__(out self, var value: SocketGetsocknameError):
+        self.value = value^
+
+    @implicit
+    fn __init__(out self, var value: InetPtonError):
+        self.value = value^
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        if self.value.isa[BindError]():
+            writer.write(self.value[BindError])
+        elif self.value.isa[SocketGetsocknameError]():
+            writer.write(self.value[SocketGetsocknameError])
+        elif self.value.isa[InetPtonError]():
+            writer.write(self.value[InetPtonError])
+
+    fn isa[T: AnyType](self) -> Bool:
+        return self.value.isa[T]()
+
+    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
+        return self.value[T]
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+
+@fieldwise_init
+struct SocketConnectError(Movable, Stringable, Writable):
+    """Error variant for socket connect operations.
+    Can be ConnectError from the syscall or SocketAcceptError from get_peer_name.
+    """
+
+    comptime type = Variant[ConnectError, SocketAcceptError]
+    var value: Self.type
+
+    @implicit
+    fn __init__(out self, var value: ConnectError):
+        self.value = value^
+
+    @implicit
+    fn __init__(out self, var value: SocketAcceptError):
+        self.value = value^
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        if self.value.isa[ConnectError]():
+            writer.write(self.value[ConnectError])
+        elif self.value.isa[SocketAcceptError]():
+            writer.write(self.value[SocketAcceptError])
+
+    fn isa[T: AnyType](self) -> Bool:
+        return self.value.isa[T]()
+
+    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
+        return self.value[T]
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+
+@fieldwise_init
+struct SocketGetsocknameError(Movable, Stringable, Writable):
+    """Error variant for socket getsockname operations.
+    Can be GetsocknameError from the syscall, SocketClosedError, or InetNtopError from binary_ip_to_string.
+    """
+
+    comptime type = Variant[GetsocknameError, SocketClosedError, InetNtopError]
+    var value: Self.type
+
+    @implicit
+    fn __init__(out self, var value: GetsocknameError):
+        self.value = value^
+
+    @implicit
+    fn __init__(out self, value: SocketClosedError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, var value: InetNtopError):
+        self.value = value^
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        if self.value.isa[GetsocknameError]():
+            writer.write(self.value[GetsocknameError])
+        elif self.value.isa[SocketClosedError]():
+            writer.write("SocketClosedError")
+        elif self.value.isa[InetNtopError]():
+            writer.write(self.value[InetNtopError])
+
+    fn isa[T: AnyType](self) -> Bool:
+        return self.value.isa[T]()
+
+    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
+        return self.value[T]
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+
+@fieldwise_init
+struct FatalCloseError(Movable, Stringable, Writable):
+    """Error type for Socket.close() that excludes EBADF.
+
+    EBADF is excluded because it indicates the socket is already closed,
+    which is the desired state. Other errors indicate actual failures
+    that should be propagated.
+    """
+
+    comptime type = Variant[CloseEINTRError, CloseEIOError, CloseENOSPCError]
+    var value: Self.type
+
+    @implicit
+    fn __init__(out self, value: CloseEINTRError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: CloseEIOError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, value: CloseENOSPCError):
+        self.value = value
+
+    @implicit
+    fn __init__(out self, var value: CloseError) raises InvalidCloseErrorConversionError:
+        if value.isa[CloseEINTRError]():
+            self.value = CloseEINTRError()
+        elif value.isa[CloseEIOError]():
+            self.value = CloseEIOError()
+        elif value.isa[CloseENOSPCError]():
+            self.value = CloseENOSPCError()
+        else:
+            raise InvalidCloseErrorConversionError()
+
+    fn write_to[W: Writer, //](self, mut writer: W):
+        if self.value.isa[CloseEINTRError]():
+            writer.write(self.value[CloseEINTRError])
+        elif self.value.isa[CloseEIOError]():
+            writer.write(self.value[CloseEIOError])
+        elif self.value.isa[CloseENOSPCError]():
+            writer.write(self.value[CloseENOSPCError])
+
+    fn isa[T: AnyType](self) -> Bool:
+        return self.value.isa[T]()
+
+    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
+        return self.value[T]
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+
+@fieldwise_init
+struct Socket[
+    address: Addr,
+    sock_type: SocketType = SocketType.SOCK_STREAM,
+    address_family: AddressFamily = AddressFamily.AF_INET,
+](Movable, Representable, Stringable, Writable):
     """Represents a network file descriptor. Wraps around a file descriptor and provides network functions.
+
+    Parameters:
+        address: The type of address the socket uses.
+        sock_type: The type of socket (e.g., SOCK_STREAM for TCP, SOCK_DGRAM for UDP).
+        address_family: The address family (e.g., AF_INET for IPv4, AF_INET6 for IPv6).
 
     Args:
         local_address: The local address of the socket (local address if bound).
         remote_address: The remote address of the socket (peer's address if connected).
-        address_family: The address family of the socket.
-        socket_type: The socket type.
-        protocol: The protocol.
     """
 
-    var fd: Int32
+    var fd: FileDescriptor
     """The file descriptor of the socket."""
-    var socket_type: Int32
-    """The socket type."""
-    var protocol: Byte
-    """The protocol."""
-    var _local_address: AddrType
+    var local_address: Self.address
     """The local address of the socket (local address if bound)."""
-    var _remote_address: AddrType
+    var remote_address: Self.address
     """The remote address of the socket (peer's address if connected)."""
     var _closed: Bool
     """Whether the socket is closed."""
@@ -89,79 +388,53 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
 
     fn __init__(
         out self,
-        local_address: AddrType = AddrType(),
-        remote_address: AddrType = AddrType(),
-        socket_type: Int32 = SOCK_STREAM,
-        protocol: Byte = 0,
-    ) raises:
+        local_address: Self.address = Self.address(),
+        remote_address: Self.address = Self.address(),
+    ) raises CSocketError:
         """Create a new socket object.
 
         Args:
             local_address: The local address of the socket (local address if bound).
             remote_address: The remote address of the socket (peer's address if connected).
-            socket_type: The socket type.
-            protocol: The protocol.
 
         Raises:
             Error: If the socket creation fails.
         """
-        self.socket_type = socket_type
-        self.protocol = protocol
-        self.fd = socket(address_family.value, socket_type, 0)
-        self._local_address = local_address
-        self._remote_address = remote_address
+        # TODO: Tried unspec for both address family and protocol, and inet for both but that doesn't seem to work.
+        # I guess for now, I'll leave protocol as unspec.
+        self.fd = FileDescriptor(Int(socket(Self.address_family.value, Self.sock_type.value, 0)))
+        self.local_address = local_address
+        self.remote_address = remote_address
         self._closed = False
         self._connected = False
 
     fn __init__(
         out self,
-        fd: Int32,
-        socket_type: Int32,
-        protocol: Byte,
-        local_address: AddrType,
-        remote_address: AddrType = AddrType(),
+        fd: FileDescriptor,
+        local_address: Self.address,
+        remote_address: Self.address = Self.address(),
     ):
         """
         Create a new socket object when you already have a socket file descriptor. Typically through socket.accept().
 
         Args:
             fd: The file descriptor of the socket.
-            socket_type: The socket type.
-            protocol: The protocol.
             local_address: The local address of the socket (local address if bound).
             remote_address: The remote address of the socket (peer's address if connected).
         """
         self.fd = fd
-        self.socket_type = socket_type
-        self.protocol = protocol
-        self._local_address = local_address
-        self._remote_address = remote_address
+        self.local_address = local_address
+        self.remote_address = remote_address
         self._closed = False
         self._connected = True
 
-    fn __moveinit__(out self, deinit existing: Self):
-        """Initialize a new socket object by moving the data from an existing socket object.
-
-        Args:
-            existing: The existing socket object to move the data from.
-        """
-        self.fd = existing.fd
-        self.socket_type = existing.socket_type
-        self.protocol = existing.protocol
-
-        self._local_address = existing._local_address^
-        self._remote_address = existing._remote_address^
-
-        self._closed = existing._closed
-        self._connected = existing._connected
-
-    fn teardown(mut self) raises:
+    fn teardown(deinit self) raises FatalCloseError:
         """Close the socket and free the file descriptor."""
         if self._connected:
             try:
                 self.shutdown()
-            except e:
-                logger.debug("Socket.teardown: Failed to shutdown socket: " + String(e))
+            except shutdown_err:
+                pass
 
         if not self._closed:
             self.close()
@@ -172,9 +445,9 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
     fn __del__(deinit self):
         """Close the socket when the object is deleted."""
         try:
-            self.teardown()
-        except e:
-            logger.debug("Socket.__del__: Failed to close socket during deletion:", e)
+            self^.teardown()
+        except teardown_err:
+            pass
 
     fn __str__(self) -> String:
         return String.write(self)
@@ -183,66 +456,27 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         return String.write(self)
 
     fn write_to[W: Writer, //](self, mut writer: W):
-        @parameter
-        fn af() -> String:
-            if address_family == AddressFamily.AF_INET:
-                return "AF_INET"
-            else:
-                return "AF_INET6"
-
         writer.write(
             "Socket[",
-            AddrType._type,
+            Self.address._type,
             ", ",
-            af(),
+            Self.address_family,
             "]",
             "(",
             "fd=",
-            String(self.fd),
-            ", _local_address=",
-            repr(self._local_address),
-            ", _remote_address=",
-            repr(self._remote_address),
+            self.fd.value,
+            ", local_address=",
+            repr(self.local_address),
+            ", remote_address=",
+            repr(self.remote_address),
             ", _closed=",
-            String(self._closed),
+            self._closed,
             ", _connected=",
-            String(self._connected),
+            self._connected,
             ")",
         )
 
-    fn local_address(ref self) -> ref [self._local_address] AddrType:
-        """Return the local address of the socket as a UDP address.
-
-        Returns:
-            The local address of the socket as a UDP address.
-        """
-        return self._local_address
-
-    fn set_local_address(mut self, address: AddrType) -> None:
-        """Set the local address of the socket.
-
-        Args:
-            address: The local address to set.
-        """
-        self._local_address = address
-
-    fn remote_address(ref self) -> ref [self._remote_address] AddrType:
-        """Return the remote address of the socket as a UDP address.
-
-        Returns:
-            The remote address of the socket as a UDP address.
-        """
-        return self._remote_address
-
-    fn set_remote_address(mut self, address: AddrType) -> None:
-        """Set the remote address of the socket.
-
-        Args:
-            address: The remote address to set.
-        """
-        self._remote_address = address
-
-    fn accept(self) raises -> Socket[AddrType]:
+    fn accept(self) raises SocketAcceptError -> Self:
         """Accept a connection. The socket must be bound to an address and listening for connections.
         The return value is a connection where conn is a new socket object usable to send and receive data on the connection,
         and address is the address bound to the socket on the other end of the connection.
@@ -251,41 +485,31 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
             A new socket object and the address of the remote socket.
 
         Raises:
-            Error: If the connection fails.
+            AcceptError: If accept fails.
+            GetpeernameError: If getting peer address fails.
         """
-        var new_socket_fd: c_int
-        try:
-            new_socket_fd = accept(self.fd)
-        except e:
-            logger.error(e)
-            raise Error("Socket.accept: Failed to accept connection, system `accept()` returned an error.")
+        var new_socket_fd = accept(self.fd)
 
-        var new_socket = Socket(
+        var new_socket = Self(
             fd=new_socket_fd,
-            socket_type=self.socket_type,
-            protocol=self.protocol,
-            local_address=self.local_address(),
+            local_address=self.local_address,
         )
         var peer = new_socket.get_peer_name()
-        new_socket.set_remote_address(AddrType(peer[0], peer[1]))
+        new_socket.remote_address = Self.address(peer[0], peer[1])
         return new_socket^
 
-    fn listen(self, backlog: UInt = 0) raises:
+    fn listen(self, backlog: UInt = 0) raises ListenError:
         """Enable a server to accept connections.
 
         Args:
             backlog: The maximum number of queued connections. Should be at least 0, and the maximum is system-dependent (usually 5).
 
         Raises:
-            Error: If listening for a connection fails.
+            ListenError: If listening for a connection fails.
         """
-        try:
-            listen(self.fd, backlog)
-        except e:
-            logger.error(e)
-            raise Error("Socket.listen: Failed to listen for connections.")
+        listen(self.fd, Int32(backlog))
 
-    fn bind(mut self, address: String, port: UInt16) raises:
+    fn bind(mut self, ip_address: String, port: UInt16) raises SocketBindError:
         """Bind the socket to address. The socket must not already be bound. (The format of address depends on the address family).
 
         When a socket is created with Socket(), it exists in a name
@@ -297,87 +521,68 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         socket'.
 
         Args:
-            address: The IP address to bind the socket to.
+            ip_address: The IP address to bind the socket to.
             port: The port number to bind the socket to.
 
         Raises:
-            Error: If binding the socket fails.
+            SocketBindError: If IP conversion fails, bind fails, or getting socket name fails.
         """
-        var binary_ip: c_uint
-        try:
-            binary_ip = inet_pton[address_family](address)
-        except e:
-            logger.error(e)
-            raise Error("ListenConfig.listen: Failed to convert IP address to binary form.")
+        var binary_ip = inet_pton[Self.address_family](ip_address)
 
-        var local_address = sockaddr_in(
-            address_family=Int(address_family.value),
+        var local_address = SocketAddress(
+            address_family=Self.address_family,
             port=port,
             binary_ip=binary_ip,
         )
-        try:
-            bind(self.fd, local_address)
-        except e:
-            logger.error(e)
-            raise Error("Socket.bind: Binding socket failed.")
+        bind(self.fd, local_address)
 
         var local = self.get_sock_name()
-        self._local_address = AddrType(local[0], local[1])
+        self.local_address = Self.address(local[0], local[1])
 
-    fn get_sock_name(self) raises -> Tuple[String, UInt16]:
+    fn get_sock_name(self) raises SocketGetsocknameError -> Tuple[String, UInt16]:
         """Return the address of the socket.
 
         Returns:
             The address of the socket.
 
         Raises:
-            Error: If getting the address of the socket fails.
+            SocketGetsocknameError: If socket is closed or getsockname fails.
         """
         if self._closed:
-            raise SocketClosedError
+            raise SocketClosedError()
 
         # TODO: Add check to see if the socket is bound and error if not.
-        var local_address = stack_allocation[1, sockaddr]()
-        try:
-            getsockname(
-                self.fd,
-                local_address,
-                Pointer(to=socklen_t(size_of[sockaddr]())),
-            )
-        except e:
-            logger.error(e)
-            raise Error("get_sock_name: Failed to get address of local socket.")
+        var local_address = SocketAddress()
+        getsockname(self.fd, local_address)
 
-        var addr_in = local_address.bitcast[sockaddr_in]().take_pointee()
-        return binary_ip_to_string[address_family](addr_in.sin_addr.s_addr), UInt16(
-            binary_port_to_int(addr_in.sin_port)
+        ref local_sockaddr_in = local_address.as_sockaddr_in()
+        return (
+            binary_ip_to_string[Self.address_family](local_sockaddr_in.sin_addr.s_addr),
+            UInt16(binary_port_to_int(local_sockaddr_in.sin_port)),
         )
 
-    fn get_peer_name(self) raises -> Tuple[String, UInt16]:
+    fn get_peer_name(self) raises SocketAcceptError -> Tuple[String, UInt16]:
         """Return the address of the peer connected to the socket.
 
         Returns:
             The address of the peer connected to the socket.
 
         Raises:
-            Error: If getting the address of the peer connected to the socket fails.
+            SocketAcceptError: If socket is closed or getpeername fails.
         """
         if self._closed:
-            raise SocketClosedError
+            raise SocketClosedError()
 
         # TODO: Add check to see if the socket is bound and error if not.
-        var addr_in: sockaddr_in
-        try:
-            addr_in = getpeername(self.fd)
-        except e:
-            logger.error(e)
-            raise Error("get_peer_name: Failed to get address of remote socket.")
+        var peer_address = getpeername(self.fd)
 
-        return binary_ip_to_string[address_family](addr_in.sin_addr.s_addr), UInt16(
-            binary_port_to_int(addr_in.sin_port)
+        ref peer_sockaddr_in = peer_address.as_sockaddr_in()
+        return (
+            binary_ip_to_string[Self.address_family](peer_sockaddr_in.sin_addr.s_addr),
+            UInt16(binary_port_to_int(peer_sockaddr_in.sin_port)),
         )
 
-    fn get_socket_option(self, option_name: Int) raises -> Int:
+    fn get_socket_option(self, option_name: SocketOption) raises GetsockoptError -> Int:
         """Return the value of the given socket option.
 
         Args:
@@ -387,16 +592,11 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
             The value of the given socket option.
 
         Raises:
-            Error: If getting the socket option fails.
+            GetsockoptError: If getting the socket option fails.
         """
-        try:
-            return getsockopt(self.fd, SOL_SOCKET, option_name)
-        except e:
-            # TODO: Should this be a warning or an error?
-            logger.warn("Socket.get_socket_option: Failed to get socket option.")
-            raise e
+        return getsockopt(self.fd, SOL_SOCKET, option_name.value)
 
-    fn set_socket_option(self, option_name: Int, var option_value: Byte = 1) raises:
+    fn set_socket_option(self, option_name: SocketOption, var option_value: Int = 1) raises SetsockoptError:
         """Return the value of the given socket option.
 
         Args:
@@ -404,88 +604,37 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
             option_value: The value to set the socket option to. Defaults to 1 (True).
 
         Raises:
-            Error: If setting the socket option fails.
+            SetsockoptError: If setting the socket option fails.
         """
-        try:
-            setsockopt(self.fd, SOL_SOCKET, option_name, option_value)
-        except e:
-            # TODO: Should this be a warning or an error?
-            logger.warn("Socket.set_socket_option: Failed to set socket option.")
-            raise e
+        setsockopt(self.fd, SOL_SOCKET, option_name.value, option_value)
 
-    fn connect(mut self, address: String, port: UInt16) raises -> None:
+    fn connect(mut self, mut ip_address: String, port: UInt16) raises -> None:
         """Connect to a remote socket at address.
 
         Args:
-            address: The IP address to connect to.
+            ip_address: The IP address to connect to.
             port: The port number to connect to.
 
         Raises:
             Error: If connecting to the remote socket fails.
         """
-
-        @parameter
-        if CompilationTarget.is_macos():
-            ip = addrinfo_macos().get_ip_address(address)
-        else:
-            ip = addrinfo_unix().get_ip_address(address)
-
-        var addr = sockaddr_in(address_family=Int(address_family.value), port=port, binary_ip=ip.s_addr)
-        try:
-            connect(self.fd, addr)
-        except e:
-            logger.error("Socket.connect: Failed to establish a connection to the server.")
-            raise e
+        var ip = get_ip_address(ip_address, Self.address_family, Self.sock_type)
+        var remote_address = SocketAddress(address_family=Self.address_family, port=port, binary_ip=ip)
+        connect(self.fd, remote_address)
 
         var remote = self.get_peer_name()
-        self._remote_address = AddrType(remote[0], remote[1])
+        self.remote_address = Self.address(remote[0], remote[1])
 
-    fn send(self, buffer: Span[Byte]) raises -> UInt:
-        try:
-            return send(self.fd, buffer.unsafe_ptr(), UInt(len(buffer)), 0)
-        except e:
-            logger.error("Socket.send: Failed to write data to connection.")
-            raise e
+    fn send(self, buffer: Span[Byte]) raises SendError -> UInt:
+        return send(self.fd, buffer, UInt(len(buffer)), 0)
 
-    fn send_all(self, src: Span[Byte], max_attempts: Int = 3) raises -> None:
-        """Send data to the socket. The socket must be connected to a remote socket.
-
-        Args:
-            src: The data to send.
-            max_attempts: The maximum number of attempts to send the data.
-
-        Raises:
-            Error: If sending the data fails, or if the data is not sent after the maximum number of attempts.
-        """
-        var total_bytes_sent = 0
-        var attempts = 0
-
-        # Try to send all the data in the buffer. If it did not send all the data, keep trying but start from the offset of the last successful send.
-        while total_bytes_sent < len(src):
-            if attempts > max_attempts:
-                raise Error("Failed to send message after " + String(max_attempts) + " attempts.")
-
-            var sent: UInt
-            try:
-                sent = self.send(src[total_bytes_sent:])
-            except e:
-                logger.error(e)
-                raise Error(
-                    "Socket.send_all: Failed to send message, wrote"
-                    + String(total_bytes_sent)
-                    + "bytes before failing."
-                )
-
-            total_bytes_sent += Int(sent)
-            attempts += 1
-
-    fn send_to(mut self, src: Span[Byte], address: String, port: UInt16) raises -> UInt:
+    fn send_to(self, src: Span[Byte], mut host: String, port: UInt16) raises -> UInt:
         """Send data to the a remote address by connecting to the remote socket before sending.
         The socket must be not already be connected to a remote socket.
 
         Args:
             src: The data to send.
-            address: The IP address to connect to.
+            host: The host to connect to.
             port: The port number to connect to.
 
         Returns:
@@ -494,51 +643,39 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         Raises:
             Error: If sending the data fails.
         """
+        var ip = get_ip_address(host, Self.address_family, Self.sock_type)
+        var remote_address = SocketAddress(address_family=Self.address_family, port=port, binary_ip=ip)
+        return sendto(self.fd, src, UInt(len(src)), 0, remote_address)
 
-        @parameter
-        if CompilationTarget.is_macos():
-            ip = addrinfo_macos().get_ip_address(address)
-        else:
-            ip = addrinfo_unix().get_ip_address(address)
-
-        var addr = sockaddr_in(address_family=Int(address_family.value), port=port, binary_ip=ip.s_addr)
-        bytes_sent = sendto(self.fd, src.unsafe_ptr(), UInt(len(src)), 0, LegacyUnsafePointer(to=addr).bitcast[sockaddr]())
-
-        return bytes_sent
-
-    fn _receive(self, mut buffer: Bytes) raises -> UInt:
+    fn _receive(self, mut buffer: Bytes) raises SocketRecvError -> UInt:
         """Receive data from the socket into the buffer.
 
         Args:
             buffer: The buffer to read data into.
 
         Returns:
-            The buffer with the received data, and an error if one occurred.
+            The number of bytes received.
 
         Raises:
-            Error: If reading data from the socket fails.
-            EOF: If 0 bytes are received, return EOF.
+            RecvError: If reading data from the socket fails.
+            EOF: If 0 bytes are received.
         """
         var bytes_received: UInt
         var size = len(buffer)
-        try:
-            bytes_received = recv(
-                self.fd,
-                buffer.unsafe_ptr().offset(size),
-                UInt(buffer.capacity - len(buffer)),
-                0,
-            )
-            buffer._len += Int(bytes_received)
-        except e:
-            logger.error(e)
-            raise Error("Socket.receive: Failed to read data from connection.")
+        bytes_received = recv(
+            self.fd,
+            Span(buffer)[size:],
+            UInt(buffer.capacity - len(buffer)),
+            0,
+        )
+        buffer._len += Int(bytes_received)
 
         if bytes_received == 0:
-            raise Error("EOF")
+            raise EOF()
 
         return bytes_received
 
-    fn receive(self, size: Int = default_buffer_size) raises -> List[Byte]:
+    fn receive(self, size: Int = default_buffer_size) raises SocketRecvError -> List[Byte]:
         """Receive data from the socket into the buffer with capacity of `size` bytes.
 
         Args:
@@ -551,7 +688,7 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         _ = self._receive(buffer)
         return buffer^
 
-    fn receive(self, mut buffer: Bytes) raises -> UInt:
+    fn receive(self, mut buffer: Bytes) raises SocketRecvError -> UInt:
         """Receive data from the socket into the buffer.
 
         Args:
@@ -573,35 +710,36 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
             buffer: The buffer to read data into.
 
         Returns:
-            The buffer with the received data, and an error if one occurred.
+            Tuple of (bytes received, remote host, remote port).
 
         Raises:
-            Error: If reading data from the socket fails.
-            EOF: If 0 bytes are received, return EOF.
+            RecvfromError: If reading data from the socket fails.
+            EOF: If 0 bytes are received.
         """
-        var remote_address = stack_allocation[1, sockaddr]()
+        var remote_address = SocketAddress()
         var bytes_received: UInt
-        try:
-            var size = len(buffer)
-            bytes_received = recvfrom(
-                self.fd, buffer.unsafe_ptr().offset(size), UInt(buffer.capacity - len(buffer)), 0, remote_address
-            )
-            buffer._len += Int(bytes_received)
-        except e:
-            logger.error(e)
-            raise Error("Socket._receive_from: Failed to read data from connection.")
+        var size = len(buffer)
+        bytes_received = recvfrom(
+            self.fd,
+            Span(buffer)[size:],
+            UInt(buffer.capacity - len(buffer)),
+            0,
+            remote_address,
+        )
+        buffer._len += Int(bytes_received)
 
         if bytes_received == 0:
             raise Error("EOF")
 
-        var addr_in = remote_address.bitcast[sockaddr_in]().take_pointee()
+        ref peer_sockaddr_in = remote_address.as_sockaddr_in()
+        var ip_str = binary_ip_to_string[Self.address_family](peer_sockaddr_in.sin_addr.s_addr)
         return (
             bytes_received,
-            binary_ip_to_string[address_family](addr_in.sin_addr.s_addr),
-            UInt16(binary_port_to_int(addr_in.sin_port)),
+            ip_str,
+            UInt16(binary_port_to_int(peer_sockaddr_in.sin_port)),
         )
 
-    fn receive_from(mut self, size: Int = default_buffer_size) raises -> Tuple[List[Byte], String, UInt16]:
+    fn receive_from(self, size: Int = default_buffer_size) raises -> Tuple[List[Byte], String, UInt16]:
         """Receive data from the socket into the buffer dest.
 
         Args:
@@ -611,13 +749,14 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
             The number of bytes read, the remote address, and an error if one occurred.
 
         Raises:
-            Error: If reading data from the socket fails.
+            RecvfromError: If reading data from the socket fails.
+            EOF: If 0 bytes are received.
         """
         var buffer = Bytes(capacity=size)
         _, host, port = self._receive_from(buffer)
         return buffer^, host, port
 
-    fn receive_from(mut self, mut dest: List[Byte]) raises -> Tuple[UInt, String, UInt16]:
+    fn receive_from(self, mut dest: List[Byte]) raises -> Tuple[UInt, String, UInt16]:
         """Receive data from the socket into the buffer dest.
 
         Args:
@@ -631,48 +770,63 @@ struct Socket[AddrType: Addr & ImplicitlyCopyable, address_family: AddressFamily
         """
         return self._receive_from(dest)
 
-    fn shutdown(mut self) raises -> None:
+    fn shutdown(mut self) raises ShutdownEINVALError -> None:
         """Shut down the socket. The remote end will receive no more data (after queued data is flushed)."""
         try:
-            shutdown(self.fd, SHUT_RDWR)
-        except e:
+            shutdown(self.fd, ShutdownOption.SHUT_RDWR)
+        except shutdown_err:
             # For the other errors, either the socket is already closed or the descriptor is invalid.
             # At that point we can feasibly say that the socket is already shut down.
-            if String(e) == ShutdownInvalidArgumentError:
-                logger.error("Socket.shutdown: Failed to shutdown socket.")
-                raise e
-            logger.debug(e)
+            if shutdown_err.isa[ShutdownEINVALError]():
+                raise shutdown_err[ShutdownEINVALError]
 
         self._connected = False
 
-    fn close(mut self) raises -> None:
+    fn close(mut self) raises FatalCloseError -> None:
         """Mark the socket closed.
         Once that happens, all future operations on the socket object will fail.
         The remote end will receive no more data (after queued data is flushed).
 
         Raises:
-            Error: If closing the socket fails.
+            FatalCloseError: If closing the socket fails (excludes EBADF which means already closed).
         """
         try:
             close(self.fd)
-        except e:
-            # If the file descriptor is invalid, then it was most likely already closed.
-            # Other errors indicate a failure while attempting to close the socket.
-            if String(e) != CloseInvalidDescriptorError:
-                logger.error("Socket.close: Failed to close socket.")
-                raise e
-            logger.debug(e)
+        except close_err:
+            # EBADF is silently ignored as it means socket already closed
+            if not close_err.isa[CloseEBADFError]():
+                if close_err.isa[CloseEINTRError]():
+                    raise close_err[CloseEINTRError]
+                elif close_err.isa[CloseEIOError]():
+                    raise close_err[CloseEIOError]
+                elif close_err.isa[CloseENOSPCError]():
+                    raise close_err[CloseENOSPCError]
 
         self._closed = True
 
-    fn get_timeout(self) raises -> Int:
+    fn get_timeout(self) raises GetsockoptError -> Int:
         """Return the timeout value for the socket."""
-        return self.get_socket_option(SO_RCVTIMEO)
+        return self.get_socket_option(SocketOption.SO_RCVTIMEO)
 
-    fn set_timeout(self, var duration: Int) raises:
+    fn set_timeout(self, var duration: Int) raises SetsockoptError:
         """Set the timeout value for the socket.
 
         Args:
             duration: Seconds - The timeout duration in seconds.
         """
-        self.set_socket_option(SO_RCVTIMEO, duration)
+        self.set_socket_option(SocketOption.SO_RCVTIMEO, duration)
+
+
+comptime UDPSocket[address: Addr] = Socket[
+    address=address,
+    sock_type = SocketType.SOCK_DGRAM,
+    address_family = AddressFamily.AF_INET,
+]
+comptime UDP4Socket = UDPSocket[UDPAddr[NetworkType.udp4]]
+comptime TCPSocket[address: Addr] = Socket[
+    address=address,
+    sock_type = SocketType.SOCK_STREAM,
+    address_family = AddressFamily.AF_INET,
+]
+comptime TCP4Socket = TCPSocket[TCPAddr[NetworkType.tcp4]]
+comptime TCP6Socket = TCPSocket[TCPAddr[NetworkType.tcp6]]

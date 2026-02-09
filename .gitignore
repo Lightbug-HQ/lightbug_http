@@ -3,6 +3,7 @@
 .DS_Store
 .mojoenv
 install_id
+kgen.*
 
 # pixi environments
 .pixi

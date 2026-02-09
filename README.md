@@ -17,14 +17,14 @@
    <br/>
    [![Join our Discord][discord-shield]][discord-url]
    [![Contributors Welcome][contributors-shield]][contributors-url]
-   
+
 
   </p>
 </div>
 
 ## Overview
 
-Lightbug is a simple and sweet HTTP framework for Mojo that builds on best practice from systems programming, such as the Golang [FastHTTP](https://github.com/valyala/fasthttp/) and Rust [may_minihttp](https://github.com/Xudong-Huang/may_minihttp/). 
+Lightbug is a simple and sweet HTTP framework for Mojo that builds on best practice from systems programming, such as the Golang [FastHTTP](https://github.com/valyala/fasthttp/) and Rust [may_minihttp](https://github.com/Xudong-Huang/may_minihttp/).
 
 This is not production ready yet. We're aiming to keep up with new developments in Mojo, but it might take some time to get to a point when this is safe to use in real-world applications.
 
@@ -45,7 +45,7 @@ Lightbug currently has the following features:
 <!-- GETTING STARTED -->
 ## Getting Started
 
-The only hard dependency for `lightbug_http` is Mojo. 
+The only hard dependency for `lightbug_http` is Mojo.
 Learn how to get up and running with Mojo on the [Modular website](https://www.modular.com/max/mojo).
 Once you have a Mojo project set up locally,
 
@@ -60,7 +60,7 @@ Once you have a Mojo project set up locally,
 
    ```toml
    [dependencies]
-   lightbug_http = ">=0.25.7,<0.25.8"
+   lightbug_http = ">=0.26.1,<0.26.2"
    ```
 
 3. Run `pixi install` at the root of your project, where `pixi.toml` is located
@@ -70,7 +70,7 @@ Once you have a Mojo project set up locally,
     from lightbug_http import *
     ```
 
-    or import individual structs and functions, e.g. 
+    or import individual structs and functions, e.g.
 
     ```mojo
     from lightbug_http.service import HTTPService
@@ -234,12 +234,12 @@ from lightbug_http.connection import dial_udp
 from lightbug_http.address import UDPAddr
 from utils import StringSlice
 
-alias test_string = "Hello, lightbug!"
+comptime test_string = "Hello, lightbug!"
 
 fn main() raises:
     print("Dialing UDP server...")
-    alias host = "127.0.0.1"
-    alias port = 12000
+    comptime host = "127.0.0.1"
+    comptime port = 12000
     var udp = dial_udp(host, port)
 
     print("Sending " + str(len(test_string)) + " messages to the server...")
@@ -287,12 +287,12 @@ We're working on support for the following (contributors welcome!):
 
 The plan is to get to a feature set similar to Python frameworks like [Starlette](https://github.com/encode/starlette), but with better performance.
 
-Our vision is to develop three libraries, with `lightbug_http` (this repo) as a starting point: 
+Our vision is to develop three libraries, with `lightbug_http` (this repo) as a starting point:
  - `lightbug_http` - Lightweight and simple HTTP framework, basic networking primitives
  - [`lightbug_api`](https://github.com/saviorand/lightbug_api) - Tools to make great APIs fast, with OpenAPI support and automated docs
  - `lightbug_web` - (release date TBD) Full-stack web framework for Mojo, similar to NextJS or SvelteKit
 
-The idea is to get to a point where the entire codebase of a simple modern web application can be written in Mojo. 
+The idea is to get to a point where the entire codebase of a simple modern web application can be written in Mojo.
 
 We don't make any promises, though -- this is just a vision, and whether we get there or not depends on many factors, including the support of the community.
 

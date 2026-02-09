@@ -1,19 +1,31 @@
-from collections import Optional
 from lightbug_http.header import HeaderKey
+from utils import Variant
 
 
-struct Cookie(Copyable, Movable):
-    alias EXPIRES = "Expires"
-    alias MAX_AGE = "Max-Age"
-    alias DOMAIN = "Domain"
-    alias PATH = "Path"
-    alias SECURE = "Secure"
-    alias HTTP_ONLY = "HttpOnly"
-    alias SAME_SITE = "SameSite"
-    alias PARTITIONED = "Partitioned"
+@fieldwise_init
+@register_passable("trivial")
+struct InvalidCookieError(Movable, Stringable, Writable):
+    """Error raised when a cookie is invalid."""
 
-    alias SEPERATOR = "; "
-    alias EQUAL = "="
+    fn write_to[W: Writer, //](self, mut writer: W):
+        writer.write("InvalidCookieError: Invalid cookie format")
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+
+struct Cookie(Copyable):
+    comptime EXPIRES = "Expires"
+    comptime MAX_AGE = "Max-Age"
+    comptime DOMAIN = "Domain"
+    comptime PATH = "Path"
+    comptime SECURE = "Secure"
+    comptime HTTP_ONLY = "HttpOnly"
+    comptime SAME_SITE = "SameSite"
+    comptime PARTITIONED = "Partitioned"
+
+    comptime SEPARATOR = "; "
+    comptime EQUAL = "="
 
     var name: String
     var value: String
@@ -27,10 +39,10 @@ struct Cookie(Copyable, Movable):
     var max_age: Optional[Duration]
 
     @staticmethod
-    fn from_set_header(header_str: String) raises -> Self:
-        var parts = header_str.split(Cookie.SEPERATOR)
+    fn from_set_header(header_str: String) raises InvalidCookieError -> Self:
+        var parts = header_str.split(Cookie.SEPARATOR)
         if len(parts) < 1:
-            raise Error("invalid Cookie")
+            raise InvalidCookieError()
 
         var cookie = Cookie("", String(parts[0]), path=String("/"))
         if Cookie.EQUAL in parts[0]:
@@ -104,7 +116,7 @@ struct Cookie(Copyable, Movable):
         self.name = existing.name^
         self.value = existing.value^
         self.max_age = existing.max_age^
-        self.expires = existing.expires^
+        self.expires = existing.expires.copy()
         self.domain = existing.domain^
         self.path = existing.path^
         self.secure = existing.secure
@@ -132,21 +144,34 @@ struct Cookie(Copyable, Movable):
                 pass
 
             if v:
-                header_value.write(Cookie.SEPERATOR, Cookie.EXPIRES, Cookie.EQUAL, v.value())
+                header_value.write(Cookie.SEPARATOR, Cookie.EXPIRES, Cookie.EQUAL, v.value())
         if self.max_age:
             header_value.write(
-                Cookie.SEPERATOR, Cookie.MAX_AGE, Cookie.EQUAL, String(self.max_age.value().total_seconds)
+                Cookie.SEPARATOR,
+                Cookie.MAX_AGE,
+                Cookie.EQUAL,
+                String(self.max_age.value().total_seconds),
             )
         if self.domain:
-            header_value.write(Cookie.SEPERATOR, Cookie.DOMAIN, Cookie.EQUAL, self.domain.value())
+            header_value.write(
+                Cookie.SEPARATOR,
+                Cookie.DOMAIN,
+                Cookie.EQUAL,
+                self.domain.value(),
+            )
         if self.path:
-            header_value.write(Cookie.SEPERATOR, Cookie.PATH, Cookie.EQUAL, self.path.value())
+            header_value.write(Cookie.SEPARATOR, Cookie.PATH, Cookie.EQUAL, self.path.value())
         if self.secure:
-            header_value.write(Cookie.SEPERATOR, Cookie.SECURE)
+            header_value.write(Cookie.SEPARATOR, Cookie.SECURE)
         if self.http_only:
-            header_value.write(Cookie.SEPERATOR, Cookie.HTTP_ONLY)
+            header_value.write(Cookie.SEPARATOR, Cookie.HTTP_ONLY)
         if self.same_site:
-            header_value.write(Cookie.SEPERATOR, Cookie.SAME_SITE, Cookie.EQUAL, String(self.same_site.value()))
+            header_value.write(
+                Cookie.SEPARATOR,
+                Cookie.SAME_SITE,
+                Cookie.EQUAL,
+                String(self.same_site.value()),
+            )
         if self.partitioned:
-            header_value.write(Cookie.SEPERATOR, Cookie.PARTITIONED)
+            header_value.write(Cookie.SEPARATOR, Cookie.PARTITIONED)
         return header_value

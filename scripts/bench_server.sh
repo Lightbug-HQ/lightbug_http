@@ -5,7 +5,6 @@ pixi run mojo build -I . benchmark/bench_server.mojo || exit 1
 echo "running server..."
 ./bench_server&
 
-
 sleep 2
 
 echo "Running benchmark"

@@ -1,13 +1,12 @@
-from collections import Optional, List, Dict
-from lightbug_http.external.small_time import SmallTime, TimeZone
-from lightbug_http.external.small_time.small_time import strptime
-from lightbug_http.strings import to_string, lineBreak
 from lightbug_http.header import HeaderKey, write_header
-from lightbug_http.io.bytes import ByteReader, ByteWriter, is_newline, is_space
+from lightbug_http.io.bytes import ByteWriter
+from lightbug_http.strings import lineBreak
+from small_time import SmallTime, TimeZone
+from small_time.small_time import parse_time_with_format
 
 
 @fieldwise_init
-struct RequestCookieJar(Writable, Stringable, Copyable, Movable):
+struct RequestCookieJar(Copyable, Stringable, Writable):
     var _inner: Dict[String, String]
 
     fn __init__(out self):
@@ -58,7 +57,7 @@ struct RequestCookieJar(Writable, Stringable, Copyable, Movable):
             return Optional[String](None)
 
     fn to_header(self) -> Optional[Header]:
-        alias equal = "="
+        comptime equal = "="
         if len(self._inner) == 0:
             return None
 
@@ -78,7 +77,7 @@ struct RequestCookieJar(Writable, Stringable, Copyable, Movable):
             write_header(writer, header.value().key, header.value().value)
 
     fn __str__(self) -> String:
-        return to_string(self)
+        return String.write(self)
 
     fn __eq__(self, other: RequestCookieJar) -> Bool:
         if len(self._inner) != len(other._inner):
