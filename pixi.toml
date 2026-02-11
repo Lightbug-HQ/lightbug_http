@@ -29,7 +29,7 @@ sort_imports = "isort **/*.mojo -m 3 --line-length 120 --lines-after-imports 2 -
 format = [{ task = "mojo_format" }, { task = "sort_imports" }]
 
 build = { cmd = "pixi build -o ." }
-publish = { cmd = "find . -name 'lightbug_http-*.conda' | xargs pixi upload https://prefix.dev/api/v1/upload/mojo-community" }
+publish = { cmd = "find . -name 'lightbug_http-*.conda' | xargs pixi upload prefix --channel mojo-community" }
 build_and_publish = [{ task = "build" }, { task = "publish" }]
 
 [package]
