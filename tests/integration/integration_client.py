@@ -1,3 +1,4 @@
+import concurrent.futures
 import requests
 import socket
 import time
@@ -31,6 +32,24 @@ response = session.get(
     "http://127.0.0.1:8080/large-headers", headers=large_headers
 )
 assert response.status_code == 200
+
+print("\n~~~ Testing parallel connections ~~~")
+# Browsers open 6+ parallel connections for assets.
+# A single-threaded server with keep-alive blocks on conn.read() waiting for
+# the next request, preventing other connections from being accepted.
+# This test verifies all parallel requests complete within a reasonable time.
+
+
+def fetch(path):
+    return requests.get(f"http://127.0.0.1:8080{path}", headers={"connection": "close"})
+
+
+with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+    futures = [executor.submit(fetch, f"/?n={i}") for i in range(4)]
+    results = concurrent.futures.wait(futures, timeout=5)
+    assert len(results.done) == 4, f"Only {len(results.done)}/4 parallel requests completed within 5s"
+    for f in results.done:
+        assert f.result().status_code == 200
 
 print("\n~~~ Testing content-length mismatch (smaller) ~~~")
 

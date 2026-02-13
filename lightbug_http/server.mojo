@@ -477,7 +477,7 @@ struct Server(Movable):
     fn __init__(
         out self,
         var address: String = "127.0.0.1",
-        tcp_keep_alive: Bool = True,
+        tcp_keep_alive: Bool = False,
     ):
         self.config = ServerConfig()
         self._address = address^
@@ -487,7 +487,7 @@ struct Server(Movable):
         out self,
         var config: ServerConfig,
         var address: String = "127.0.0.1",
-        tcp_keep_alive: Bool = True,
+        tcp_keep_alive: Bool = False,
     ):
         self.config = config^
         self._address = address^
