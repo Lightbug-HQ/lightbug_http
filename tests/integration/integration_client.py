@@ -34,14 +34,10 @@ response = session.get(
 assert response.status_code == 200
 
 print("\n~~~ Testing parallel connections ~~~")
-# Browsers open 6+ parallel connections for assets.
-# A single-threaded server with keep-alive blocks on conn.read() waiting for
-# the next request, preventing other connections from being accepted.
-# This test verifies all parallel requests complete within a reasonable time.
 
 
 def fetch(path):
-    return requests.get(f"http://127.0.0.1:8080{path}", headers={"connection": "close"})
+    return requests.get(f"http://127.0.0.1:8080{path}")
 
 
 with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:

@@ -10,6 +10,7 @@ from lightbug_http.c.socket_error import (
     RecvfromError,
     SendError,
     SendtoError,
+    SetsockoptError,
     ShutdownEINVALError,
 )
 from lightbug_http.c.socket_error import SocketError as CSocketError
@@ -360,18 +361,33 @@ struct TCPConnection[network: NetworkType = NetworkType.tcp4]:
         return self.socket.receive(buf)
 
     fn write(self, buf: Span[Byte]) raises SendError -> UInt:
-        """Write data to the TCP connection.
+        """Write all data to the TCP connection, handling partial sends.
 
         Args:
             buf: Buffer containing data to write.
 
         Returns:
-            Number of bytes written.
+            Total number of bytes written.
 
         Raises:
             SendError: If write fails.
         """
-        return self.socket.send(buf)
+        var total_sent: UInt = 0
+        while total_sent < UInt(len(buf)):
+            var sent = self.socket.send(buf[Int(total_sent):])
+            total_sent += sent
+        return total_sent
+
+    fn set_recv_timeout(self, seconds: Int) raises SetsockoptError:
+        """Set the receive timeout on this connection's socket.
+
+        Args:
+            seconds: Timeout in seconds. 0 to disable.
+
+        Raises:
+            SetsockoptError: If setting the socket option fails.
+        """
+        self.socket.set_timeout(seconds)
 
     fn close(mut self) raises FatalCloseError:
         """Close the TCP connection.

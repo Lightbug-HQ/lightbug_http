@@ -1,6 +1,8 @@
 from sys.ffi import c_uint
 from sys.info import CompilationTarget
 
+from lightbug_http.c.aliases import c_void
+
 from lightbug_http.address import (
     Addr,
     NetworkType,
@@ -17,6 +19,7 @@ from lightbug_http.c.socket import (
     ShutdownOption,
     SocketOption,
     SocketType,
+    _setsockopt,
     accept,
     bind,
     close,
@@ -808,13 +811,25 @@ struct Socket[
         """Return the timeout value for the socket."""
         return self.get_socket_option(SocketOption.SO_RCVTIMEO)
 
-    fn set_timeout(self, var duration: Int) raises SetsockoptError:
-        """Set the timeout value for the socket.
+    fn set_timeout(self, seconds: Int) raises SetsockoptError:
+        """Set the receive timeout for the socket.
 
         Args:
-            duration: Seconds - The timeout duration in seconds.
+            seconds: The timeout duration in seconds.
+
+        Raises:
+            SetsockoptError: If setting the socket option fails.
         """
-        self.set_socket_option(SocketOption.SO_RCVTIMEO, duration)
+        # SO_RCVTIMEO requires a timeval struct: {tv_sec: Int64, tv_usec: Int64}
+        # (16 bytes on both macOS and Linux 64-bit).
+        var timeval = InlineArray[Int64, 2](seconds, 0)
+        _ = _setsockopt(
+            self.fd.value,
+            SOL_SOCKET,
+            SocketOption.SO_RCVTIMEO.value,
+            UnsafePointer(to=timeval).bitcast[c_void](),
+            16,
+        )
 
 
 comptime UDPSocket[address: Addr] = Socket[

@@ -295,6 +295,11 @@ fn handle_connection[
                 if read_err.isa[EOF]() or read_err.isa[SocketClosedError]():
                     provision.state = ConnectionState.closed()
                     break
+                # On keep-alive connections, treat timeout (EAGAIN) as clean close
+                # so the server can accept new connections.
+                if provision.keepalive_count > 0:
+                    provision.state = ConnectionState.closed()
+                    break
                 raise read_err^
 
             if bytes_read == 0:
@@ -437,8 +442,8 @@ fn handle_connection[
                 if (provision.keepalive_count + 1) >= config.max_keepalive_requests:
                     provision.should_close = True
 
-            if provision.should_close:
-                response.set_connection_close()
+            # Always send Connection: close for now as the server is single-threaded
+            response.set_connection_close()
 
             provision.response = response^
             provision.state = ConnectionState.responding()
@@ -583,7 +588,6 @@ struct Server(Movable):
                 # Connection handling failed - just close the connection
                 pass
             finally:
-                # Always clean up the connection and return provision to pool
                 try:
                     conn^.teardown()
                 except:

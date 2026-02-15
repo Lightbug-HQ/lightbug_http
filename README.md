@@ -60,7 +60,7 @@ Once you have a Mojo project set up locally,
 
    ```toml
    [dependencies]
-   lightbug_http = ">=0.26.1,<0.26.2"
+   lightbug_http = ">=0.26.1.1,<0.26.2"
    ```
 
 3. Run `pixi install` at the root of your project, where `pixi.toml` is located
