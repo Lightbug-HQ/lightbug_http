@@ -34,7 +34,7 @@ build_and_publish = [{ task = "build" }, { task = "publish" }]
 
 [package]
 name = "lightbug_http"
-version = "0.26.1.0"
+version = "0.26.1.1"
 
 [package.build]
 backend = { name = "pixi-build-mojo", version = "*" }
