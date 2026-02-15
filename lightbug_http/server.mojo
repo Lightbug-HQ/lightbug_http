@@ -295,6 +295,11 @@ fn handle_connection[
                 if read_err.isa[EOF]() or read_err.isa[SocketClosedError]():
                     provision.state = ConnectionState.closed()
                     break
+                # On keep-alive connections, treat timeout (EAGAIN) as clean close
+                # so the server can accept new connections.
+                if provision.keepalive_count > 0:
+                    provision.state = ConnectionState.closed()
+                    break
                 raise read_err^
 
             if bytes_read == 0:
@@ -437,8 +442,10 @@ fn handle_connection[
                 if (provision.keepalive_count + 1) >= config.max_keepalive_requests:
                     provision.should_close = True
 
-            if provision.should_close:
-                response.set_connection_close()
+            # Always send Connection: close. The server is single-threaded and can't
+            # serve other clients while blocked on a keep-alive read. Without this,
+            # browsers hold connections open and queue behind idle ones.
+            response.set_connection_close()
 
             provision.response = response^
             provision.state = ConnectionState.responding()
@@ -462,6 +469,14 @@ fn handle_connection[
 
             provision.keepalive_count += 1
             provision.prepare_for_new_request()
+
+            # Set a recv timeout so the server doesn't block forever
+            # waiting for the next request on this keep-alive connection.
+            # This allows the server to accept new connections from other clients.
+            try:
+                conn.set_recv_timeout(1)
+            except:
+                pass
 
         else:
             break
