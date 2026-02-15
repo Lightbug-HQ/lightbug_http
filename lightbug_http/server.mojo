@@ -470,14 +470,6 @@ fn handle_connection[
             provision.keepalive_count += 1
             provision.prepare_for_new_request()
 
-            # Set a recv timeout so the server doesn't block forever
-            # waiting for the next request on this keep-alive connection.
-            # This allows the server to accept new connections from other clients.
-            try:
-                conn.set_recv_timeout(1)
-            except:
-                pass
-
         else:
             break
 
