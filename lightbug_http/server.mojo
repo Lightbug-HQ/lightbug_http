@@ -442,9 +442,7 @@ fn handle_connection[
                 if (provision.keepalive_count + 1) >= config.max_keepalive_requests:
                     provision.should_close = True
 
-            # Always send Connection: close. The server is single-threaded and can't
-            # serve other clients while blocked on a keep-alive read. Without this,
-            # browsers hold connections open and queue behind idle ones.
+            # Always send Connection: close for now as the server is single-threaded
             response.set_connection_close()
 
             provision.response = response^
@@ -590,7 +588,6 @@ struct Server(Movable):
                 # Connection handling failed - just close the connection
                 pass
             finally:
-                # Always clean up the connection and return provision to pool
                 try:
                     conn^.teardown()
                 except:
