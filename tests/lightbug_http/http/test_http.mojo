@@ -4,7 +4,7 @@ import testing
 from lightbug_http.header import Header, HeaderKey, Headers
 from lightbug_http.io.bytes import Bytes
 from lightbug_http.uri import URI
-from testing import assert_equal, assert_true
+from testing import assert_equal, assert_false, assert_true
 
 from lightbug_http.cookie import Cookie, Duration, RequestCookieJar, ResponseCookieJar, ResponseCookieKey
 from lightbug_http.http import HTTPRequest, HTTPResponse, encode
@@ -121,6 +121,62 @@ def test_decoding_http_response():
 #     testing.assert_equal(v1._v, 1)
 #     var v2 = HttpVersion("HTTP/2")
 #     testing.assert_equal(v2._v, 2)
+
+
+def test_header_iso8859_encoding_regression():
+    """Regression: header values must be ISO-8859-1 encoded on the wire, not raw UTF-8.
+
+    Before the fix, a header value containing 'é' (U+00E9), which Mojo stores
+    internally as the UTF-8 byte sequence [0xC3, 0xA9], would be written to the
+    wire as those two bytes verbatim. Per RFC 7230, header field values must use
+    ISO-8859-1, so 'é' must appear on the wire as the single byte 0xE9.
+    """
+    var res = HTTPResponse(Bytes())
+    res.headers[HeaderKey.DATE] = "Thu, 01 Jan 2026 00:00:00 GMT"
+    res.headers["x-test"] = "café"
+
+    var wire = encode(res^)
+
+    # All other headers and the body are ASCII, so the only non-ASCII byte in
+    # the wire output must come from 'é' in the value of x-test.
+    var latin1_byte_found = False  # 0xE9: correct ISO-8859-1 single byte
+    var utf8_lead_found = False    # 0xC3: buggy raw UTF-8 lead byte
+    for i in range(len(wire)):
+        if wire[i] == UInt8(0xE9):
+            latin1_byte_found = True
+        if wire[i] == UInt8(0xC3):
+            utf8_lead_found = True
+
+    assert_true(latin1_byte_found)
+    assert_false(utf8_lead_found)
+
+
+def test_request_header_iso8859_encoding_regression():
+    """Regression: request header values must be ISO-8859-1 encoded on the wire, not raw UTF-8.
+
+    Mirrors test_header_iso8859_encoding_regression but for HTTPRequest.encode(),
+    verifying the same fix applies to the outgoing request path.
+    """
+    var uri: URI
+    try:
+        uri = URI.parse(default_server_conn_string + "/")
+    except e:
+        raise Error("Failed to parse URI: ", e)
+
+    var req = HTTPRequest(uri=uri^, headers=Headers(Header("x-test", "café")))
+
+    var wire = encode(req^)
+
+    var latin1_byte_found = False  # 0xE9: correct ISO-8859-1 single byte
+    var utf8_lead_found = False    # 0xC3: buggy raw UTF-8 lead byte
+    for i in range(len(wire)):
+        if wire[i] == UInt8(0xE9):
+            latin1_byte_found = True
+        if wire[i] == UInt8(0xC3):
+            utf8_lead_found = True
+
+    assert_true(latin1_byte_found)
+    assert_false(utf8_lead_found)
 
 
 def main():

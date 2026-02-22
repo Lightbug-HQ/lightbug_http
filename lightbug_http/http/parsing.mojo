@@ -117,9 +117,10 @@ fn get_token_to_eol[
             raise IncompleteError()
 
         var c = byte.value()
-        if not is_printable_ascii(c):
-            if (c < 0x20 and c != 0x09) or c == 0x7F:
-                break
+        # RFC 7230 §3.2.6: reject control characters (< 0x20 except HTAB, and DEL).
+        # Accept SP (0x20), visible ASCII (0x21–0x7E), and obs-text (0x80–0xFF).
+        if (c < 0x20 and c != 0x09) or c == 0x7F:
+            break
         buf.increment()
 
     if not buf.available():

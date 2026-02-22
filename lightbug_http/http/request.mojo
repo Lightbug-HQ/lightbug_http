@@ -230,10 +230,9 @@ struct HTTPRequest(Copyable, Encodable, Stringable, Writable):
             whitespace,
             self.protocol,
             lineBreak,
-            self.headers,
-            self.cookies,
-            lineBreak,
         )
+        self.headers.write_latin1_to(writer)
+        writer.write(self.cookies, lineBreak)
         writer.consuming_write(self.body_raw^)
         return writer^.consume()
 

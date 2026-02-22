@@ -4,7 +4,7 @@ from lightbug_http.http.parsing import (
     http_parse_request_headers,
     http_parse_response_headers,
 )
-from lightbug_http.io.bytes import ByteReader, Bytes, byte, is_newline, is_space
+from lightbug_http.io.bytes import ByteReader, Bytes, ByteWriter, byte, is_newline, is_space
 from lightbug_http.strings import CR, LF, BytesConstant, lineBreak
 from memory import Span
 from utils import Variant
@@ -329,6 +329,66 @@ fn write_header[T: Writer](mut writer: T, key: String, value: String):
     writer.write(key, ": ", value, lineBreak)
 
 
+fn encode_latin1_header_value(value: String) -> List[UInt8]:
+    """Transcode a header value from UTF-8 to ISO-8859-1 bytes.
+
+    HTTP/1.1 header field values must be representable in ISO-8859-1 (RFC 7230 §3.2).
+    - Codepoints U+0000–U+007F: single byte, passed through unchanged.
+    - Codepoints U+0080–U+00FF: encoded as their single ISO-8859-1 byte.
+    - Codepoints above U+00FF: cannot be represented in ISO-8859-1; the raw UTF-8
+      bytes are written as-is (best-effort fallback — use RFC 5987 encoding instead).
+    - Invalid UTF-8 byte sequences (obs-text from parsing): passed through as-is.
+    """
+    var utf8 = value.as_bytes()
+    var out = List[UInt8](capacity=len(utf8))
+    var i = 0
+    while i < len(utf8):
+        var b = utf8[i]
+        if b < 0x80:
+            out.append(b)
+            i += 1
+        else:
+            var seq_len = 0
+            var codepoint = 0
+            if b >= 0xC2 and b <= 0xDF and i + 1 < len(utf8):
+                var b2 = utf8[i + 1]
+                if b2 >= 0x80 and b2 <= 0xBF:
+                    seq_len = 2
+                    codepoint = ((Int(b) & 0x1F) << 6) | (Int(b2) & 0x3F)
+            elif b >= 0xE0 and b <= 0xEF and i + 2 < len(utf8):
+                var b2 = utf8[i + 1]
+                var b3 = utf8[i + 2]
+                if b2 >= 0x80 and b2 <= 0xBF and b3 >= 0x80 and b3 <= 0xBF:
+                    seq_len = 3
+                    codepoint = ((Int(b) & 0x0F) << 12) | ((Int(b2) & 0x3F) << 6) | (Int(b3) & 0x3F)
+            elif b >= 0xF0 and b <= 0xF7 and i + 3 < len(utf8):
+                var b2 = utf8[i + 1]
+                var b3 = utf8[i + 2]
+                var b4 = utf8[i + 3]
+                if b2 >= 0x80 and b2 <= 0xBF and b3 >= 0x80 and b3 <= 0xBF and b4 >= 0x80 and b4 <= 0xBF:
+                    seq_len = 4
+                    codepoint = ((Int(b) & 0x07) << 18) | ((Int(b2) & 0x3F) << 12) | ((Int(b3) & 0x3F) << 6) | (Int(b4) & 0x3F)
+
+            if seq_len > 0 and codepoint <= 0xFF:
+                out.append(UInt8(codepoint))
+                i += seq_len
+            elif seq_len > 0:
+                for j in range(seq_len):
+                    out.append(utf8[i + j])
+                i += seq_len
+            else:
+                out.append(b)
+                i += 1
+    return out^
+
+
+fn write_header_latin1(mut writer: ByteWriter, key: String, value: String):
+    """Write a header with the value transcoded to ISO-8859-1."""
+    writer.write(key, ": ")
+    writer.consuming_write(encode_latin1_header_value(value))
+    writer.write(lineBreak)
+
+
 @fieldwise_init
 struct Headers(Copyable, Stringable, Writable):
     """Collection of HTTP headers.
@@ -382,6 +442,11 @@ struct Headers(Copyable, Stringable, Writable):
     fn write_to[T: Writer, //](self, mut writer: T):
         for header in self._inner.items():
             write_header(writer, header.key, header.value)
+
+    fn write_latin1_to(self, mut writer: ByteWriter):
+        """Write headers with values transcoded to ISO-8859-1 for HTTP wire format."""
+        for header in self._inner.items():
+            write_header_latin1(writer, header.key, header.value)
 
     fn __str__(self) -> String:
         return String.write(self)

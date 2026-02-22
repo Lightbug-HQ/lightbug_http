@@ -418,7 +418,8 @@ struct HTTPResponse(Encodable, Movable, Sized, Stringable, Writable):
         )
         if HeaderKey.DATE not in self.headers:
             write_header(writer, HeaderKey.DATE, http_date_now())
-        writer.write(self.headers, self.cookies, lineBreak)
+        self.headers.write_latin1_to(writer)
+        writer.write(self.cookies, lineBreak)
         writer.consuming_write(self.body_raw^)
         return writer^.consume()
 
