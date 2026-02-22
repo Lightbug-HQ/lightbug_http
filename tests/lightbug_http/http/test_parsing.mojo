@@ -296,7 +296,7 @@ fn test_request_invalid_header_name_char() raises:
 
 fn test_request_extended_chars() raises:
     var headers = InlineArray[HTTPHeader, 4](fill=HTTPHeader())
-    # Accept MSB chars
+    # obs-text (0x80-0xFF) is explicitly permitted in header values per RFC 7230 §3.2.6
     result = parse_request_test(
         "GET /\xa0 HTTP/1.0\r\nh: c\xa2y\r\n\r\n", 0, headers
     )
@@ -307,6 +307,33 @@ fn test_request_extended_chars() raises:
     assert_equal(result.minor_version, 0)
     assert_equal(headers[0].name, "h")
     assert_equal(headers[0].value, "c\xa2y")
+
+
+fn test_request_tab_in_header_value() raises:
+    var headers = InlineArray[HTTPHeader, 4](fill=HTTPHeader())
+    # HTAB (0x09) is explicitly permitted inside header field values per RFC 7230 §3.2.6
+    result = parse_request_test(
+        "GET / HTTP/1.0\r\nfoo: bar\tbaz\r\n\r\n", 0, headers
+    )
+    assert_true(result.ret > 0)
+    assert_equal(result.num_headers, 1)
+    assert_equal(headers[0].name, "foo")
+    assert_equal(headers[0].value, "bar\tbaz")
+
+
+fn test_request_control_char_in_header_value() raises:
+    var headers = InlineArray[HTTPHeader, 4](fill=HTTPHeader())
+    # Control characters (< 0x20 except HTAB) in a header value must cause a parse error
+    result = parse_request_test(
+        "GET / HTTP/1.0\r\nfoo: bar\x01baz\r\n\r\n", 0, headers
+    )
+    assert_equal(result.ret, -1)
+
+    # DEL (0x7F) is also rejected
+    result = parse_request_test(
+        "GET / HTTP/1.0\r\nfoo: bar\x7fbaz\r\n\r\n", 0, headers
+    )
+    assert_equal(result.ret, -1)
 
 
 fn test_request_allowed_special_header_name_chars() raises:
