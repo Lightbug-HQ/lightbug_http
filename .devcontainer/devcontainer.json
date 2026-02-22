@@ -1,0 +1,11 @@
+{
+  "name": "Lightbug HTTP (Linux)",
+  "image": "ghcr.io/prefix-dev/pixi:latest",
+  "postCreateCommand": "apt-get update && apt-get install -y git && pixi install",
+  "forwardPorts": [8080],
+  "customizations": {
+    "vscode": {
+      "extensions": ["modular-mojotools.vscode-mojo"]
+    }
+  }
+}
