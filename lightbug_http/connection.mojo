@@ -239,14 +239,11 @@ struct ListenConfig:
         except socket_err:
             raise SocketCreationError()
 
-        @parameter
-        # TODO: do we want to add SO_REUSEPORT on linux? Doesn't work on some systems
-        if CompilationTarget.is_macos():
-            try:
-                socket.set_socket_option(SocketOption.SO_REUSEADDR, 1)
-            except sockopt_err:
-                # Socket option failure is not fatal, just continue
-                pass
+        try:
+            socket.set_socket_option(SocketOption.SO_REUSEADDR, 1)
+        except sockopt_err:
+            # Socket option failure is not fatal, just continue
+            pass
 
         var addr = TCPAddr[network](ip=local.host^, port=local.port)
         var bind_success = False
