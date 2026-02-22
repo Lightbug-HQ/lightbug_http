@@ -29,9 +29,7 @@ Lightbug is a simple and sweet HTTP framework for Mojo that builds on best pract
 This is not production ready yet. We're aiming to keep up with new developments in Mojo, but it might take some time to get to a point when this is safe to use in real-world applications.
 
 Lightbug currently has the following features:
- - [x] Pure Mojo! No Python dependencies. Everything is fully typed, with no `def` functions used
- - [x] HTTP Server and Client implementations
- - [x] TCP and UDP support
+ - [x] Pure Mojo HTTP 1.1 server with no Python dependencies. Everything is fully typed, with no `def` functions used
  - [x] Cookie support
 
  ### Check Out These Mojo Libraries:
@@ -97,7 +95,6 @@ Once you have a Mojo project set up locally,
 
    ```mojo
     from lightbug_http.http import HTTPRequest, HTTPResponse, OK
-    from lightbug_http.strings import to_string
     from lightbug_http.header import HeaderKey
 
     @fieldwise_init
@@ -109,7 +106,7 @@ Once you have a Mojo project set up locally,
             if HeaderKey.CONTENT_TYPE in req.headers:
                 print("Request Content-Type:", req.headers[HeaderKey.CONTENT_TYPE])
             if req.body_raw:
-                print("Request Body:", to_string(req.body_raw))
+                print("Request Body:", req.get_body())
 
             return OK(req.body_raw)
    ```
@@ -140,19 +137,16 @@ from lightbug_http import *
 @fieldwise_init
 struct ExampleRouter(HTTPService):
     fn func(mut self, req: HTTPRequest) raises -> HTTPResponse:
-        var body = req.body_raw
-        var uri = req.uri
-
-        if uri.path == "/":
+        if req.uri.path == "/":
             print("I'm on the index path!")
-        if uri.path == "/first":
+        if req.uri.path == "/first":
             print("I'm on /first!")
-        elif uri.path == "/second":
+        elif req.uri.path == "/second":
             print("I'm on /second!")
-        elif uri.path == "/echo":
-            print(to_string(body))
+        elif req.uri.path == "/echo":
+            print(req.get_body())
 
-        return OK(body)
+        return OK(req.body_raw)
 ```
 
 We plan to add more advanced routing functionality in a future library called `lightbug_api`, see [Roadmap](#roadmap) for more details.
@@ -171,103 +165,15 @@ from lightbug_http.io.bytes import Bytes
 @fieldwise_init
 struct Welcome(HTTPService):
     fn func(mut self, req: HTTPRequest) raises -> HTTPResponse:
-        var uri = req.uri
-
-        if uri.path == "/":
-            var html: Bytes
+        if req.uri.path == "/":
             with open("static/lightbug_welcome.html", "r") as f:
-                html = Bytes(f.read_bytes())
-            return OK(html, "text/html; charset=utf-8")
+                return OK(Bytes(f.read_bytes()), "text/html; charset=utf-8")
 
-        if uri.path == "/logo.png":
-            var image: Bytes
+        if req.uri.path == "/logo.png":
             with open("static/logo.png", "r") as f:
-                image = Bytes(f.read_bytes())
-            return OK(image, "image/png")
+                return OK(Bytes(f.read_bytes()), "image/png")
 
-        return NotFound(uri.path)
-```
-
-### Using the client
-
-Create a file, e.g `client.mojo` with the following code. Run `pixi run mojo client.mojo` to execute the request to a given URL.
-
-```mojo
-from lightbug_http import *
-from lightbug_http.client import Client
-
-fn test_request(mut client: Client) raises -> None:
-    var uri = URI.parse("google.com")
-    var headers = Headers(Header("Host", "google.com"))
-    var request = HTTPRequest(uri, headers)
-    var response = client.do(request^)
-
-    # print status code
-    print("Response:", response.status_code)
-
-    print(response.headers)
-
-    print(
-        "Is connection set to connection-close? ", response.connection_close()
-    )
-
-    # print body
-    print(to_string(response.body_raw))
-
-
-fn main() -> None:
-    try:
-        var client = Client()
-        test_request(client)
-    except e:
-        print(e)
-```
-
-Pure Mojo-based client is available by default. This client is also used internally for testing the server.
-
-### UDP Support
-To get started with UDP, just use the `listen_udp` and `dial_udp` functions, along with `write_to` and `read_from` methods, like below.
-
-On the client:
-```mojo
-from lightbug_http.connection import dial_udp
-from lightbug_http.address import UDPAddr
-from utils import StringSlice
-
-comptime test_string = "Hello, lightbug!"
-
-fn main() raises:
-    print("Dialing UDP server...")
-    comptime host = "127.0.0.1"
-    comptime port = 12000
-    var udp = dial_udp(host, port)
-
-    print("Sending " + str(len(test_string)) + " messages to the server...")
-    for i in range(len(test_string)):
-        _ = udp.write_to(str(test_string[i]).as_bytes(), host, port)
-
-        try:
-            response, _, _ = udp.read_from(16)
-            print("Response received:", StringSlice(unsafe_from_utf8=response))
-        except e:
-            if str(e) != str("EOF"):
-                raise e
-
-```
-
-On the server:
-```mojo
-fn main() raises:
-    var listener = listen_udp("127.0.0.1", 12000)
-
-    while True:
-        response, host, port = listener.read_from(16)
-        var message = StringSlice(unsafe_from_utf8=response)
-        print("Message received:", message)
-
-        # Response with the same message in uppercase
-        _ = listener.write_to(String.upper(message).as_bytes(), host, port)
-
+        return NotFound(req.uri.path)
 ```
 
 <!-- ROADMAP -->
