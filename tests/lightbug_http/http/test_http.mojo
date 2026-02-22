@@ -133,8 +133,6 @@ def test_header_iso8859_encoding_regression():
     """
     var res = HTTPResponse(Bytes())
     res.headers[HeaderKey.DATE] = "Thu, 01 Jan 2026 00:00:00 GMT"
-    # "café" contains 'é' = U+00E9, stored in Mojo as UTF-8 [0xC3, 0xA9].
-    # On the HTTP wire it must be ISO-8859-1 [0xE9] — one byte, not two.
     res.headers["x-test"] = "café"
 
     var wire = encode(res^)
@@ -149,8 +147,8 @@ def test_header_iso8859_encoding_regression():
         if wire[i] == UInt8(0xC3):
             utf8_lead_found = True
 
-    assert_true(latin1_byte_found)   # 'é' must be encoded as single byte 0xE9
-    assert_false(utf8_lead_found)    # UTF-8 lead byte 0xC3 must NOT appear
+    assert_true(latin1_byte_found)
+    assert_false(utf8_lead_found)
 
 
 def test_request_header_iso8859_encoding_regression():
@@ -177,8 +175,8 @@ def test_request_header_iso8859_encoding_regression():
         if wire[i] == UInt8(0xC3):
             utf8_lead_found = True
 
-    assert_true(latin1_byte_found)   # 'é' must be encoded as single byte 0xE9
-    assert_false(utf8_lead_found)    # UTF-8 lead byte 0xC3 must NOT appear
+    assert_true(latin1_byte_found)
+    assert_false(utf8_lead_found)
 
 
 def main():

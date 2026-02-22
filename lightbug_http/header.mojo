@@ -370,28 +370,20 @@ fn encode_latin1_header_value(value: String) -> List[UInt8]:
                     codepoint = ((Int(b) & 0x07) << 18) | ((Int(b2) & 0x3F) << 12) | ((Int(b3) & 0x3F) << 6) | (Int(b4) & 0x3F)
 
             if seq_len > 0 and codepoint <= 0xFF:
-                # Valid UTF-8, codepoint fits in ISO-8859-1: encode as single byte.
                 out.append(UInt8(codepoint))
                 i += seq_len
             elif seq_len > 0:
-                # Valid UTF-8 but codepoint > U+00FF: pass raw UTF-8 bytes through.
                 for j in range(seq_len):
                     out.append(utf8[i + j])
                 i += seq_len
             else:
-                # Not valid UTF-8 (obs-text or stray continuation byte): pass through.
                 out.append(b)
                 i += 1
     return out^
 
 
 fn write_header_latin1(mut writer: ByteWriter, key: String, value: String):
-    """Write a header with the value transcoded to ISO-8859-1.
-
-    Equivalent to write_header but converts multi-byte UTF-8 sequences for
-    codepoints U+0080–U+00FF to their single ISO-8859-1 byte before writing.
-    See encode_latin1_header_value for full encoding rules.
-    """
+    """Write a header with the value transcoded to ISO-8859-1."""
     writer.write(key, ": ")
     writer.consuming_write(encode_latin1_header_value(value))
     writer.write(lineBreak)

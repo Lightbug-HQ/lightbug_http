@@ -47,8 +47,8 @@ def test_encode_latin1_ascii():
     """ASCII values are passed through unchanged."""
     var result = encode_latin1_header_value("hello, world")
     assert_equal(len(result), 12)
-    assert_equal(result[0], UInt8(0x68))  # 'h'
-    assert_equal(result[5], UInt8(0x2C))  # ','
+    assert_equal(result[0], UInt8(0x68))
+    assert_equal(result[5], UInt8(0x2C))
 
 
 def test_encode_latin1_supplement():
@@ -74,9 +74,9 @@ def test_encode_latin1_obs_text():
     # 0xA2 alone is not a valid UTF-8 lead byte → treated as obs-text
     var result = encode_latin1_header_value("c\xa2y")
     assert_equal(len(result), 3)
-    assert_equal(result[0], UInt8(0x63))  # 'c'
+    assert_equal(result[0], UInt8(0x63))
     assert_equal(result[1], UInt8(0xA2))  # obs-text byte preserved
-    assert_equal(result[2], UInt8(0x79))  # 'y'
+    assert_equal(result[2], UInt8(0x79))
 
 
 def test_encode_latin1_above_latin1():
@@ -91,15 +91,14 @@ def test_encode_latin1_above_latin1():
 
 def test_write_header_latin1_encodes_value():
     """Values with Latin-1 supplement characters are encoded as single bytes on the wire."""
-    # "é" (U+00E9, UTF-8: 0xC3 0xA9) must appear as single byte 0xE9
     var writer = ByteWriter()
     write_header_latin1(writer, "x-test", "café")
     var bytes = writer^.consume()
     # "x-test: caf" = 11 bytes, then 0xE9 = 1 byte, then "\r\n" = 2 bytes → 14 total
     assert_equal(len(bytes), 14)
     assert_equal(bytes[11], UInt8(0xE9))  # single Latin-1 byte for 'é'
-    assert_equal(bytes[12], UInt8(0x0D))  # \r
-    assert_equal(bytes[13], UInt8(0x0A))  # \n
+    assert_equal(bytes[12], UInt8(0x0D))
+    assert_equal(bytes[13], UInt8(0x0A))
 
 
 def test_headers_write_latin1_to():
