@@ -19,3 +19,7 @@ __pycache__
 
 # misc
 .vscode
+.mcp.json
+.claude
+CLAUDE.md
+.kli/**
