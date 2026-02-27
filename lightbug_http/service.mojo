@@ -1,7 +1,7 @@
 from lightbug_http.header import HeaderKey
 from lightbug_http.io.bytes import Bytes
 
-from lightbug_http.http import OK, HTTPRequest, HTTPResponse, NotFound
+from lightbug_http.http import OK, HTTPRequest, HTTPResponse, NotFound, JsonOK
 
 
 trait HTTPService:
@@ -58,7 +58,7 @@ struct TechEmpowerRouter(HTTPService):
         if req.uri.path == "/plaintext":
             return OK("Hello, World!", "text/plain")
         elif req.uri.path == "/json":
-            return OK('{"message": "Hello, World!"}', "application/json")
+            return JsonOK('{"message": "Hello, World!"}')
 
         return OK("Hello world!")  # text/plain is the default
 

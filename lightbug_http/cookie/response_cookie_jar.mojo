@@ -42,15 +42,15 @@ struct ResponseCookieKey(ImplicitlyCopyable, KeyElement):
     fn __eq__(self: Self, other: Self) -> Bool:
         return self.name == other.name and self.domain == other.domain and self.path == other.path
 
-    fn __moveinit__(out self: Self, deinit existing: Self):
-        self.name = existing.name
-        self.domain = existing.domain
-        self.path = existing.path
+    fn __moveinit__(out self: ResponseCookieKey, deinit take: ResponseCookieKey):
+        self.name = take.name
+        self.domain = take.domain
+        self.path = take.path
 
-    fn __copyinit__(out self: Self, existing: Self):
-        self.name = existing.name
-        self.domain = existing.domain
-        self.path = existing.path
+    fn __copyinit__(out self: ResponseCookieKey, copy: ResponseCookieKey):
+        self.name = copy.name
+        self.domain = copy.domain
+        self.path = copy.path
 
     fn __hash__[H: Hasher](self: Self, mut hasher: H):
         hasher.update(self.name + "~" + self.domain + "~" + self.path)

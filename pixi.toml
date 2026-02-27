@@ -1,6 +1,6 @@
 [workspace]
 authors = ["saviorand"]
-channels = ["conda-forge", "https://conda.modular.com/max", "https://repo.prefix.dev/modular-community", "https://repo.prefix.dev/mojo-community"]
+channels = ["conda-forge", "https://repo.prefix.dev/mojo-community", "https://conda.modular.com/max-nightly/", "https://conda.modular.com/max", "https://repo.prefix.dev/modular-community"]
 description = "Simple and fast HTTP framework for Mojo!"
 platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
 license = "MIT"
@@ -40,20 +40,24 @@ version = "0.26.1.2"
 backend = { name = "pixi-build-mojo", version = "*" }
 
 [dependencies]
-mojo = ">=0.26.1.0,<0.26.2.0"
-small_time = ">=26.1.0,<26.2.0"
+mojo = ">=0.26.2.0.dev2026020205,<0.27"
+small_time = {path = "./small-time"}
+emberjson = {git = "https://github.com/bgreni/EmberJson.git", rev = "583a72d"}
 
 [package.host-dependencies]
-mojo-compiler = ">=0.26.1.0,<0.26.2.0"
-small_time = ">=26.1.0,<26.2.0"
+mojo-compiler = ">=0.26.2.0.dev2026020205,<0.27"
+small_time = {path = "./small-time"}
+emberjson = {git = "https://github.com/bgreni/EmberJson.git", rev = "583a72d"}
 
 [package.build-dependencies]
-mojo-compiler = ">=0.26.1.0,<0.26.2.0"
-small_time = ">=26.1.0,<26.2.0"
+mojo-compiler = ">=0.26.2.0.dev2026020205,<0.27"
+small_time = {path = "./small-time"}
+emberjson = {git = "https://github.com/bgreni/EmberJson.git", rev = "583a72d"}
 
 [package.run-dependencies]
-mojo-compiler = ">=0.26.1.0,<0.26.2.0"
-small_time = ">=26.1.0,<26.2.0"
+mojo-compiler = ">=0.26.2.0.dev2026020205,<0.27"
+small_time = {path = "./small-time"}
+emberjson = {git = "https://github.com/bgreni/EmberJson.git", rev = "583a72d"}
 
 [feature.util.dependencies]
 isort = ">=7.0.0,<8"
