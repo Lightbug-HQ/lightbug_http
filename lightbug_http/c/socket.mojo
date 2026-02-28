@@ -323,11 +323,11 @@ fn setsockopt(
     * Reference: https://man7.org/linux/man-pages/man3/setsockopt.3p.html .
     """
     var result = _setsockopt(
-        socket.value,
+        Int32(socket.value),
         level,
         option_name,
         UnsafePointer(to=option_value).bitcast[c_void](),
-        size_of[Int32](),
+        UInt32(size_of[Int32]()),
     )
     if result == -1:
         var errno = get_errno()
@@ -499,7 +499,7 @@ fn getsockname(socket: FileDescriptor, mut address: SocketAddress) raises Getsoc
     * Reference: https://man7.org/linux/man-pages/man3/getsockname.3p.html .
     """
     var sockaddr_size = address.SIZE
-    var result = _getsockname(socket.value, address.unsafe_ptr(), Pointer(to=sockaddr_size))
+    var result = _getsockname(Int32(socket.value), address.unsafe_ptr(), Pointer(to=sockaddr_size))
     if result == -1:
         var errno = get_errno()
         if errno == errno.EBADF:
@@ -570,7 +570,7 @@ fn getpeername(file_descriptor: FileDescriptor) raises GetpeernameError -> Socke
     var remote_address = SocketAddress()
     var sockaddr_size = remote_address.SIZE
     var result = _getpeername(
-        file_descriptor.value,
+        Int32(file_descriptor.value),
         remote_address.unsafe_ptr(),
         Pointer(to=sockaddr_size),
     )
@@ -652,7 +652,7 @@ fn bind(socket: FileDescriptor, mut address: SocketAddress) raises BindError:
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/bind.3p.html .
     """
-    var result = _bind(socket.value, Pointer(to=address.as_sockaddr_in()), address.SIZE)
+    var result = _bind(Int32(socket.value), Pointer(to=address.as_sockaddr_in()), address.SIZE)
     if result == -1:
         var errno = get_errno()
         if errno == errno.EACCES:
@@ -720,7 +720,7 @@ fn listen(socket: FileDescriptor, backlog: c_int) raises ListenError:
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/listen.3p.html .
     """
-    var result = _listen(socket.value, backlog)
+    var result = _listen(Int32(socket.value), backlog)
     if result == -1:
         var errno = get_errno()
         if errno == errno.EADDRINUSE:
@@ -794,7 +794,7 @@ fn accept(socket: FileDescriptor) raises AcceptError -> FileDescriptor:
     var remote_address = sockaddr()
     # TODO: Should this be sizeof sockaddr?
     var buffer_size = socklen_t(size_of[socklen_t]())
-    var result = _accept(socket.value, Pointer(to=remote_address), Pointer(to=buffer_size))
+    var result = _accept(Int32(socket.value), Pointer(to=remote_address), Pointer(to=buffer_size))
     if result == -1:
         var errno = get_errno()
         if errno in [errno.EAGAIN, errno.EWOULDBLOCK]:
@@ -983,7 +983,7 @@ fn recv[
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/recv.3p.html .
     """
-    var result = _recv(socket.value, buffer.unsafe_ptr().bitcast[c_void](), length, flags)
+    var result = _recv(Int32(socket.value), buffer.unsafe_ptr().bitcast[c_void](), length, flags)
     if result == -1:
         var errno = get_errno()
         if errno in [errno.EAGAIN, errno.EWOULDBLOCK]:
@@ -1217,7 +1217,7 @@ fn send[
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/send.3p.html .
     """
-    var result = _send(socket.value, buffer.unsafe_ptr().bitcast[c_void](), length, flags)
+    var result = _send(Int32(socket.value), buffer.unsafe_ptr().bitcast[c_void](), length, flags)
     if result == -1:
         var errno = get_errno()
         if errno in [errno.EAGAIN, errno.EWOULDBLOCK]:
@@ -1444,7 +1444,7 @@ fn shutdown(socket: FileDescriptor, how: ShutdownOption) raises ShutdownError:
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/shutdown.3p.html .
     """
-    var result = _shutdown(socket.value, how.value)
+    var result = _shutdown(Int32(socket.value), how.value)
     if result == -1:
         var errno = get_errno()
         if errno == errno.EBADF:
@@ -1502,7 +1502,7 @@ fn close(file_descriptor: FileDescriptor) raises CloseError:
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/close.3p.html .
     """
-    if _close(file_descriptor.value) == -1:
+    if _close(Int32(file_descriptor.value)) == -1:
         var errno = get_errno()
         if errno == errno.EBADF:
             raise CloseError(CloseEBADFError())

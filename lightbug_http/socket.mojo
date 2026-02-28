@@ -606,7 +606,7 @@ struct Socket[
         Raises:
             SetsockoptError: If setting the socket option fails.
         """
-        setsockopt(self.fd, SOL_SOCKET, option_name.value, option_value)
+        setsockopt(self.fd, SOL_SOCKET, option_name.value, Int32(option_value))
 
     fn connect(mut self, mut ip_address: String, port: UInt16) raises -> None:
         """Connect to a remote socket at address.

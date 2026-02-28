@@ -32,7 +32,7 @@ fn unquote[expand_plus: Bool = False](input_str: String, disallowed_escapes: Lis
                     encoded_str[current_offset + 1 : current_offset + 3],
                     base=16,
                 )
-                str_bytes.append(char_byte)
+                str_bytes.append(UInt8(char_byte))
             except:
                 break
 
@@ -80,8 +80,8 @@ struct URIDelimiters:
 
 
 struct PortBounds:
-    comptime NINE: UInt8 = ord("9")
-    comptime ZERO: UInt8 = ord("0")
+    comptime NINE: UInt8 = UInt8(ord("9"))
+    comptime ZERO: UInt8 = UInt8(ord("0"))
 
 
 @fieldwise_init
@@ -151,7 +151,7 @@ struct URI(Copyable, Representable, Stringable, Writable):
         # Assume http if no scheme is provided, fairly safe given the context of lightbug.
         var scheme: String = "http"
         if "://" in uri:
-            scheme = String(reader.read_until(ord(URIDelimiters.SCHEME)))
+            scheme = String(reader.read_until(UInt8(ord(URIDelimiters.SCHEME))))
             var scheme_delimiter: ByteView[origin_of(uri)]
             try:
                 scheme_delimiter = reader.read_bytes(3)
@@ -170,8 +170,8 @@ struct URI(Copyable, Representable, Stringable, Writable):
 
         # Parse the user info, if exists.
         # TODO (@thatstoasty): Store the user information (username and password) if it exists.
-        if ord(URIDelimiters.AUTHORITY) in reader:
-            _ = reader.read_until(ord(URIDelimiters.AUTHORITY))
+        if UInt8(ord(URIDelimiters.AUTHORITY)) in reader:
+            _ = reader.read_until(UInt8(ord(URIDelimiters.AUTHORITY)))
             reader.increment(1)
 
         # TODOs (@thatstoasty)
@@ -179,8 +179,8 @@ struct URI(Copyable, Representable, Stringable, Writable):
         # Handle string host
         # A query right after the domain is a valid uri, but it's equivalent to example.com/?query
         # so we should add the normalization of paths
-        var host_and_port = reader.read_until(ord(URIDelimiters.PATH))
-        colon = host_and_port.find(ord(URIDelimiters.SCHEME))
+        var host_and_port = reader.read_until(UInt8(ord(URIDelimiters.PATH)))
+        colon = host_and_port.find(UInt8(ord(URIDelimiters.SCHEME)))
         var host: String
         var port: Optional[UInt16] = None
         if colon != -1:
@@ -206,7 +206,7 @@ struct URI(Copyable, Representable, Stringable, Writable):
 
         # Reads until either the start of the query string, or the end of the uri.
         var unquote_reader = reader.copy()
-        var original_path_bytes = unquote_reader.read_until(ord(URIDelimiters.QUERY))
+        var original_path_bytes = unquote_reader.read_until(UInt8(ord(URIDelimiters.QUERY)))
         var original_path: String
         if not original_path_bytes:
             original_path = "/"
@@ -237,14 +237,14 @@ struct URI(Copyable, Representable, Stringable, Writable):
 
         var path: String = "/"
         var request_uri: String = "/"
-        if path_delimiter == ord(URIDelimiters.PATH):
+        if path_delimiter == UInt8(ord(URIDelimiters.PATH)):
             # Copy the remaining bytes to read the request uri.
             var request_uri_reader = reader.copy()
             request_uri = String(request_uri_reader.read_bytes())
 
             # Read until the query string, or the end if there is none.
             path = unquote(
-                String(reader.read_until(ord(URIDelimiters.QUERY))),
+                String(reader.read_until(UInt8(ord(URIDelimiters.QUERY)))),
                 disallowed_escapes=["/"],
             )
 
@@ -259,7 +259,7 @@ struct URI(Copyable, Representable, Stringable, Writable):
             return result^
 
         var query: String = ""
-        if query_delimiter == ord(URIDelimiters.QUERY):
+        if query_delimiter == UInt8(ord(URIDelimiters.QUERY)):
             # TODO: Handle fragments for anchors
             query = String(reader.read_bytes()[1:])
 

@@ -175,7 +175,7 @@ struct sockaddr_in(TrivialRegisterPassable):
             port: A 16-bit integer port in host byte order, gets converted to network byte order via `htons`.
             binary_ip: The binary representation of the IP address.
         """
-        self.sin_family = address_family
+        self.sin_family = sa_family_t(address_family)
         self.sin_port = htons(port)
         self.sin_addr = in_addr(binary_ip)
         self.sin_zero = StaticTuple[c_char, 8](0, 0, 0, 0, 0, 0, 0, 0)
@@ -327,7 +327,7 @@ fn inet_ntop[
         address_family.value,
         UnsafePointer(to=ip_address).bitcast[c_void](),
         dst.unsafe_ptr().bitcast[c_char](),
-        address_length.value,
+        UInt32(address_length.value),
     )
     if not result:
         var errno = get_errno()
