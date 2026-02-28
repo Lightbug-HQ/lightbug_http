@@ -1,4 +1,4 @@
-from sys.ffi import CompilationTarget, c_char, c_int, c_uchar, external_call
+from ffi import CompilationTarget, c_char, c_int, c_uchar, external_call
 
 from lightbug_http.c.address import AddressFamily, AddressLength
 from lightbug_http.c.aliases import ExternalImmutUnsafePointer, ExternalMutUnsafePointer, c_void

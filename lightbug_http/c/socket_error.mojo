@@ -4,7 +4,7 @@ Generated from socket.mojo error handling patterns.
 Follows the pattern from typed_errors.mojo.
 """
 
-from sys.ffi import c_int, external_call, get_errno
+from ffi import c_int, external_call, get_errno
 
 from lightbug_http.utils.error import CustomError
 from utils import Variant

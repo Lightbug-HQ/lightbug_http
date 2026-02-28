@@ -1,4 +1,4 @@
-from sys.ffi import c_char, c_int, c_uint, c_ushort, external_call, get_errno
+from ffi import c_char, c_int, c_uint, c_ushort, external_call, get_errno
 from sys.info import size_of
 
 from lightbug_http.c.address import AddressFamily, AddressLength

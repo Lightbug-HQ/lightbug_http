@@ -1,4 +1,4 @@
-from sys.ffi import c_int, c_size_t, c_ssize_t, c_uchar, external_call, get_errno
+from ffi import c_int, c_size_t, c_ssize_t, c_uchar, external_call, get_errno
 from sys.info import CompilationTarget, size_of
 
 from lightbug_http.c.aliases import c_void

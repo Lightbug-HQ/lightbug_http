@@ -1,4 +1,4 @@
-from sys.ffi import c_uint
+from ffi import c_uint
 from sys.info import CompilationTarget
 
 from lightbug_http.c.aliases import c_void
