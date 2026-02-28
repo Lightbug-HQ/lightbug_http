@@ -372,10 +372,10 @@ fn get_ip_address(
         try:
             result = getaddrinfo(host, service, hints)
         except getaddrinfo_err:
-            raise getaddrinfo_err
+            raise GetIPAddressError(getaddrinfo_err)
 
         if not result.unsafe_ptr()[].ai_addr:
-            raise GetaddrinfoNullAddrError()
+            raise GetIPAddressError(GetaddrinfoNullAddrError())
 
         # extend result's lifetime to avoid invalid access of pointer, it'd get freed early
         return (
@@ -396,10 +396,10 @@ fn get_ip_address(
         try:
             result = getaddrinfo(host, service, hints)
         except getaddrinfo_err:
-            raise getaddrinfo_err
+            raise GetIPAddressError(getaddrinfo_err)
 
         if not result.unsafe_ptr()[].ai_addr:
-            raise GetaddrinfoNullAddrError()
+            raise GetIPAddressError(GetaddrinfoNullAddrError())
 
         return (
             result.unsafe_ptr()[]
@@ -561,125 +561,21 @@ struct GetaddrinfoError(CustomError, TrivialRegisterPassable):
 
 
 
-@fieldwise_init
-struct GetIPAddressError(Movable, Stringable, Writable):
-    """Typed error variant for get_ip_address() function."""
-
-    comptime type = Variant[GetaddrinfoError, GetaddrinfoNullAddrError]
-    var value: Self.type
-
-    @implicit
-    fn __init__(out self, value: GetaddrinfoError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: GetaddrinfoNullAddrError):
-        self.value = value
-
-    fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[GetaddrinfoError]():
-            writer.write(self.value[GetaddrinfoError])
-        elif self.value.isa[GetaddrinfoNullAddrError]():
-            writer.write(self.value[GetaddrinfoNullAddrError])
-
-    fn isa[T: AnyType](self) -> Bool:
-        return self.value.isa[T]()
-
-    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
-        return self.value[T]
-
-    fn __str__(self) -> String:
-        return String.write(self)
+comptime GetIPAddressError = Variant[GetaddrinfoError, GetaddrinfoNullAddrError]
 
 
-@fieldwise_init
-struct ParseError(Movable, Stringable, Writable):
-    """Typed error variant for address parsing functions."""
-
-    comptime type = Variant[
-        ParseEmptyAddressError,
-        ParseMissingClosingBracketError,
-        ParseMissingPortError,
-        ParseUnexpectedBracketError,
-        ParseEmptyPortError,
-        ParseInvalidPortNumberError,
-        ParsePortOutOfRangeError,
-        ParseMissingSeparatorError,
-        ParseTooManyColonsError,
-        ParseIPProtocolPortError,
-    ]
-    var value: Self.type
-
-    @implicit
-    fn __init__(out self, value: ParseEmptyAddressError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ParseMissingClosingBracketError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ParseMissingPortError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ParseUnexpectedBracketError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ParseEmptyPortError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ParseInvalidPortNumberError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ParsePortOutOfRangeError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ParseMissingSeparatorError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ParseTooManyColonsError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ParseIPProtocolPortError):
-        self.value = value
-
-    fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[ParseEmptyAddressError]():
-            writer.write(self.value[ParseEmptyAddressError])
-        elif self.value.isa[ParseMissingClosingBracketError]():
-            writer.write(self.value[ParseMissingClosingBracketError])
-        elif self.value.isa[ParseMissingPortError]():
-            writer.write(self.value[ParseMissingPortError])
-        elif self.value.isa[ParseUnexpectedBracketError]():
-            writer.write(self.value[ParseUnexpectedBracketError])
-        elif self.value.isa[ParseEmptyPortError]():
-            writer.write(self.value[ParseEmptyPortError])
-        elif self.value.isa[ParseInvalidPortNumberError]():
-            writer.write(self.value[ParseInvalidPortNumberError])
-        elif self.value.isa[ParsePortOutOfRangeError]():
-            writer.write(self.value[ParsePortOutOfRangeError])
-        elif self.value.isa[ParseMissingSeparatorError]():
-            writer.write(self.value[ParseMissingSeparatorError])
-        elif self.value.isa[ParseTooManyColonsError]():
-            writer.write(self.value[ParseTooManyColonsError])
-        elif self.value.isa[ParseIPProtocolPortError]():
-            writer.write(self.value[ParseIPProtocolPortError])
-
-    fn isa[T: AnyType](self) -> Bool:
-        return self.value.isa[T]()
-
-    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
-        return self.value[T]
-
-    fn __str__(self) -> String:
-        return String.write(self)
+comptime ParseError = Variant[
+    ParseEmptyAddressError,
+    ParseMissingClosingBracketError,
+    ParseMissingPortError,
+    ParseUnexpectedBracketError,
+    ParseEmptyPortError,
+    ParseInvalidPortNumberError,
+    ParsePortOutOfRangeError,
+    ParseMissingSeparatorError,
+    ParseTooManyColonsError,
+    ParseIPProtocolPortError,
+]
 
 
 fn parse_ipv6_bracketed_address[
@@ -695,14 +591,14 @@ fn parse_ipv6_bracketed_address[
 
     var end_bracket_index = address.find("]")
     if end_bracket_index == -1:
-        raise ParseMissingClosingBracketError()
+        raise ParseError(ParseMissingClosingBracketError())
 
     if end_bracket_index + 1 == len(address):
-        raise ParseMissingPortError()
+        raise ParseError(ParseMissingPortError())
 
     var colon_index = end_bracket_index + 1
     if address[colon_index : colon_index + 1] != ":":
-        raise ParseMissingPortError()
+        raise ParseError(ParseMissingPortError())
 
     return address[1:end_bracket_index], UInt16(end_bracket_index + 1)
 
@@ -719,24 +615,24 @@ fn validate_no_brackets[
         segment = address[Int(start_idx) : Int(end_idx.value())]
 
     if segment.find("[") != -1:
-        raise ParseUnexpectedBracketError()
+        raise ParseError(ParseUnexpectedBracketError())
     if segment.find("]") != -1:
-        raise ParseUnexpectedBracketError()
+        raise ParseError(ParseUnexpectedBracketError())
 
 
 fn parse_port[origin: ImmutOrigin](port_str: StringSlice[origin]) raises ParseError -> UInt16:
     """Parse and validate port number."""
     if port_str == AddressConstants.EMPTY:
-        raise ParseEmptyPortError()
+        raise ParseError(ParseEmptyPortError())
 
     var port: Int
     try:
         port = Int(String(port_str))
     except conversion_err:
-        raise ParseInvalidPortNumberError()
+        raise ParseError(ParseInvalidPortNumberError())
 
     if port < MIN_PORT or port > MAX_PORT:
-        raise ParsePortOutOfRangeError()
+        raise ParseError(ParsePortOutOfRangeError())
 
     return UInt16(port)
 
@@ -765,7 +661,7 @@ fn parse_address[
         Tuple containing the host and port.
     """
     if address == AddressConstants.EMPTY:
-        raise ParseEmptyAddressError()
+        raise ParseError(ParseEmptyAddressError())
 
     if address == AddressConstants.LOCALHOST:
 
@@ -781,13 +677,13 @@ fn parse_address[
             return HostPort(String(address), DEFAULT_IP_PORT)
 
         if address.find(":") != -1:
-            raise ParseIPProtocolPortError()
+            raise ParseError(ParseIPProtocolPortError())
 
         return HostPort(String(address), DEFAULT_IP_PORT)
 
     var colon_index = address.rfind(":")
     if colon_index == -1:
-        raise ParseMissingSeparatorError()
+        raise ParseError(ParseMissingSeparatorError())
 
     var host: StringSlice[origin]
     var port: UInt16
@@ -802,7 +698,7 @@ fn parse_address[
     else:
         host = address[:colon_index]
         if host.find(":") != -1:
-            raise ParseTooManyColonsError()
+            raise ParseError(ParseTooManyColonsError())
 
     port = parse_port(address[colon_index + 1 :])
     if host == AddressConstants.LOCALHOST:

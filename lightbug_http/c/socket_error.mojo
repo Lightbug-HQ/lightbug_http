@@ -4,8 +4,6 @@ Generated from socket.mojo error handling patterns.
 Follows the pattern from typed_errors.mojo.
 """
 
-from ffi import c_int, external_call, get_errno
-
 from lightbug_http.utils.error import CustomError
 from utils import Variant
 
@@ -1455,1266 +1453,186 @@ struct SocketEPROTONOSUPPORTError(CustomError, TrivialRegisterPassable):
         return Self.message
 
 
-@fieldwise_init
-struct AcceptError(Movable, Stringable, Writable):
-    """Typed error variant for accept() function."""
-
-    comptime type = Variant[
-        AcceptEBADFError,
-        AcceptEINTRError,
-        AcceptEAGAINError,
-        AcceptECONNABORTEDError,
-        AcceptEFAULTError,
-        AcceptEINVALError,
-        AcceptEMFILEError,
-        AcceptENFILEError,
-        AcceptENOBUFSError,
-        AcceptENOTSOCKError,
-        AcceptEOPNOTSUPPError,
-        AcceptEPERMError,
-        AcceptEPROTOError,
-        Error,
-    ]
-    var value: Self.type
-
-    @implicit
-    fn __init__(out self, value: AcceptEBADFError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: AcceptEINTRError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: AcceptEAGAINError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: AcceptECONNABORTEDError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: AcceptEFAULTError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: AcceptEINVALError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: AcceptEMFILEError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: AcceptENFILEError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: AcceptENOBUFSError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: AcceptENOTSOCKError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: AcceptEOPNOTSUPPError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: AcceptEPERMError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: AcceptEPROTOError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
-    fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[AcceptEBADFError]():
-            writer.write(self.value[AcceptEBADFError])
-        elif self.value.isa[AcceptEINTRError]():
-            writer.write(self.value[AcceptEINTRError])
-        elif self.value.isa[AcceptEAGAINError]():
-            writer.write(self.value[AcceptEAGAINError])
-        elif self.value.isa[AcceptECONNABORTEDError]():
-            writer.write(self.value[AcceptECONNABORTEDError])
-        elif self.value.isa[AcceptEFAULTError]():
-            writer.write(self.value[AcceptEFAULTError])
-        elif self.value.isa[AcceptEINVALError]():
-            writer.write(self.value[AcceptEINVALError])
-        elif self.value.isa[AcceptEMFILEError]():
-            writer.write(self.value[AcceptEMFILEError])
-        elif self.value.isa[AcceptENFILEError]():
-            writer.write(self.value[AcceptENFILEError])
-        elif self.value.isa[AcceptENOBUFSError]():
-            writer.write(self.value[AcceptENOBUFSError])
-        elif self.value.isa[AcceptENOTSOCKError]():
-            writer.write(self.value[AcceptENOTSOCKError])
-        elif self.value.isa[AcceptEOPNOTSUPPError]():
-            writer.write(self.value[AcceptEOPNOTSUPPError])
-        elif self.value.isa[AcceptEPERMError]():
-            writer.write(self.value[AcceptEPERMError])
-        elif self.value.isa[AcceptEPROTOError]():
-            writer.write(self.value[AcceptEPROTOError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
-
-    fn isa[T: AnyType](self) -> Bool:
-        return self.value.isa[T]()
-
-    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
-        return self.value[T]
-
-    fn __str__(self) -> String:
-        return String.write(self)
-
-
-@fieldwise_init
-struct BindError(Movable, Stringable, Writable):
-    """Typed error variant for bind() function."""
-
-    comptime type = Variant[
-        BindEACCESError,
-        BindEADDRINUSEError,
-        BindEBADFError,
-        BindEFAULTError,
-        BindEINVALError,
-        BindELOOPError,
-        BindENAMETOOLONGError,
-        BindENOMEMError,
-        BindENOTSOCKError,
-        Error,
-    ]
-    var value: Self.type
-
-    @implicit
-    fn __init__(out self, value: BindEACCESError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: BindEADDRINUSEError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: BindEBADFError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: BindEFAULTError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: BindEINVALError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: BindELOOPError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: BindENAMETOOLONGError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: BindENOMEMError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: BindENOTSOCKError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
-    fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[BindEACCESError]():
-            writer.write(self.value[BindEACCESError])
-        elif self.value.isa[BindEADDRINUSEError]():
-            writer.write(self.value[BindEADDRINUSEError])
-        elif self.value.isa[BindEBADFError]():
-            writer.write(self.value[BindEBADFError])
-        elif self.value.isa[BindEFAULTError]():
-            writer.write(self.value[BindEFAULTError])
-        elif self.value.isa[BindEINVALError]():
-            writer.write(self.value[BindEINVALError])
-        elif self.value.isa[BindELOOPError]():
-            writer.write(self.value[BindELOOPError])
-        elif self.value.isa[BindENAMETOOLONGError]():
-            writer.write(self.value[BindENAMETOOLONGError])
-        elif self.value.isa[BindENOMEMError]():
-            writer.write(self.value[BindENOMEMError])
-        elif self.value.isa[BindENOTSOCKError]():
-            writer.write(self.value[BindENOTSOCKError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
-
-    fn isa[T: AnyType](self) -> Bool:
-        return self.value.isa[T]()
-
-    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
-        return self.value[T]
-
-    fn __str__(self) -> String:
-        return String.write(self)
-
-
-@fieldwise_init
-struct CloseError(Movable, Stringable, Writable):
-    """Typed error variant for close() function."""
-
-    comptime type = Variant[CloseEBADFError, CloseEINTRError, CloseEIOError, CloseENOSPCError]
-    var value: Self.type
-
-    @implicit
-    fn __init__(out self, value: CloseEBADFError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: CloseEINTRError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: CloseEIOError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: CloseENOSPCError):
-        self.value = value
-
-    fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[CloseEBADFError]():
-            writer.write(self.value[CloseEBADFError])
-        elif self.value.isa[CloseEINTRError]():
-            writer.write(self.value[CloseEINTRError])
-        elif self.value.isa[CloseEIOError]():
-            writer.write(self.value[CloseEIOError])
-        elif self.value.isa[CloseENOSPCError]():
-            writer.write(self.value[CloseENOSPCError])
-
-    fn isa[T: AnyType](self) -> Bool:
-        return self.value.isa[T]()
-
-    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
-        return self.value[T]
-
-    fn __str__(self) -> String:
-        return String.write(self)
-
-
-@fieldwise_init
-struct ConnectError(Movable, Stringable, Writable):
-    """Typed error variant for connect() function."""
-
-    comptime type = Variant[
-        ConnectEACCESError,
-        ConnectEADDRINUSEError,
-        ConnectEAFNOSUPPORTError,
-        ConnectEAGAINError,
-        ConnectEALREADYError,
-        ConnectEBADFError,
-        ConnectECONNREFUSEDError,
-        ConnectEFAULTError,
-        ConnectEINPROGRESSError,
-        ConnectEINTRError,
-        ConnectEISCONNError,
-        ConnectENETUNREACHError,
-        ConnectENOTSOCKError,
-        ConnectETIMEDOUTError,
-        Error,
-    ]
-    var value: Self.type
-
-    @implicit
-    fn __init__(out self, value: ConnectEACCESError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ConnectEADDRINUSEError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ConnectEAFNOSUPPORTError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ConnectEAGAINError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ConnectEALREADYError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ConnectEBADFError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ConnectECONNREFUSEDError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ConnectEFAULTError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ConnectEINPROGRESSError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ConnectEINTRError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ConnectEISCONNError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ConnectENETUNREACHError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ConnectENOTSOCKError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ConnectETIMEDOUTError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
-    fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[ConnectEACCESError]():
-            writer.write(self.value[ConnectEACCESError])
-        elif self.value.isa[ConnectEADDRINUSEError]():
-            writer.write(self.value[ConnectEADDRINUSEError])
-        elif self.value.isa[ConnectEAFNOSUPPORTError]():
-            writer.write(self.value[ConnectEAFNOSUPPORTError])
-        elif self.value.isa[ConnectEAGAINError]():
-            writer.write(self.value[ConnectEAGAINError])
-        elif self.value.isa[ConnectEALREADYError]():
-            writer.write(self.value[ConnectEALREADYError])
-        elif self.value.isa[ConnectEBADFError]():
-            writer.write(self.value[ConnectEBADFError])
-        elif self.value.isa[ConnectECONNREFUSEDError]():
-            writer.write(self.value[ConnectECONNREFUSEDError])
-        elif self.value.isa[ConnectEFAULTError]():
-            writer.write(self.value[ConnectEFAULTError])
-        elif self.value.isa[ConnectEINPROGRESSError]():
-            writer.write(self.value[ConnectEINPROGRESSError])
-        elif self.value.isa[ConnectEINTRError]():
-            writer.write(self.value[ConnectEINTRError])
-        elif self.value.isa[ConnectEISCONNError]():
-            writer.write(self.value[ConnectEISCONNError])
-        elif self.value.isa[ConnectENETUNREACHError]():
-            writer.write(self.value[ConnectENETUNREACHError])
-        elif self.value.isa[ConnectENOTSOCKError]():
-            writer.write(self.value[ConnectENOTSOCKError])
-        elif self.value.isa[ConnectETIMEDOUTError]():
-            writer.write(self.value[ConnectETIMEDOUTError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
-
-    fn isa[T: AnyType](self) -> Bool:
-        return self.value.isa[T]()
-
-    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
-        return self.value[T]
-
-    fn __str__(self) -> String:
-        return String.write(self)
-
-
-@fieldwise_init
-struct GetpeernameError(Movable, Stringable, Writable):
-    """Typed error variant for getpeername() function."""
-
-    comptime type = Variant[
-        GetpeernameEBADFError,
-        GetpeernameEFAULTError,
-        GetpeernameEINVALError,
-        GetpeernameENOBUFSError,
-        GetpeernameENOTCONNError,
-        GetpeernameENOTSOCKError,
-    ]
-    var value: Self.type
-
-    @implicit
-    fn __init__(out self, value: GetpeernameEBADFError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: GetpeernameEFAULTError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: GetpeernameEINVALError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: GetpeernameENOBUFSError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: GetpeernameENOTCONNError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: GetpeernameENOTSOCKError):
-        self.value = value
-
-    fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[GetpeernameEBADFError]():
-            writer.write(self.value[GetpeernameEBADFError])
-        elif self.value.isa[GetpeernameEFAULTError]():
-            writer.write(self.value[GetpeernameEFAULTError])
-        elif self.value.isa[GetpeernameEINVALError]():
-            writer.write(self.value[GetpeernameEINVALError])
-        elif self.value.isa[GetpeernameENOBUFSError]():
-            writer.write(self.value[GetpeernameENOBUFSError])
-        elif self.value.isa[GetpeernameENOTCONNError]():
-            writer.write(self.value[GetpeernameENOTCONNError])
-        elif self.value.isa[GetpeernameENOTSOCKError]():
-            writer.write(self.value[GetpeernameENOTSOCKError])
-
-    fn isa[T: AnyType](self) -> Bool:
-        return self.value.isa[T]()
-
-    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
-        return self.value[T]
-
-    fn __str__(self) -> String:
-        return String.write(self)
-
-
-@fieldwise_init
-struct GetsocknameError(Movable, Stringable, Writable):
-    """Typed error variant for getsockname() function."""
-
-    comptime type = Variant[
-        GetsocknameEBADFError,
-        GetsocknameEFAULTError,
-        GetsocknameEINVALError,
-        GetsocknameENOBUFSError,
-        GetsocknameENOTSOCKError,
-    ]
-    var value: Self.type
-
-    @implicit
-    fn __init__(out self, value: GetsocknameEBADFError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: GetsocknameEFAULTError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: GetsocknameEINVALError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: GetsocknameENOBUFSError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: GetsocknameENOTSOCKError):
-        self.value = value
-
-    fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[GetsocknameEBADFError]():
-            writer.write(self.value[GetsocknameEBADFError])
-        elif self.value.isa[GetsocknameEFAULTError]():
-            writer.write(self.value[GetsocknameEFAULTError])
-        elif self.value.isa[GetsocknameEINVALError]():
-            writer.write(self.value[GetsocknameEINVALError])
-        elif self.value.isa[GetsocknameENOBUFSError]():
-            writer.write(self.value[GetsocknameENOBUFSError])
-        elif self.value.isa[GetsocknameENOTSOCKError]():
-            writer.write(self.value[GetsocknameENOTSOCKError])
-
-    fn isa[T: AnyType](self) -> Bool:
-        return self.value.isa[T]()
-
-    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
-        return self.value[T]
-
-    fn __str__(self) -> String:
-        return String.write(self)
-
-
-@fieldwise_init
-struct GetsockoptError(Movable, Stringable, Writable):
-    """Typed error variant for getsockopt() function."""
-
-    comptime type = Variant[
-        GetsockoptEBADFError,
-        GetsockoptEFAULTError,
-        GetsockoptEINVALError,
-        GetsockoptENOPROTOOPTError,
-        GetsockoptENOTSOCKError,
-        Error,
-    ]
-    var value: Self.type
-
-    @implicit
-    fn __init__(out self, value: GetsockoptEBADFError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: GetsockoptEFAULTError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: GetsockoptEINVALError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: GetsockoptENOPROTOOPTError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: GetsockoptENOTSOCKError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
-    fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[GetsockoptEBADFError]():
-            writer.write(self.value[GetsockoptEBADFError])
-        elif self.value.isa[GetsockoptEFAULTError]():
-            writer.write(self.value[GetsockoptEFAULTError])
-        elif self.value.isa[GetsockoptEINVALError]():
-            writer.write(self.value[GetsockoptEINVALError])
-        elif self.value.isa[GetsockoptENOPROTOOPTError]():
-            writer.write(self.value[GetsockoptENOPROTOOPTError])
-        elif self.value.isa[GetsockoptENOTSOCKError]():
-            writer.write(self.value[GetsockoptENOTSOCKError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
-
-    fn isa[T: AnyType](self) -> Bool:
-        return self.value.isa[T]()
-
-    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
-        return self.value[T]
-
-    fn __str__(self) -> String:
-        return String.write(self)
-
-
-@fieldwise_init
-struct ListenError(Movable, Stringable, Writable):
-    """Typed error variant for listen() function."""
-
-    comptime type = Variant[ListenEADDRINUSEError, ListenEBADFError, ListenENOTSOCKError, ListenEOPNOTSUPPError]
-    var value: Self.type
-
-    @implicit
-    fn __init__(out self, value: ListenEADDRINUSEError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ListenEBADFError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ListenENOTSOCKError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ListenEOPNOTSUPPError):
-        self.value = value
-
-    fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[ListenEADDRINUSEError]():
-            writer.write(self.value[ListenEADDRINUSEError])
-        elif self.value.isa[ListenEBADFError]():
-            writer.write(self.value[ListenEBADFError])
-        elif self.value.isa[ListenENOTSOCKError]():
-            writer.write(self.value[ListenENOTSOCKError])
-        elif self.value.isa[ListenEOPNOTSUPPError]():
-            writer.write(self.value[ListenEOPNOTSUPPError])
-
-    fn isa[T: AnyType](self) -> Bool:
-        return self.value.isa[T]()
-
-    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
-        return self.value[T]
-
-    fn __str__(self) -> String:
-        return String.write(self)
-
-
-@fieldwise_init
-struct RecvError(Movable, Stringable, Writable):
-    """Typed error variant for recv() function."""
-
-    comptime type = Variant[
-        RecvEAGAINError,
-        RecvEBADFError,
-        RecvECONNREFUSEDError,
-        RecvEFAULTError,
-        RecvEINTRError,
-        RecvENOTCONNError,
-        RecvENOTSOCKError,
-        Error,
-    ]
-    var value: Self.type
-
-    @implicit
-    fn __init__(out self, value: RecvEAGAINError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: RecvEBADFError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: RecvECONNREFUSEDError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: RecvEFAULTError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: RecvEINTRError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: RecvENOTCONNError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: RecvENOTSOCKError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
-    fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[RecvEAGAINError]():
-            writer.write(self.value[RecvEAGAINError])
-        elif self.value.isa[RecvEBADFError]():
-            writer.write(self.value[RecvEBADFError])
-        elif self.value.isa[RecvECONNREFUSEDError]():
-            writer.write(self.value[RecvECONNREFUSEDError])
-        elif self.value.isa[RecvEFAULTError]():
-            writer.write(self.value[RecvEFAULTError])
-        elif self.value.isa[RecvEINTRError]():
-            writer.write(self.value[RecvEINTRError])
-        elif self.value.isa[RecvENOTCONNError]():
-            writer.write(self.value[RecvENOTCONNError])
-        elif self.value.isa[RecvENOTSOCKError]():
-            writer.write(self.value[RecvENOTSOCKError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
-
-    fn isa[T: AnyType](self) -> Bool:
-        return self.value.isa[T]()
-
-    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
-        return self.value[T]
-
-    fn __str__(self) -> String:
-        return String.write(self)
-
-
-@fieldwise_init
-struct RecvfromError(Movable, Stringable, Writable):
-    """Typed error variant for recvfrom() function."""
-
-    comptime type = Variant[
-        RecvfromEAGAINError,
-        RecvfromEBADFError,
-        RecvfromECONNRESETError,
-        RecvfromEINTRError,
-        RecvfromEINVALError,
-        RecvfromEIOError,
-        RecvfromENOBUFSError,
-        RecvfromENOMEMError,
-        RecvfromENOTCONNError,
-        RecvfromENOTSOCKError,
-        RecvfromEOPNOTSUPPError,
-        RecvfromETIMEDOUTError,
-        Error,
-    ]
-    var value: Self.type
-
-    @implicit
-    fn __init__(out self, value: RecvfromEAGAINError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: RecvfromEBADFError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: RecvfromECONNRESETError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: RecvfromEINTRError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: RecvfromEINVALError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: RecvfromEIOError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: RecvfromENOBUFSError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: RecvfromENOMEMError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: RecvfromENOTCONNError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: RecvfromENOTSOCKError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: RecvfromEOPNOTSUPPError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: RecvfromETIMEDOUTError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
-    fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[RecvfromEAGAINError]():
-            writer.write(self.value[RecvfromEAGAINError])
-        elif self.value.isa[RecvfromEBADFError]():
-            writer.write(self.value[RecvfromEBADFError])
-        elif self.value.isa[RecvfromECONNRESETError]():
-            writer.write(self.value[RecvfromECONNRESETError])
-        elif self.value.isa[RecvfromEINTRError]():
-            writer.write(self.value[RecvfromEINTRError])
-        elif self.value.isa[RecvfromEINVALError]():
-            writer.write(self.value[RecvfromEINVALError])
-        elif self.value.isa[RecvfromEIOError]():
-            writer.write(self.value[RecvfromEIOError])
-        elif self.value.isa[RecvfromENOBUFSError]():
-            writer.write(self.value[RecvfromENOBUFSError])
-        elif self.value.isa[RecvfromENOMEMError]():
-            writer.write(self.value[RecvfromENOMEMError])
-        elif self.value.isa[RecvfromENOTCONNError]():
-            writer.write(self.value[RecvfromENOTCONNError])
-        elif self.value.isa[RecvfromENOTSOCKError]():
-            writer.write(self.value[RecvfromENOTSOCKError])
-        elif self.value.isa[RecvfromEOPNOTSUPPError]():
-            writer.write(self.value[RecvfromEOPNOTSUPPError])
-        elif self.value.isa[RecvfromETIMEDOUTError]():
-            writer.write(self.value[RecvfromETIMEDOUTError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
-
-    fn isa[T: AnyType](self) -> Bool:
-        return self.value.isa[T]()
-
-    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
-        return self.value[T]
-
-    fn __str__(self) -> String:
-        return String.write(self)
-
-
-@fieldwise_init
-struct SendError(Movable, Stringable, Writable):
-    """Typed error variant for send() function."""
-
-    comptime type = Variant[
-        SendEAGAINError,
-        SendEBADFError,
-        SendECONNREFUSEDError,
-        SendECONNRESETError,
-        SendEDESTADDRREQError,
-        SendEFAULTError,
-        SendEINTRError,
-        SendEINVALError,
-        SendEISCONNError,
-        SendENOBUFSError,
-        SendENOMEMError,
-        SendENOTCONNError,
-        SendENOTSOCKError,
-        SendEOPNOTSUPPError,
-        Error,
-    ]
-    var value: Self.type
-
-    @implicit
-    fn __init__(out self, value: SendEAGAINError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendEBADFError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendECONNREFUSEDError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendECONNRESETError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendEDESTADDRREQError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendEFAULTError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendEINTRError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendEINVALError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendEISCONNError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendENOBUFSError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendENOMEMError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendENOTCONNError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendENOTSOCKError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendEOPNOTSUPPError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
-    fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[SendEAGAINError]():
-            writer.write(self.value[SendEAGAINError])
-        elif self.value.isa[SendEBADFError]():
-            writer.write(self.value[SendEBADFError])
-        elif self.value.isa[SendECONNREFUSEDError]():
-            writer.write(self.value[SendECONNREFUSEDError])
-        elif self.value.isa[SendECONNRESETError]():
-            writer.write(self.value[SendECONNRESETError])
-        elif self.value.isa[SendEDESTADDRREQError]():
-            writer.write(self.value[SendEDESTADDRREQError])
-        elif self.value.isa[SendEFAULTError]():
-            writer.write(self.value[SendEFAULTError])
-        elif self.value.isa[SendEINTRError]():
-            writer.write(self.value[SendEINTRError])
-        elif self.value.isa[SendEINVALError]():
-            writer.write(self.value[SendEINVALError])
-        elif self.value.isa[SendEISCONNError]():
-            writer.write(self.value[SendEISCONNError])
-        elif self.value.isa[SendENOBUFSError]():
-            writer.write(self.value[SendENOBUFSError])
-        elif self.value.isa[SendENOMEMError]():
-            writer.write(self.value[SendENOMEMError])
-        elif self.value.isa[SendENOTCONNError]():
-            writer.write(self.value[SendENOTCONNError])
-        elif self.value.isa[SendENOTSOCKError]():
-            writer.write(self.value[SendENOTSOCKError])
-        elif self.value.isa[SendEOPNOTSUPPError]():
-            writer.write(self.value[SendEOPNOTSUPPError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
-
-    fn isa[T: AnyType](self) -> Bool:
-        return self.value.isa[T]()
-
-    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
-        return self.value[T]
-
-    fn __str__(self) -> String:
-        return String.write(self)
-
-
-@fieldwise_init
-struct SendtoError(Movable, Stringable, Writable):
-    """Typed error variant for sendto() function."""
-
-    comptime type = Variant[
-        SendtoEACCESError,
-        SendtoEAFNOSUPPORTError,
-        SendtoEAGAINError,
-        SendtoEBADFError,
-        SendtoECONNRESETError,
-        SendtoEDESTADDRREQError,
-        SendtoEHOSTUNREACHError,
-        SendtoEINTRError,
-        SendtoEINVALError,
-        SendtoEIOError,
-        SendtoEISCONNError,
-        SendtoELOOPError,
-        SendtoEMSGSIZEError,
-        SendtoENAMETOOLONGError,
-        SendtoENETDOWNError,
-        SendtoENETUNREACHError,
-        SendtoENOBUFSError,
-        SendtoENOMEMError,
-        SendtoENOTCONNError,
-        SendtoENOTSOCKError,
-        SendtoEPIPEError,
-        Error,
-    ]
-    var value: Self.type
-
-    @implicit
-    fn __init__(out self, value: SendtoEACCESError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendtoEAFNOSUPPORTError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendtoEAGAINError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendtoEBADFError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendtoECONNRESETError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendtoEDESTADDRREQError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendtoEHOSTUNREACHError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendtoEINTRError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendtoEINVALError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendtoEIOError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendtoEISCONNError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendtoELOOPError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendtoEMSGSIZEError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendtoENAMETOOLONGError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendtoENETDOWNError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendtoENETUNREACHError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendtoENOBUFSError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendtoENOMEMError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendtoENOTCONNError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendtoENOTSOCKError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SendtoEPIPEError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
-    fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[SendtoEACCESError]():
-            writer.write(self.value[SendtoEACCESError])
-        elif self.value.isa[SendtoEAFNOSUPPORTError]():
-            writer.write(self.value[SendtoEAFNOSUPPORTError])
-        elif self.value.isa[SendtoEAGAINError]():
-            writer.write(self.value[SendtoEAGAINError])
-        elif self.value.isa[SendtoEBADFError]():
-            writer.write(self.value[SendtoEBADFError])
-        elif self.value.isa[SendtoECONNRESETError]():
-            writer.write(self.value[SendtoECONNRESETError])
-        elif self.value.isa[SendtoEDESTADDRREQError]():
-            writer.write(self.value[SendtoEDESTADDRREQError])
-        elif self.value.isa[SendtoEHOSTUNREACHError]():
-            writer.write(self.value[SendtoEHOSTUNREACHError])
-        elif self.value.isa[SendtoEINTRError]():
-            writer.write(self.value[SendtoEINTRError])
-        elif self.value.isa[SendtoEINVALError]():
-            writer.write(self.value[SendtoEINVALError])
-        elif self.value.isa[SendtoEIOError]():
-            writer.write(self.value[SendtoEIOError])
-        elif self.value.isa[SendtoEISCONNError]():
-            writer.write(self.value[SendtoEISCONNError])
-        elif self.value.isa[SendtoELOOPError]():
-            writer.write(self.value[SendtoELOOPError])
-        elif self.value.isa[SendtoEMSGSIZEError]():
-            writer.write(self.value[SendtoEMSGSIZEError])
-        elif self.value.isa[SendtoENAMETOOLONGError]():
-            writer.write(self.value[SendtoENAMETOOLONGError])
-        elif self.value.isa[SendtoENETDOWNError]():
-            writer.write(self.value[SendtoENETDOWNError])
-        elif self.value.isa[SendtoENETUNREACHError]():
-            writer.write(self.value[SendtoENETUNREACHError])
-        elif self.value.isa[SendtoENOBUFSError]():
-            writer.write(self.value[SendtoENOBUFSError])
-        elif self.value.isa[SendtoENOMEMError]():
-            writer.write(self.value[SendtoENOMEMError])
-        elif self.value.isa[SendtoENOTCONNError]():
-            writer.write(self.value[SendtoENOTCONNError])
-        elif self.value.isa[SendtoENOTSOCKError]():
-            writer.write(self.value[SendtoENOTSOCKError])
-        elif self.value.isa[SendtoEPIPEError]():
-            writer.write(self.value[SendtoEPIPEError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
-
-    fn isa[T: AnyType](self) -> Bool:
-        return self.value.isa[T]()
-
-    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
-        return self.value[T]
-
-    fn __str__(self) -> String:
-        return String.write(self)
-
-
-@fieldwise_init
-struct SetsockoptError(Movable, Stringable, Writable):
-    """Typed error variant for setsockopt() function."""
-
-    comptime type = Variant[
-        SetsockoptEBADFError,
-        SetsockoptEFAULTError,
-        SetsockoptEINVALError,
-        SetsockoptENOPROTOOPTError,
-        SetsockoptENOTSOCKError,
-        Error,
-    ]
-    var value: Self.type
-
-    @implicit
-    fn __init__(out self, value: SetsockoptEBADFError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SetsockoptEFAULTError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SetsockoptEINVALError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SetsockoptENOPROTOOPTError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SetsockoptENOTSOCKError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
-    fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[SetsockoptEBADFError]():
-            writer.write(self.value[SetsockoptEBADFError])
-        elif self.value.isa[SetsockoptEFAULTError]():
-            writer.write(self.value[SetsockoptEFAULTError])
-        elif self.value.isa[SetsockoptEINVALError]():
-            writer.write(self.value[SetsockoptEINVALError])
-        elif self.value.isa[SetsockoptENOPROTOOPTError]():
-            writer.write(self.value[SetsockoptENOPROTOOPTError])
-        elif self.value.isa[SetsockoptENOTSOCKError]():
-            writer.write(self.value[SetsockoptENOTSOCKError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
-
-    fn isa[T: AnyType](self) -> Bool:
-        return self.value.isa[T]()
-
-    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
-        return self.value[T]
-
-    fn __str__(self) -> String:
-        return String.write(self)
-
-
-@fieldwise_init
-struct ShutdownError(Movable, Stringable, Writable):
-    """Typed error variant for shutdown() function."""
-
-    comptime type = Variant[ShutdownEBADFError, ShutdownEINVALError, ShutdownENOTCONNError, ShutdownENOTSOCKError]
-    var value: Self.type
-
-    @implicit
-    fn __init__(out self, value: ShutdownEBADFError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ShutdownEINVALError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ShutdownENOTCONNError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: ShutdownENOTSOCKError):
-        self.value = value
-
-    fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[ShutdownEBADFError]():
-            writer.write(self.value[ShutdownEBADFError])
-        elif self.value.isa[ShutdownEINVALError]():
-            writer.write(self.value[ShutdownEINVALError])
-        elif self.value.isa[ShutdownENOTCONNError]():
-            writer.write(self.value[ShutdownENOTCONNError])
-        elif self.value.isa[ShutdownENOTSOCKError]():
-            writer.write(self.value[ShutdownENOTSOCKError])
-
-    fn isa[T: AnyType](self) -> Bool:
-        return self.value.isa[T]()
-
-    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
-        return self.value[T]
-
-    fn __str__(self) -> String:
-        return String.write(self)
-
-
-@fieldwise_init
-struct SocketError(Movable, Stringable, Writable):
-    """Typed error variant for socket() function."""
-
-    comptime type = Variant[
-        SocketEACCESError,
-        SocketEAFNOSUPPORTError,
-        SocketEINVALError,
-        SocketEMFILEError,
-        SocketENFILEError,
-        SocketENOBUFSError,
-        SocketEPROTONOSUPPORTError,
-        Error,
-    ]
-    var value: Self.type
-
-    @implicit
-    fn __init__(out self, value: SocketEACCESError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SocketEAFNOSUPPORTError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SocketEINVALError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SocketEMFILEError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SocketENFILEError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SocketENOBUFSError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: SocketEPROTONOSUPPORTError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
-    fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[SocketEACCESError]():
-            writer.write(self.value[SocketEACCESError])
-        elif self.value.isa[SocketEAFNOSUPPORTError]():
-            writer.write(self.value[SocketEAFNOSUPPORTError])
-        elif self.value.isa[SocketEINVALError]():
-            writer.write(self.value[SocketEINVALError])
-        elif self.value.isa[SocketEMFILEError]():
-            writer.write(self.value[SocketEMFILEError])
-        elif self.value.isa[SocketENFILEError]():
-            writer.write(self.value[SocketENFILEError])
-        elif self.value.isa[SocketENOBUFSError]():
-            writer.write(self.value[SocketENOBUFSError])
-        elif self.value.isa[SocketEPROTONOSUPPORTError]():
-            writer.write(self.value[SocketEPROTONOSUPPORTError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
-
-    fn isa[T: AnyType](self) -> Bool:
-        return self.value.isa[T]()
-
-    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
-        return self.value[T]
-
-    fn __str__(self) -> String:
-        return String.write(self)
+comptime AcceptError = Variant[
+    AcceptEBADFError,
+    AcceptEINTRError,
+    AcceptEAGAINError,
+    AcceptECONNABORTEDError,
+    AcceptEFAULTError,
+    AcceptEINVALError,
+    AcceptEMFILEError,
+    AcceptENFILEError,
+    AcceptENOBUFSError,
+    AcceptENOTSOCKError,
+    AcceptEOPNOTSUPPError,
+    AcceptEPERMError,
+    AcceptEPROTOError,
+    Error,
+]
+
+
+comptime BindError = Variant[
+    BindEACCESError,
+    BindEADDRINUSEError,
+    BindEBADFError,
+    BindEFAULTError,
+    BindEINVALError,
+    BindELOOPError,
+    BindENAMETOOLONGError,
+    BindENOMEMError,
+    BindENOTSOCKError,
+    Error,
+]
+
+
+comptime CloseError = Variant[CloseEBADFError, CloseEINTRError, CloseEIOError, CloseENOSPCError]
+
+
+comptime ConnectError = Variant[
+    ConnectEACCESError,
+    ConnectEADDRINUSEError,
+    ConnectEAFNOSUPPORTError,
+    ConnectEAGAINError,
+    ConnectEALREADYError,
+    ConnectEBADFError,
+    ConnectECONNREFUSEDError,
+    ConnectEFAULTError,
+    ConnectEINPROGRESSError,
+    ConnectEINTRError,
+    ConnectEISCONNError,
+    ConnectENETUNREACHError,
+    ConnectENOTSOCKError,
+    ConnectETIMEDOUTError,
+    Error,
+]
+
+
+comptime GetpeernameError = Variant[
+    GetpeernameEBADFError,
+    GetpeernameEFAULTError,
+    GetpeernameEINVALError,
+    GetpeernameENOBUFSError,
+    GetpeernameENOTCONNError,
+    GetpeernameENOTSOCKError,
+]
+
+
+comptime GetsocknameError = Variant[
+    GetsocknameEBADFError,
+    GetsocknameEFAULTError,
+    GetsocknameEINVALError,
+    GetsocknameENOBUFSError,
+    GetsocknameENOTSOCKError,
+]
+
+
+comptime GetsockoptError = Variant[
+    GetsockoptEBADFError,
+    GetsockoptEFAULTError,
+    GetsockoptEINVALError,
+    GetsockoptENOPROTOOPTError,
+    GetsockoptENOTSOCKError,
+    Error,
+]
+
+
+comptime ListenError = Variant[ListenEADDRINUSEError, ListenEBADFError, ListenENOTSOCKError, ListenEOPNOTSUPPError]
+
+
+comptime RecvError = Variant[
+    RecvEAGAINError,
+    RecvEBADFError,
+    RecvECONNREFUSEDError,
+    RecvEFAULTError,
+    RecvEINTRError,
+    RecvENOTCONNError,
+    RecvENOTSOCKError,
+    Error,
+]
+
+
+comptime RecvfromError = Variant[
+    RecvfromEAGAINError,
+    RecvfromEBADFError,
+    RecvfromECONNRESETError,
+    RecvfromEINTRError,
+    RecvfromEINVALError,
+    RecvfromEIOError,
+    RecvfromENOBUFSError,
+    RecvfromENOMEMError,
+    RecvfromENOTCONNError,
+    RecvfromENOTSOCKError,
+    RecvfromEOPNOTSUPPError,
+    RecvfromETIMEDOUTError,
+    Error,
+]
+
+
+comptime SendError = Variant[
+    SendEAGAINError,
+    SendEBADFError,
+    SendECONNREFUSEDError,
+    SendECONNRESETError,
+    SendEDESTADDRREQError,
+    SendEFAULTError,
+    SendEINTRError,
+    SendEINVALError,
+    SendEISCONNError,
+    SendENOBUFSError,
+    SendENOMEMError,
+    SendENOTCONNError,
+    SendENOTSOCKError,
+    SendEOPNOTSUPPError,
+    Error,
+]
+
+
+comptime SendtoError = Variant[
+    SendtoEACCESError,
+    SendtoEAFNOSUPPORTError,
+    SendtoEAGAINError,
+    SendtoEBADFError,
+    SendtoECONNRESETError,
+    SendtoEDESTADDRREQError,
+    SendtoEHOSTUNREACHError,
+    SendtoEINTRError,
+    SendtoEINVALError,
+    SendtoEIOError,
+    SendtoEISCONNError,
+    SendtoELOOPError,
+    SendtoEMSGSIZEError,
+    SendtoENAMETOOLONGError,
+    SendtoENETDOWNError,
+    SendtoENETUNREACHError,
+    SendtoENOBUFSError,
+    SendtoENOMEMError,
+    SendtoENOTCONNError,
+    SendtoENOTSOCKError,
+    SendtoEPIPEError,
+    Error,
+]
+
+
+comptime SetsockoptError = Variant[
+    SetsockoptEBADFError,
+    SetsockoptEFAULTError,
+    SetsockoptEINVALError,
+    SetsockoptENOPROTOOPTError,
+    SetsockoptENOTSOCKError,
+    Error,
+]
+
+
+comptime ShutdownError = Variant[ShutdownEBADFError, ShutdownEINVALError, ShutdownENOTCONNError, ShutdownENOTSOCKError]
+
+
+comptime SocketError = Variant[
+    SocketEACCESError,
+    SocketEAFNOSUPPORTError,
+    SocketEINVALError,
+    SocketEMFILEError,
+    SocketENFILEError,
+    SocketENOBUFSError,
+    SocketEPROTONOSUPPORTError,
+    Error,
+]

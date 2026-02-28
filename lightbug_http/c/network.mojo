@@ -41,72 +41,10 @@ struct InetPtonInvalidAddressError(CustomError, TrivialRegisterPassable):
         return Self.message
 
 
-@fieldwise_init
-struct InetNtopError(Movable, Stringable, Writable):
-    """Typed error variant for inet_ntop() function."""
-
-    comptime type = Variant[InetNtopEAFNOSUPPORTError, InetNtopENOSPCError, Error]
-    var value: Self.type
-
-    @implicit
-    fn __init__(out self, value: InetNtopEAFNOSUPPORTError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, value: InetNtopENOSPCError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
-    fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[InetNtopEAFNOSUPPORTError]():
-            writer.write(self.value[InetNtopEAFNOSUPPORTError])
-        elif self.value.isa[InetNtopENOSPCError]():
-            writer.write(self.value[InetNtopENOSPCError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
-
-    fn isa[T: AnyType](self) -> Bool:
-        return self.value.isa[T]()
-
-    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
-        return self.value[T]
-
-    fn __str__(self) -> String:
-        return String.write(self)
+comptime InetNtopError = Variant[InetNtopEAFNOSUPPORTError, InetNtopENOSPCError, Error]
 
 
-@fieldwise_init
-struct InetPtonError(Movable, Stringable, Writable):
-    """Typed error variant for inet_pton() function."""
-
-    comptime type = Variant[InetPtonInvalidAddressError, Error]
-    var value: Self.type
-
-    @implicit
-    fn __init__(out self, value: InetPtonInvalidAddressError):
-        self.value = value
-
-    @implicit
-    fn __init__(out self, var value: Error):
-        self.value = value^
-
-    fn write_to[W: Writer, //](self, mut writer: W):
-        if self.value.isa[InetPtonInvalidAddressError]():
-            writer.write(self.value[InetPtonInvalidAddressError])
-        elif self.value.isa[Error]():
-            writer.write(self.value[Error])
-
-    fn isa[T: AnyType](self) -> Bool:
-        return self.value.isa[T]()
-
-    fn __getitem__[T: AnyType](self) -> ref [self.value] T:
-        return self.value[T]
-
-    fn __str__(self) -> String:
-        return String.write(self)
+comptime InetPtonError = Variant[InetPtonInvalidAddressError, Error]
 
 
 fn htonl(hostlong: c_uint) -> c_uint:
@@ -394,14 +332,14 @@ fn inet_ntop[
     if not result:
         var errno = get_errno()
         if errno == errno.EAFNOSUPPORT:
-            raise InetNtopEAFNOSUPPORTError()
+            raise InetNtopError(InetNtopEAFNOSUPPORTError())
         elif errno == errno.ENOSPC:
-            raise InetNtopENOSPCError()
+            raise InetNtopError(InetNtopENOSPCError())
         else:
-            raise Error(
+            raise InetNtopError(Error(
                 "inet_ntop Error: An error occurred while converting the address. Error code: ",
                 errno,
-            )
+            ))
 
     return String(unsafe_from_utf8_ptr=dst.unsafe_ptr())
 
@@ -472,12 +410,12 @@ fn inet_pton[address_family: AddressFamily](var src: String) raises InetPtonErro
 
     var result = _inet_pton(address_family.value, src.as_c_string_slice().unsafe_ptr(), ip_buffer)
     if result == 0:
-        raise InetPtonInvalidAddressError()
+        raise InetPtonError(InetPtonInvalidAddressError())
     elif result == -1:
         var errno = get_errno()
-        raise Error(
+        raise InetPtonError(Error(
             "inet_pton Error: An error occurred while converting the address. Error code: ",
             errno,
-        )
+        ))
 
     return ip_buffer.bitcast[c_uint]().take_pointee()
