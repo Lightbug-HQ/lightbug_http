@@ -9,8 +9,7 @@ from utils import StaticTuple, Variant
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct InetNtopEAFNOSUPPORTError(CustomError):
+struct InetNtopEAFNOSUPPORTError(CustomError, TrivialRegisterPassable):
     comptime message = "inet_ntop Error (EAFNOSUPPORT): `*src` was not an `AF_INET` or `AF_INET6` family address."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -21,8 +20,7 @@ struct InetNtopEAFNOSUPPORTError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct InetNtopENOSPCError(CustomError):
+struct InetNtopENOSPCError(CustomError, TrivialRegisterPassable):
     comptime message = "inet_ntop Error (ENOSPC): The buffer size was not large enough to store the presentation form of the address."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -33,8 +31,7 @@ struct InetNtopENOSPCError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct InetPtonInvalidAddressError(CustomError):
+struct InetPtonInvalidAddressError(CustomError, TrivialRegisterPassable):
     comptime message = "inet_pton Error: The input is not a valid address."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -203,19 +200,16 @@ comptime in_port_t = c_ushort
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct in_addr:
+struct in_addr(TrivialRegisterPassable):
     var s_addr: in_addr_t
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct in6_addr:
+struct in6_addr(TrivialRegisterPassable):
     var s6_addr: StaticTuple[c_char, 16]
 
 
-@register_passable("trivial")
-struct sockaddr:
+struct sockaddr(TrivialRegisterPassable):
     var sa_family: sa_family_t
     var sa_data: StaticTuple[c_char, 14]
 
@@ -229,8 +223,7 @@ struct sockaddr:
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct sockaddr_in:
+struct sockaddr_in(TrivialRegisterPassable):
     var sin_family: sa_family_t
     var sin_port: in_port_t
     var sin_addr: in_addr
@@ -251,8 +244,7 @@ struct sockaddr_in:
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct sockaddr_in6:
+struct sockaddr_in6(TrivialRegisterPassable):
     var sin6_family: sa_family_t
     var sin6_port: in_port_t
     var sin6_flowinfo: c_uint
@@ -307,8 +299,7 @@ struct SocketAddress(Movable):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct addrinfo:
+struct addrinfo(TrivialRegisterPassable):
     var ai_flags: c_int
     var ai_family: c_int
     var ai_socktype: c_int

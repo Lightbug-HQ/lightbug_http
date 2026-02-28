@@ -64,20 +64,17 @@ from utils import Variant
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SocketClosedError(Movable):
+struct SocketClosedError(Movable, TrivialRegisterPassable):
     pass
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct EOF(Movable):
+struct EOF(Movable, TrivialRegisterPassable):
     pass
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct InvalidCloseErrorConversionError(Movable, Stringable, Writable):
+struct InvalidCloseErrorConversionError(Movable, Stringable, Writable, TrivialRegisterPassable):
     fn write_to[W: Writer, //](self, mut writer: W):
         writer.write("InvalidCloseErrorConversionError: Cannot convert EBADF to FatalCloseError")
 

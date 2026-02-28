@@ -266,8 +266,7 @@ struct UDPAddr[network: NetworkType = NetworkType.udp4](Addr, ImplicitlyCopyable
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct addrinfo_macos(AnAddrInfo):
+struct addrinfo_macos(AnAddrInfo, TrivialRegisterPassable):
     """
     For MacOS, I had to swap the order of ai_canonname and ai_addr.
     https://stackoverflow.com/questions/53575101/calling-getaddrinfo-directly-from-python-ai-addr-is-null-pointer.
@@ -307,8 +306,7 @@ struct addrinfo_macos(AnAddrInfo):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct addrinfo_unix(AnAddrInfo):
+struct addrinfo_unix(AnAddrInfo, TrivialRegisterPassable):
     """Standard addrinfo struct for Unix systems.
     Overwrites the existing libc `getaddrinfo` function to adhere to the AnAddrInfo trait.
     """
@@ -429,8 +427,7 @@ fn is_ipv6(network: NetworkType) -> Bool:
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ParseEmptyAddressError(CustomError):
+struct ParseEmptyAddressError(CustomError, TrivialRegisterPassable):
     comptime message = "ParseError: Failed to parse address: received empty address string."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -441,8 +438,7 @@ struct ParseEmptyAddressError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ParseMissingClosingBracketError(CustomError):
+struct ParseMissingClosingBracketError(CustomError, TrivialRegisterPassable):
     comptime message = "ParseError: Failed to parse ipv6 address: missing ']'"
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -453,8 +449,7 @@ struct ParseMissingClosingBracketError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ParseMissingPortError(CustomError):
+struct ParseMissingPortError(CustomError, TrivialRegisterPassable):
     comptime message = "ParseError: Failed to parse ipv6 address: missing port in address"
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -465,8 +460,7 @@ struct ParseMissingPortError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ParseUnexpectedBracketError(CustomError):
+struct ParseUnexpectedBracketError(CustomError, TrivialRegisterPassable):
     comptime message = "ParseError: Address failed bracket validation, unexpectedly contained brackets"
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -477,8 +471,7 @@ struct ParseUnexpectedBracketError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ParseEmptyPortError(CustomError):
+struct ParseEmptyPortError(CustomError, TrivialRegisterPassable):
     comptime message = "ParseError: Failed to parse port: port string is empty."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -489,8 +482,7 @@ struct ParseEmptyPortError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ParseInvalidPortNumberError(CustomError):
+struct ParseInvalidPortNumberError(CustomError, TrivialRegisterPassable):
     comptime message = "ParseError: Failed to parse port: invalid integer value."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -501,8 +493,7 @@ struct ParseInvalidPortNumberError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ParsePortOutOfRangeError(CustomError):
+struct ParsePortOutOfRangeError(CustomError, TrivialRegisterPassable):
     comptime message = "ParseError: Failed to parse port: Port number out of range (0-65535)."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -513,8 +504,7 @@ struct ParsePortOutOfRangeError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ParseMissingSeparatorError(CustomError):
+struct ParseMissingSeparatorError(CustomError, TrivialRegisterPassable):
     comptime message = "ParseError: Failed to parse address: missing port separator ':' in address."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -525,8 +515,7 @@ struct ParseMissingSeparatorError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ParseTooManyColonsError(CustomError):
+struct ParseTooManyColonsError(CustomError, TrivialRegisterPassable):
     comptime message = "ParseError: Failed to parse address: too many colons in address"
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -537,8 +526,7 @@ struct ParseTooManyColonsError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ParseIPProtocolPortError(CustomError):
+struct ParseIPProtocolPortError(CustomError, TrivialRegisterPassable):
     comptime message = "ParseError: IP protocol addresses should not include ports"
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -551,8 +539,7 @@ struct ParseIPProtocolPortError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct GetaddrinfoNullAddrError(CustomError):
+struct GetaddrinfoNullAddrError(CustomError, TrivialRegisterPassable):
     comptime message = "GetaddrinfoError: Failed to get IP address because the response's `ai_addr` was null."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -563,8 +550,7 @@ struct GetaddrinfoNullAddrError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct GetaddrinfoError(CustomError):
+struct GetaddrinfoError(CustomError, TrivialRegisterPassable):
     comptime message = "GetaddrinfoError: Failed to resolve address information."
 
     fn write_to[W: Writer, //](self, mut writer: W):

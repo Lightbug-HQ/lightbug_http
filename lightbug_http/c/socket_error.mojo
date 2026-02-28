@@ -12,8 +12,7 @@ from utils import Variant
 
 # Accept errors
 @fieldwise_init
-@register_passable("trivial")
-struct AcceptEBADFError(CustomError):
+struct AcceptEBADFError(CustomError, TrivialRegisterPassable):
     comptime message = "accept (EBADF): socket is not a valid descriptor."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -24,8 +23,7 @@ struct AcceptEBADFError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct AcceptEINTRError(CustomError):
+struct AcceptEINTRError(CustomError, TrivialRegisterPassable):
     comptime message = "accept (EINTR): The system call was interrupted by a signal that was caught before a valid connection arrived."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -36,8 +34,7 @@ struct AcceptEINTRError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct AcceptEAGAINError(CustomError):
+struct AcceptEAGAINError(CustomError, TrivialRegisterPassable):
     comptime message = "accept (EAGAIN/EWOULDBLOCK): The socket is marked nonblocking and no connections are present to be accepted."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -48,8 +45,7 @@ struct AcceptEAGAINError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct AcceptECONNABORTEDError(CustomError):
+struct AcceptECONNABORTEDError(CustomError, TrivialRegisterPassable):
     comptime message = "accept (ECONNABORTED): A connection has been aborted."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -60,8 +56,7 @@ struct AcceptECONNABORTEDError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct AcceptEFAULTError(CustomError):
+struct AcceptEFAULTError(CustomError, TrivialRegisterPassable):
     comptime message = "accept (EFAULT): The address argument is not in a writable part of the user address space."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -72,8 +67,7 @@ struct AcceptEFAULTError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct AcceptEINVALError(CustomError):
+struct AcceptEINVALError(CustomError, TrivialRegisterPassable):
     comptime message = "accept (EINVAL): Socket is not listening for connections, or address_len is invalid."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -84,8 +78,7 @@ struct AcceptEINVALError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct AcceptEMFILEError(CustomError):
+struct AcceptEMFILEError(CustomError, TrivialRegisterPassable):
     comptime message = "accept (EMFILE): The per-process limit of open file descriptors has been reached."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -96,8 +89,7 @@ struct AcceptEMFILEError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct AcceptENFILEError(CustomError):
+struct AcceptENFILEError(CustomError, TrivialRegisterPassable):
     comptime message = "accept (ENFILE): The system limit on the total number of open files has been reached."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -108,8 +100,7 @@ struct AcceptENFILEError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct AcceptENOBUFSError(CustomError):
+struct AcceptENOBUFSError(CustomError, TrivialRegisterPassable):
     comptime message = "accept (ENOBUFS): Not enough free memory."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -120,8 +111,7 @@ struct AcceptENOBUFSError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct AcceptENOTSOCKError(CustomError):
+struct AcceptENOTSOCKError(CustomError, TrivialRegisterPassable):
     comptime message = "accept (ENOTSOCK): socket is a descriptor for a file, not a socket."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -132,8 +122,7 @@ struct AcceptENOTSOCKError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct AcceptEOPNOTSUPPError(CustomError):
+struct AcceptEOPNOTSUPPError(CustomError, TrivialRegisterPassable):
     comptime message = "accept (EOPNOTSUPP): The referenced socket is not of type SOCK_STREAM."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -144,8 +133,7 @@ struct AcceptEOPNOTSUPPError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct AcceptEPERMError(CustomError):
+struct AcceptEPERMError(CustomError, TrivialRegisterPassable):
     comptime message = "accept (EPERM): Firewall rules forbid connection."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -156,8 +144,7 @@ struct AcceptEPERMError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct AcceptEPROTOError(CustomError):
+struct AcceptEPROTOError(CustomError, TrivialRegisterPassable):
     comptime message = "accept (EPROTO): Protocol error."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -169,8 +156,7 @@ struct AcceptEPROTOError(CustomError):
 
 # Bind errors
 @fieldwise_init
-@register_passable("trivial")
-struct BindEACCESError(CustomError):
+struct BindEACCESError(CustomError, TrivialRegisterPassable):
     comptime message = "bind (EACCES): The address is protected, and the user is not the superuser."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -181,8 +167,7 @@ struct BindEACCESError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct BindEADDRINUSEError(CustomError):
+struct BindEADDRINUSEError(CustomError, TrivialRegisterPassable):
     comptime message = "bind (EADDRINUSE): The given address is already in use."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -193,8 +178,7 @@ struct BindEADDRINUSEError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct BindEBADFError(CustomError):
+struct BindEBADFError(CustomError, TrivialRegisterPassable):
     comptime message = "bind (EBADF): socket is not a valid descriptor."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -205,8 +189,7 @@ struct BindEBADFError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct BindEFAULTError(CustomError):
+struct BindEFAULTError(CustomError, TrivialRegisterPassable):
     comptime message = "bind (EFAULT): address points outside the user's accessible address space."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -217,8 +200,7 @@ struct BindEFAULTError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct BindEINVALError(CustomError):
+struct BindEINVALError(CustomError, TrivialRegisterPassable):
     comptime message = "bind (EINVAL): The socket is already bound to an address."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -229,8 +211,7 @@ struct BindEINVALError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct BindELOOPError(CustomError):
+struct BindELOOPError(CustomError, TrivialRegisterPassable):
     comptime message = "bind (ELOOP): Too many symbolic links were encountered in resolving address."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -241,8 +222,7 @@ struct BindELOOPError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct BindENAMETOOLONGError(CustomError):
+struct BindENAMETOOLONGError(CustomError, TrivialRegisterPassable):
     comptime message = "bind (ENAMETOOLONG): address is too long."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -253,8 +233,7 @@ struct BindENAMETOOLONGError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct BindENOMEMError(CustomError):
+struct BindENOMEMError(CustomError, TrivialRegisterPassable):
     comptime message = "bind (ENOMEM): Insufficient kernel memory was available."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -265,8 +244,7 @@ struct BindENOMEMError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct BindENOTSOCKError(CustomError):
+struct BindENOTSOCKError(CustomError, TrivialRegisterPassable):
     comptime message = "bind (ENOTSOCK): socket is a descriptor for a file, not a socket."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -278,8 +256,7 @@ struct BindENOTSOCKError(CustomError):
 
 # Close errors
 @fieldwise_init
-@register_passable("trivial")
-struct CloseEBADFError(CustomError):
+struct CloseEBADFError(CustomError, TrivialRegisterPassable):
     comptime message = "close (EBADF): The file_descriptor argument is not a valid open file descriptor."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -290,8 +267,7 @@ struct CloseEBADFError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct CloseEINTRError(CustomError):
+struct CloseEINTRError(CustomError, TrivialRegisterPassable):
     comptime message = "close (EINTR): The close() function was interrupted by a signal."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -302,8 +278,7 @@ struct CloseEINTRError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct CloseEIOError(CustomError):
+struct CloseEIOError(CustomError, TrivialRegisterPassable):
     comptime message = "close (EIO): An I/O error occurred while reading from or writing to the file system."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -314,8 +289,7 @@ struct CloseEIOError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct CloseENOSPCError(CustomError):
+struct CloseENOSPCError(CustomError, TrivialRegisterPassable):
     comptime message = "close (ENOSPC or EDQUOT): On NFS, these errors are not normally reported against the first write which exceeds the available storage space, but instead against a subsequent write, fsync, or close."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -327,8 +301,7 @@ struct CloseENOSPCError(CustomError):
 
 # Connect errors
 @fieldwise_init
-@register_passable("trivial")
-struct ConnectEACCESError(CustomError):
+struct ConnectEACCESError(CustomError, TrivialRegisterPassable):
     comptime message = "connect (EACCES): Write permission is denied on the socket file, or search permission is denied for one of the directories in the path prefix."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -339,8 +312,7 @@ struct ConnectEACCESError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ConnectEADDRINUSEError(CustomError):
+struct ConnectEADDRINUSEError(CustomError, TrivialRegisterPassable):
     comptime message = "connect (EADDRINUSE): Local address is already in use."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -351,8 +323,7 @@ struct ConnectEADDRINUSEError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ConnectEAFNOSUPPORTError(CustomError):
+struct ConnectEAFNOSUPPORTError(CustomError, TrivialRegisterPassable):
     comptime message = "connect (EAFNOSUPPORT): The passed address didn't have the correct address family in its sa_family field."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -363,8 +334,7 @@ struct ConnectEAFNOSUPPORTError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ConnectEAGAINError(CustomError):
+struct ConnectEAGAINError(CustomError, TrivialRegisterPassable):
     comptime message = "connect (EAGAIN): No more free local ports or insufficient entries in the routing cache."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -375,8 +345,7 @@ struct ConnectEAGAINError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ConnectEALREADYError(CustomError):
+struct ConnectEALREADYError(CustomError, TrivialRegisterPassable):
     comptime message = "connect (EALREADY): The socket is nonblocking and a previous connection attempt has not yet been completed."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -387,8 +356,7 @@ struct ConnectEALREADYError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ConnectEBADFError(CustomError):
+struct ConnectEBADFError(CustomError, TrivialRegisterPassable):
     comptime message = "connect (EBADF): The file descriptor is not a valid index in the descriptor table."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -399,8 +367,7 @@ struct ConnectEBADFError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ConnectECONNREFUSEDError(CustomError):
+struct ConnectECONNREFUSEDError(CustomError, TrivialRegisterPassable):
     comptime message = "connect (ECONNREFUSED): No-one listening on the remote address."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -411,8 +378,7 @@ struct ConnectECONNREFUSEDError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ConnectEFAULTError(CustomError):
+struct ConnectEFAULTError(CustomError, TrivialRegisterPassable):
     comptime message = "connect (EFAULT): The socket structure address is outside the user's address space."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -423,8 +389,7 @@ struct ConnectEFAULTError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ConnectEINPROGRESSError(CustomError):
+struct ConnectEINPROGRESSError(CustomError, TrivialRegisterPassable):
     comptime message = "connect (EINPROGRESS): The socket is nonblocking and the connection cannot be completed immediately. It is possible to select(2) or poll(2) for completion by selecting the socket for writing. After select(2) indicates writability, use getsockopt(2) to read the SO_ERROR option at level SOL_SOCKET to determine whether connect() completed successfully (SO_ERROR is zero) or unsuccessfully (SO_ERROR is one of the usual error codes listed here, explaining the reason for the failure)."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -435,8 +400,7 @@ struct ConnectEINPROGRESSError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ConnectEINTRError(CustomError):
+struct ConnectEINTRError(CustomError, TrivialRegisterPassable):
     comptime message = "connect (EINTR): The system call was interrupted by a signal that was caught."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -447,8 +411,7 @@ struct ConnectEINTRError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ConnectEISCONNError(CustomError):
+struct ConnectEISCONNError(CustomError, TrivialRegisterPassable):
     comptime message = "connect (EISCONN): The socket is already connected."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -459,8 +422,7 @@ struct ConnectEISCONNError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ConnectENETUNREACHError(CustomError):
+struct ConnectENETUNREACHError(CustomError, TrivialRegisterPassable):
     comptime message = "connect (ENETUNREACH): Network is unreachable."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -471,8 +433,7 @@ struct ConnectENETUNREACHError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ConnectENOTSOCKError(CustomError):
+struct ConnectENOTSOCKError(CustomError, TrivialRegisterPassable):
     comptime message = "connect (ENOTSOCK): The file descriptor is not associated with a socket."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -483,8 +444,7 @@ struct ConnectENOTSOCKError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ConnectETIMEDOUTError(CustomError):
+struct ConnectETIMEDOUTError(CustomError, TrivialRegisterPassable):
     comptime message = "connect (ETIMEDOUT): Timeout while attempting connection."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -496,8 +456,7 @@ struct ConnectETIMEDOUTError(CustomError):
 
 # Getpeername errors
 @fieldwise_init
-@register_passable("trivial")
-struct GetpeernameEBADFError(CustomError):
+struct GetpeernameEBADFError(CustomError, TrivialRegisterPassable):
     comptime message = "getpeername (EBADF): socket is not a valid descriptor."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -508,8 +467,7 @@ struct GetpeernameEBADFError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct GetpeernameEFAULTError(CustomError):
+struct GetpeernameEFAULTError(CustomError, TrivialRegisterPassable):
     comptime message = "getpeername (EFAULT): The address argument points to memory not in a valid part of the process address space."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -520,8 +478,7 @@ struct GetpeernameEFAULTError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct GetpeernameEINVALError(CustomError):
+struct GetpeernameEINVALError(CustomError, TrivialRegisterPassable):
     comptime message = "getpeername (EINVAL): address_len is invalid (e.g., is negative)."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -532,8 +489,7 @@ struct GetpeernameEINVALError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct GetpeernameENOBUFSError(CustomError):
+struct GetpeernameENOBUFSError(CustomError, TrivialRegisterPassable):
     comptime message = "getpeername (ENOBUFS): Insufficient resources were available in the system to perform the operation."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -544,8 +500,7 @@ struct GetpeernameENOBUFSError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct GetpeernameENOTCONNError(CustomError):
+struct GetpeernameENOTCONNError(CustomError, TrivialRegisterPassable):
     comptime message = "getpeername (ENOTCONN): The socket is not connected."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -556,8 +511,7 @@ struct GetpeernameENOTCONNError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct GetpeernameENOTSOCKError(CustomError):
+struct GetpeernameENOTSOCKError(CustomError, TrivialRegisterPassable):
     comptime message = "getpeername (ENOTSOCK): The argument socket is not a socket."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -569,8 +523,7 @@ struct GetpeernameENOTSOCKError(CustomError):
 
 # Getsockname errors
 @fieldwise_init
-@register_passable("trivial")
-struct GetsocknameEBADFError(CustomError):
+struct GetsocknameEBADFError(CustomError, TrivialRegisterPassable):
     comptime message = "getsockname (EBADF): socket is not a valid descriptor."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -581,8 +534,7 @@ struct GetsocknameEBADFError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct GetsocknameEFAULTError(CustomError):
+struct GetsocknameEFAULTError(CustomError, TrivialRegisterPassable):
     comptime message = "getsockname (EFAULT): The address argument points to memory not in a valid part of the process address space."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -593,8 +545,7 @@ struct GetsocknameEFAULTError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct GetsocknameEINVALError(CustomError):
+struct GetsocknameEINVALError(CustomError, TrivialRegisterPassable):
     comptime message = "getsockname (EINVAL): address_len is invalid (e.g., is negative)."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -605,8 +556,7 @@ struct GetsocknameEINVALError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct GetsocknameENOBUFSError(CustomError):
+struct GetsocknameENOBUFSError(CustomError, TrivialRegisterPassable):
     comptime message = "getsockname (ENOBUFS): Insufficient resources were available in the system to perform the operation."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -617,8 +567,7 @@ struct GetsocknameENOBUFSError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct GetsocknameENOTSOCKError(CustomError):
+struct GetsocknameENOTSOCKError(CustomError, TrivialRegisterPassable):
     comptime message = "getsockname (ENOTSOCK): The argument socket is a file, not a socket."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -630,8 +579,7 @@ struct GetsocknameENOTSOCKError(CustomError):
 
 # Getsockopt errors
 @fieldwise_init
-@register_passable("trivial")
-struct GetsockoptEBADFError(CustomError):
+struct GetsockoptEBADFError(CustomError, TrivialRegisterPassable):
     comptime message = "getsockopt (EBADF): The argument socket is not a valid descriptor."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -642,8 +590,7 @@ struct GetsockoptEBADFError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct GetsockoptEFAULTError(CustomError):
+struct GetsockoptEFAULTError(CustomError, TrivialRegisterPassable):
     comptime message = "getsockopt (EFAULT): The argument option_value points outside the process's allocated address space."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -654,8 +601,7 @@ struct GetsockoptEFAULTError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct GetsockoptEINVALError(CustomError):
+struct GetsockoptEINVALError(CustomError, TrivialRegisterPassable):
     comptime message = "getsockopt (EINVAL): The argument option_len is invalid."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -666,8 +612,7 @@ struct GetsockoptEINVALError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct GetsockoptENOPROTOOPTError(CustomError):
+struct GetsockoptENOPROTOOPTError(CustomError, TrivialRegisterPassable):
     comptime message = "getsockopt (ENOPROTOOPT): The option is unknown at the level indicated."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -678,8 +623,7 @@ struct GetsockoptENOPROTOOPTError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct GetsockoptENOTSOCKError(CustomError):
+struct GetsockoptENOTSOCKError(CustomError, TrivialRegisterPassable):
     comptime message = "getsockopt (ENOTSOCK): The argument socket is not a socket."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -691,8 +635,7 @@ struct GetsockoptENOTSOCKError(CustomError):
 
 # Listen errors
 @fieldwise_init
-@register_passable("trivial")
-struct ListenEADDRINUSEError(CustomError):
+struct ListenEADDRINUSEError(CustomError, TrivialRegisterPassable):
     comptime message = "listen (EADDRINUSE): Another socket is already listening on the same port."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -703,8 +646,7 @@ struct ListenEADDRINUSEError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ListenEBADFError(CustomError):
+struct ListenEBADFError(CustomError, TrivialRegisterPassable):
     comptime message = "listen (EBADF): socket is not a valid descriptor."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -715,8 +657,7 @@ struct ListenEBADFError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ListenENOTSOCKError(CustomError):
+struct ListenENOTSOCKError(CustomError, TrivialRegisterPassable):
     comptime message = "listen (ENOTSOCK): socket is a descriptor for a file, not a socket."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -727,8 +668,7 @@ struct ListenENOTSOCKError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ListenEOPNOTSUPPError(CustomError):
+struct ListenEOPNOTSUPPError(CustomError, TrivialRegisterPassable):
     comptime message = "listen (EOPNOTSUPP): The socket is not of a type that supports the listen() operation."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -740,8 +680,7 @@ struct ListenEOPNOTSUPPError(CustomError):
 
 # Recv errors
 @fieldwise_init
-@register_passable("trivial")
-struct RecvEAGAINError(CustomError):
+struct RecvEAGAINError(CustomError, TrivialRegisterPassable):
     comptime message = "recv (EAGAIN/EWOULDBLOCK): The socket is marked nonblocking and the receive operation would block."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -752,8 +691,7 @@ struct RecvEAGAINError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct RecvEBADFError(CustomError):
+struct RecvEBADFError(CustomError, TrivialRegisterPassable):
     comptime message = "recv (EBADF): The argument socket is an invalid descriptor."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -764,8 +702,7 @@ struct RecvEBADFError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct RecvECONNREFUSEDError(CustomError):
+struct RecvECONNREFUSEDError(CustomError, TrivialRegisterPassable):
     comptime message = "recv (ECONNREFUSED): The remote host refused to allow the network connection."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -776,8 +713,7 @@ struct RecvECONNREFUSEDError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct RecvEFAULTError(CustomError):
+struct RecvEFAULTError(CustomError, TrivialRegisterPassable):
     comptime message = "recv (EFAULT): buffer points outside the process's address space."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -788,8 +724,7 @@ struct RecvEFAULTError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct RecvEINTRError(CustomError):
+struct RecvEINTRError(CustomError, TrivialRegisterPassable):
     comptime message = "recv (EINTR): The receive was interrupted by delivery of a signal before any data were available."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -800,8 +735,7 @@ struct RecvEINTRError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct RecvENOTCONNError(CustomError):
+struct RecvENOTCONNError(CustomError, TrivialRegisterPassable):
     comptime message = "recv (ENOTCONN): The socket is not connected."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -812,8 +746,7 @@ struct RecvENOTCONNError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct RecvENOTSOCKError(CustomError):
+struct RecvENOTSOCKError(CustomError, TrivialRegisterPassable):
     comptime message = "recv (ENOTSOCK): The file descriptor is not associated with a socket."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -825,8 +758,7 @@ struct RecvENOTSOCKError(CustomError):
 
 # Recvfrom errors
 @fieldwise_init
-@register_passable("trivial")
-struct RecvfromEAGAINError(CustomError):
+struct RecvfromEAGAINError(CustomError, TrivialRegisterPassable):
     comptime message = "recvfrom (EAGAIN/EWOULDBLOCK): The socket is marked nonblocking and the receive operation would block."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -837,8 +769,7 @@ struct RecvfromEAGAINError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct RecvfromEBADFError(CustomError):
+struct RecvfromEBADFError(CustomError, TrivialRegisterPassable):
     comptime message = "recvfrom (EBADF): The argument socket is an invalid descriptor."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -849,8 +780,7 @@ struct RecvfromEBADFError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct RecvfromECONNRESETError(CustomError):
+struct RecvfromECONNRESETError(CustomError, TrivialRegisterPassable):
     comptime message = "recvfrom (ECONNRESET): A connection was forcibly closed by a peer."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -861,8 +791,7 @@ struct RecvfromECONNRESETError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct RecvfromEINTRError(CustomError):
+struct RecvfromEINTRError(CustomError, TrivialRegisterPassable):
     comptime message = "recvfrom (EINTR): The receive was interrupted by delivery of a signal."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -873,8 +802,7 @@ struct RecvfromEINTRError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct RecvfromEINVALError(CustomError):
+struct RecvfromEINVALError(CustomError, TrivialRegisterPassable):
     comptime message = "recvfrom (EINVAL): Invalid argument passed."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -885,8 +813,7 @@ struct RecvfromEINVALError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct RecvfromEIOError(CustomError):
+struct RecvfromEIOError(CustomError, TrivialRegisterPassable):
     comptime message = "recvfrom (EIO): An I/O error occurred."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -897,8 +824,7 @@ struct RecvfromEIOError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct RecvfromENOBUFSError(CustomError):
+struct RecvfromENOBUFSError(CustomError, TrivialRegisterPassable):
     comptime message = "recvfrom (ENOBUFS): Insufficient resources were available in the system to perform the operation."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -909,8 +835,7 @@ struct RecvfromENOBUFSError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct RecvfromENOMEMError(CustomError):
+struct RecvfromENOMEMError(CustomError, TrivialRegisterPassable):
     comptime message = "recvfrom (ENOMEM): Insufficient memory was available to fulfill the request."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -921,8 +846,7 @@ struct RecvfromENOMEMError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct RecvfromENOTCONNError(CustomError):
+struct RecvfromENOTCONNError(CustomError, TrivialRegisterPassable):
     comptime message = "recvfrom (ENOTCONN): The socket is not connected."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -933,8 +857,7 @@ struct RecvfromENOTCONNError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct RecvfromENOTSOCKError(CustomError):
+struct RecvfromENOTSOCKError(CustomError, TrivialRegisterPassable):
     comptime message = "recvfrom (ENOTSOCK): The file descriptor is not associated with a socket."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -945,8 +868,7 @@ struct RecvfromENOTSOCKError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct RecvfromEOPNOTSUPPError(CustomError):
+struct RecvfromEOPNOTSUPPError(CustomError, TrivialRegisterPassable):
     comptime message = "recvfrom (EOPNOTSUPP): The specified flags are not supported for this socket type or protocol."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -957,8 +879,7 @@ struct RecvfromEOPNOTSUPPError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct RecvfromETIMEDOUTError(CustomError):
+struct RecvfromETIMEDOUTError(CustomError, TrivialRegisterPassable):
     comptime message = "recvfrom (ETIMEDOUT): The connection timed out."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -970,8 +891,7 @@ struct RecvfromETIMEDOUTError(CustomError):
 
 # Send errors
 @fieldwise_init
-@register_passable("trivial")
-struct SendEAGAINError(CustomError):
+struct SendEAGAINError(CustomError, TrivialRegisterPassable):
     comptime message = "send (EAGAIN/EWOULDBLOCK): The socket is marked nonblocking and the send operation would block."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -982,8 +902,7 @@ struct SendEAGAINError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendEBADFError(CustomError):
+struct SendEBADFError(CustomError, TrivialRegisterPassable):
     comptime message = "send (EBADF): The argument socket is an invalid descriptor."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -994,8 +913,7 @@ struct SendEBADFError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendECONNREFUSEDError(CustomError):
+struct SendECONNREFUSEDError(CustomError, TrivialRegisterPassable):
     comptime message = "send (ECONNREFUSED): The remote host refused to allow the network connection."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1006,8 +924,7 @@ struct SendECONNREFUSEDError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendECONNRESETError(CustomError):
+struct SendECONNRESETError(CustomError, TrivialRegisterPassable):
     comptime message = "send (ECONNRESET): Connection reset by peer."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1018,8 +935,7 @@ struct SendECONNRESETError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendEDESTADDRREQError(CustomError):
+struct SendEDESTADDRREQError(CustomError, TrivialRegisterPassable):
     comptime message = "send (EDESTADDRREQ): The socket is not connection-mode, and no peer address is set."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1030,8 +946,7 @@ struct SendEDESTADDRREQError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendEFAULTError(CustomError):
+struct SendEFAULTError(CustomError, TrivialRegisterPassable):
     comptime message = "send (EFAULT): buffer points outside the process's address space."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1042,8 +957,7 @@ struct SendEFAULTError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendEINTRError(CustomError):
+struct SendEINTRError(CustomError, TrivialRegisterPassable):
     comptime message = "send (EINTR): The send was interrupted by delivery of a signal."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1054,8 +968,7 @@ struct SendEINTRError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendEINVALError(CustomError):
+struct SendEINVALError(CustomError, TrivialRegisterPassable):
     comptime message = "send (EINVAL): Invalid argument passed."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1066,8 +979,7 @@ struct SendEINVALError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendEISCONNError(CustomError):
+struct SendEISCONNError(CustomError, TrivialRegisterPassable):
     comptime message = "send (EISCONN): The connection-mode socket was connected already but a recipient was specified."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1078,8 +990,7 @@ struct SendEISCONNError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendENOBUFSError(CustomError):
+struct SendENOBUFSError(CustomError, TrivialRegisterPassable):
     comptime message = "send (ENOBUFS): The output queue for a network interface was full."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1090,8 +1001,7 @@ struct SendENOBUFSError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendENOMEMError(CustomError):
+struct SendENOMEMError(CustomError, TrivialRegisterPassable):
     comptime message = "send (ENOMEM): No memory available."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1102,8 +1012,7 @@ struct SendENOMEMError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendENOTCONNError(CustomError):
+struct SendENOTCONNError(CustomError, TrivialRegisterPassable):
     comptime message = "send (ENOTCONN): The socket is not connected."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1114,8 +1023,7 @@ struct SendENOTCONNError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendENOTSOCKError(CustomError):
+struct SendENOTSOCKError(CustomError, TrivialRegisterPassable):
     comptime message = "send (ENOTSOCK): The file descriptor is not associated with a socket."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1126,8 +1034,7 @@ struct SendENOTSOCKError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendEOPNOTSUPPError(CustomError):
+struct SendEOPNOTSUPPError(CustomError, TrivialRegisterPassable):
     comptime message = "send (EOPNOTSUPP): Some bit in the flags argument is inappropriate for the socket type."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1139,8 +1046,7 @@ struct SendEOPNOTSUPPError(CustomError):
 
 # Sendto errors
 @fieldwise_init
-@register_passable("trivial")
-struct SendtoEACCESError(CustomError):
+struct SendtoEACCESError(CustomError, TrivialRegisterPassable):
     comptime message = "sendto (EACCES): Write access to the named socket is denied."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1151,8 +1057,7 @@ struct SendtoEACCESError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendtoEAFNOSUPPORTError(CustomError):
+struct SendtoEAFNOSUPPORTError(CustomError, TrivialRegisterPassable):
     comptime message = "sendto (EAFNOSUPPORT): Addresses in the specified address family cannot be used with this socket."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1163,8 +1068,7 @@ struct SendtoEAFNOSUPPORTError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendtoEAGAINError(CustomError):
+struct SendtoEAGAINError(CustomError, TrivialRegisterPassable):
     comptime message = "sendto (EAGAIN/EWOULDBLOCK): The socket's file descriptor is marked O_NONBLOCK and the requested operation would block."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1175,8 +1079,7 @@ struct SendtoEAGAINError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendtoEBADFError(CustomError):
+struct SendtoEBADFError(CustomError, TrivialRegisterPassable):
     comptime message = "sendto (EBADF): The argument socket is an invalid descriptor."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1187,8 +1090,7 @@ struct SendtoEBADFError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendtoECONNRESETError(CustomError):
+struct SendtoECONNRESETError(CustomError, TrivialRegisterPassable):
     comptime message = "sendto (ECONNRESET): A connection was forcibly closed by a peer."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1199,8 +1101,7 @@ struct SendtoECONNRESETError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendtoEDESTADDRREQError(CustomError):
+struct SendtoEDESTADDRREQError(CustomError, TrivialRegisterPassable):
     comptime message = "sendto (EDESTADDRREQ): The socket is not connection-mode and does not have its peer address set, and no destination address was specified."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1211,8 +1112,7 @@ struct SendtoEDESTADDRREQError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendtoEHOSTUNREACHError(CustomError):
+struct SendtoEHOSTUNREACHError(CustomError, TrivialRegisterPassable):
     comptime message = "sendto (EHOSTUNREACH): The destination host cannot be reached."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1223,8 +1123,7 @@ struct SendtoEHOSTUNREACHError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendtoEINTRError(CustomError):
+struct SendtoEINTRError(CustomError, TrivialRegisterPassable):
     comptime message = "sendto (EINTR): The send was interrupted by delivery of a signal."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1235,8 +1134,7 @@ struct SendtoEINTRError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendtoEINVALError(CustomError):
+struct SendtoEINVALError(CustomError, TrivialRegisterPassable):
     comptime message = "sendto (EINVAL): Invalid argument passed."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1247,8 +1145,7 @@ struct SendtoEINVALError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendtoEIOError(CustomError):
+struct SendtoEIOError(CustomError, TrivialRegisterPassable):
     comptime message = "sendto (EIO): An I/O error occurred."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1259,8 +1156,7 @@ struct SendtoEIOError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendtoEISCONNError(CustomError):
+struct SendtoEISCONNError(CustomError, TrivialRegisterPassable):
     comptime message = "sendto (EISCONN): A destination address was specified and the socket is already connected."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1271,8 +1167,7 @@ struct SendtoEISCONNError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendtoELOOPError(CustomError):
+struct SendtoELOOPError(CustomError, TrivialRegisterPassable):
     comptime message = "sendto (ELOOP): More than SYMLOOP_MAX symbolic links were encountered during resolution of the pathname in the socket address."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1283,8 +1178,7 @@ struct SendtoELOOPError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendtoEMSGSIZEError(CustomError):
+struct SendtoEMSGSIZEError(CustomError, TrivialRegisterPassable):
     comptime message = "sendto (EMSGSIZE): The message is too large to be sent all at once, as the socket requires."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1295,8 +1189,7 @@ struct SendtoEMSGSIZEError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendtoENAMETOOLONGError(CustomError):
+struct SendtoENAMETOOLONGError(CustomError, TrivialRegisterPassable):
     comptime message = "sendto (ENAMETOOLONG): The length of a pathname exceeds PATH_MAX."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1307,8 +1200,7 @@ struct SendtoENAMETOOLONGError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendtoENETDOWNError(CustomError):
+struct SendtoENETDOWNError(CustomError, TrivialRegisterPassable):
     comptime message = "sendto (ENETDOWN): The local network interface used to reach the destination is down."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1319,8 +1211,7 @@ struct SendtoENETDOWNError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendtoENETUNREACHError(CustomError):
+struct SendtoENETUNREACHError(CustomError, TrivialRegisterPassable):
     comptime message = "sendto (ENETUNREACH): No route to the network is present."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1331,8 +1222,7 @@ struct SendtoENETUNREACHError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendtoENOBUFSError(CustomError):
+struct SendtoENOBUFSError(CustomError, TrivialRegisterPassable):
     comptime message = "sendto (ENOBUFS): Insufficient resources were available in the system to perform the operation."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1343,8 +1233,7 @@ struct SendtoENOBUFSError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendtoENOMEMError(CustomError):
+struct SendtoENOMEMError(CustomError, TrivialRegisterPassable):
     comptime message = "sendto (ENOMEM): Insufficient memory was available to fulfill the request."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1355,8 +1244,7 @@ struct SendtoENOMEMError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendtoENOTCONNError(CustomError):
+struct SendtoENOTCONNError(CustomError, TrivialRegisterPassable):
     comptime message = "sendto (ENOTCONN): The socket is not connected."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1367,8 +1255,7 @@ struct SendtoENOTCONNError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendtoENOTSOCKError(CustomError):
+struct SendtoENOTSOCKError(CustomError, TrivialRegisterPassable):
     comptime message = "sendto (ENOTSOCK): The file descriptor is not associated with a socket."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1379,8 +1266,7 @@ struct SendtoENOTSOCKError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SendtoEPIPEError(CustomError):
+struct SendtoEPIPEError(CustomError, TrivialRegisterPassable):
     comptime message = "sendto (EPIPE): The socket is shut down for writing, or the socket is connection-mode and is no longer connected."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1392,8 +1278,7 @@ struct SendtoEPIPEError(CustomError):
 
 # Setsockopt errors
 @fieldwise_init
-@register_passable("trivial")
-struct SetsockoptEBADFError(CustomError):
+struct SetsockoptEBADFError(CustomError, TrivialRegisterPassable):
     comptime message = "setsockopt (EBADF): The argument socket is not a valid descriptor."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1404,8 +1289,7 @@ struct SetsockoptEBADFError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SetsockoptEFAULTError(CustomError):
+struct SetsockoptEFAULTError(CustomError, TrivialRegisterPassable):
     comptime message = "setsockopt (EFAULT): The argument option_value points outside the process's allocated address space."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1416,8 +1300,7 @@ struct SetsockoptEFAULTError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SetsockoptEINVALError(CustomError):
+struct SetsockoptEINVALError(CustomError, TrivialRegisterPassable):
     comptime message = "setsockopt (EINVAL): The argument option_len is invalid."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1428,8 +1311,7 @@ struct SetsockoptEINVALError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SetsockoptENOPROTOOPTError(CustomError):
+struct SetsockoptENOPROTOOPTError(CustomError, TrivialRegisterPassable):
     comptime message = "setsockopt (ENOPROTOOPT): The option is unknown at the level indicated."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1440,8 +1322,7 @@ struct SetsockoptENOPROTOOPTError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SetsockoptENOTSOCKError(CustomError):
+struct SetsockoptENOTSOCKError(CustomError, TrivialRegisterPassable):
     comptime message = "setsockopt (ENOTSOCK): The argument socket is not a socket."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1453,8 +1334,7 @@ struct SetsockoptENOTSOCKError(CustomError):
 
 # Shutdown errors
 @fieldwise_init
-@register_passable("trivial")
-struct ShutdownEBADFError(CustomError):
+struct ShutdownEBADFError(CustomError, TrivialRegisterPassable):
     comptime message = "shutdown (EBADF): The argument socket is an invalid descriptor."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1465,8 +1345,7 @@ struct ShutdownEBADFError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ShutdownEINVALError(CustomError):
+struct ShutdownEINVALError(CustomError, TrivialRegisterPassable):
     comptime message = "shutdown (EINVAL): Invalid argument passed."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1477,8 +1356,7 @@ struct ShutdownEINVALError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ShutdownENOTCONNError(CustomError):
+struct ShutdownENOTCONNError(CustomError, TrivialRegisterPassable):
     comptime message = "shutdown (ENOTCONN): The socket is not connected."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1489,8 +1367,7 @@ struct ShutdownENOTCONNError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ShutdownENOTSOCKError(CustomError):
+struct ShutdownENOTSOCKError(CustomError, TrivialRegisterPassable):
     comptime message = "shutdown (ENOTSOCK): The file descriptor is not associated with a socket."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1502,8 +1379,7 @@ struct ShutdownENOTSOCKError(CustomError):
 
 # Socket errors
 @fieldwise_init
-@register_passable("trivial")
-struct SocketEACCESError(CustomError):
+struct SocketEACCESError(CustomError, TrivialRegisterPassable):
     comptime message = "socket (EACCES): Permission to create a socket of the specified type and/or protocol is denied."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1514,8 +1390,7 @@ struct SocketEACCESError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SocketEAFNOSUPPORTError(CustomError):
+struct SocketEAFNOSUPPORTError(CustomError, TrivialRegisterPassable):
     comptime message = "socket (EAFNOSUPPORT): The implementation does not support the specified address family."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1526,8 +1401,7 @@ struct SocketEAFNOSUPPORTError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SocketEINVALError(CustomError):
+struct SocketEINVALError(CustomError, TrivialRegisterPassable):
     comptime message = "socket (EINVAL): Invalid flags in type, unknown protocol, or protocol family not available."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1538,8 +1412,7 @@ struct SocketEINVALError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SocketEMFILEError(CustomError):
+struct SocketEMFILEError(CustomError, TrivialRegisterPassable):
     comptime message = "socket (EMFILE): The per-process limit on the number of open file descriptors has been reached."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1550,8 +1423,7 @@ struct SocketEMFILEError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SocketENFILEError(CustomError):
+struct SocketENFILEError(CustomError, TrivialRegisterPassable):
     comptime message = "socket (ENFILE): The system-wide limit on the total number of open files has been reached."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1562,8 +1434,7 @@ struct SocketENFILEError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SocketENOBUFSError(CustomError):
+struct SocketENOBUFSError(CustomError, TrivialRegisterPassable):
     comptime message = "socket (ENOBUFS): Insufficient memory is available. The socket cannot be created until sufficient resources are freed."
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -1574,8 +1445,7 @@ struct SocketENOBUFSError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SocketEPROTONOSUPPORTError(CustomError):
+struct SocketEPROTONOSUPPORTError(CustomError, TrivialRegisterPassable):
     comptime message = "socket (EPROTONOSUPPORT): The protocol type or the specified protocol is not supported within this domain."
 
     fn write_to[W: Writer, //](self, mut writer: W):

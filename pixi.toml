@@ -41,22 +41,22 @@ backend = { name = "pixi-build-mojo", version = "*" }
 
 [dependencies]
 mojo = ">=0.26.2.0.dev2026020205,<0.27"
-small_time = {path = "./small-time"}
+small_time = {git = "https://github.com/thatstoasty/small-time.git", branch = "26.2"}
 emberjson = {git = "https://github.com/bgreni/EmberJson.git", rev = "583a72d"}
 
 [package.host-dependencies]
 mojo-compiler = ">=0.26.2.0.dev2026020205,<0.27"
-small_time = {path = "./small-time"}
+small_time = {git = "https://github.com/thatstoasty/small-time.git", branch = "26.2"}
 emberjson = {git = "https://github.com/bgreni/EmberJson.git", rev = "583a72d"}
 
 [package.build-dependencies]
 mojo-compiler = ">=0.26.2.0.dev2026020205,<0.27"
-small_time = {path = "./small-time"}
+small_time = {git = "https://github.com/thatstoasty/small-time.git", branch = "26.2"}
 emberjson = {git = "https://github.com/bgreni/EmberJson.git", rev = "583a72d"}
 
 [package.run-dependencies]
 mojo-compiler = ">=0.26.2.0.dev2026020205,<0.27"
-small_time = {path = "./small-time"}
+small_time = {git = "https://github.com/thatstoasty/small-time.git", branch = "26.2"}
 emberjson = {git = "https://github.com/bgreni/EmberJson.git", rev = "583a72d"}
 
 [feature.util.dependencies]

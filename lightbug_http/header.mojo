@@ -109,8 +109,7 @@ struct HeaderKey:
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct HeaderKeyNotFoundError(Movable, Stringable, Writable):
+struct HeaderKeyNotFoundError(Movable, Stringable, Writable, TrivialRegisterPassable):
     """Error raised when a header key is not found."""
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -121,8 +120,7 @@ struct HeaderKeyNotFoundError(Movable, Stringable, Writable):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct InvalidHTTPRequestError(Movable, Stringable, Writable):
+struct InvalidHTTPRequestError(Movable, Stringable, Writable, TrivialRegisterPassable):
     """Error raised when the HTTP request is malformed."""
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -133,8 +131,7 @@ struct InvalidHTTPRequestError(Movable, Stringable, Writable):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct IncompleteHTTPRequestError(Movable, Stringable, Writable):
+struct IncompleteHTTPRequestError(Movable, Stringable, Writable, TrivialRegisterPassable):
     """Error raised when the HTTP request is incomplete (need more data)."""
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -145,8 +142,7 @@ struct IncompleteHTTPRequestError(Movable, Stringable, Writable):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct InvalidHTTPResponseError(Movable, Stringable, Writable):
+struct InvalidHTTPResponseError(Movable, Stringable, Writable, TrivialRegisterPassable):
     """Error raised when the HTTP response is malformed."""
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -157,8 +153,7 @@ struct InvalidHTTPResponseError(Movable, Stringable, Writable):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct IncompleteHTTPResponseError(Movable, Stringable, Writable):
+struct IncompleteHTTPResponseError(Movable, Stringable, Writable, TrivialRegisterPassable):
     """Error raised when the HTTP response is incomplete."""
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -169,8 +164,7 @@ struct IncompleteHTTPResponseError(Movable, Stringable, Writable):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct EmptyBufferError(Movable, Stringable, Writable):
+struct EmptyBufferError(Movable, Stringable, Writable, TrivialRegisterPassable):
     """Error raised when buffer has no data available."""
 
     fn write_to[W: Writer, //](self, mut writer: W):

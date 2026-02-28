@@ -3,8 +3,7 @@ from utils import Variant
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct InvalidCookieError(Movable, Stringable, Writable):
+struct InvalidCookieError(Movable, Stringable, Writable, TrivialRegisterPassable):
     """Error raised when a cookie is invalid."""
 
     fn write_to[W: Writer, //](self, mut writer: W):
