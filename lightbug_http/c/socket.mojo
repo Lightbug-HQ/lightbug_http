@@ -1,4 +1,4 @@
-from sys.ffi import c_int, c_size_t, c_ssize_t, c_uchar, external_call, get_errno
+from ffi import c_int, c_size_t, c_ssize_t, c_uchar, external_call, get_errno
 from sys.info import CompilationTarget, size_of
 
 from lightbug_http.c.aliases import c_void
@@ -8,8 +8,7 @@ from memory import stack_allocation
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ShutdownOption(Copyable, Equatable, Stringable, Writable):
+struct ShutdownOption(Copyable, Equatable, Stringable, Writable, TrivialRegisterPassable):
     var value: c_int
     comptime SHUT_RD = Self(0)
     comptime SHUT_WR = Self(1)
@@ -37,8 +36,7 @@ comptime SOL_SOCKET = 0xFFFF
 # TODO: These are probably platform specific, on MacOS I have these values, but we should check on Linux.
 # Taken from: https://github.com/openbsd/src/blob/master/sys/sys/socket.h
 @fieldwise_init
-@register_passable("trivial")
-struct SocketOption(Copyable, Equatable, Stringable, Writable):
+struct SocketOption(Copyable, Equatable, Stringable, Writable, TrivialRegisterPassable):
     var value: c_int
     comptime SO_DEBUG = Self(0x0001)
     comptime SO_ACCEPTCONN = Self(0x0002)
@@ -141,8 +139,7 @@ comptime O_CLOEXEC = 524288
 
 # Socket Type constants
 @fieldwise_init
-@register_passable("trivial")
-struct SocketType(Copyable, Equatable, Stringable, Writable):
+struct SocketType(Copyable, Equatable, Stringable, Writable, TrivialRegisterPassable):
     var value: c_int
     comptime SOCK_STREAM = Self(1)
     comptime SOCK_DGRAM = Self(2)
@@ -238,19 +235,19 @@ fn socket(domain: c_int, type: c_int, protocol: c_int) raises SocketError -> c_i
     if fd == -1:
         var errno = get_errno()
         if errno == errno.EACCES:
-            raise SocketEACCESError()
+            raise SocketError(SocketEACCESError())
         elif errno == errno.EAFNOSUPPORT:
-            raise SocketEAFNOSUPPORTError()
+            raise SocketError(SocketEAFNOSUPPORTError())
         elif errno == errno.EINVAL:
-            raise SocketEINVALError()
+            raise SocketError(SocketEINVALError())
         elif errno == errno.EMFILE:
-            raise SocketEMFILEError()
+            raise SocketError(SocketEMFILEError())
         elif errno == errno.ENFILE:
-            raise SocketENFILEError()
+            raise SocketError(SocketENFILEError())
         elif errno in [errno.ENOBUFS, errno.ENOMEM]:
-            raise SocketENOBUFSError()
+            raise SocketError(SocketENOBUFSError())
         elif errno == errno.EPROTONOSUPPORT:
-            raise SocketEPROTONOSUPPORTError()
+            raise SocketError(SocketEPROTONOSUPPORTError())
 
     return fd
 
@@ -326,29 +323,29 @@ fn setsockopt(
     * Reference: https://man7.org/linux/man-pages/man3/setsockopt.3p.html .
     """
     var result = _setsockopt(
-        socket.value,
+        Int32(socket.value),
         level,
         option_name,
         UnsafePointer(to=option_value).bitcast[c_void](),
-        size_of[Int32](),
+        UInt32(size_of[Int32]()),
     )
     if result == -1:
         var errno = get_errno()
         if errno == errno.EBADF:
-            raise SetsockoptEBADFError()
+            raise SetsockoptError(SetsockoptEBADFError())
         elif errno == errno.EFAULT:
-            raise SetsockoptEFAULTError()
+            raise SetsockoptError(SetsockoptEFAULTError())
         elif errno == errno.EINVAL:
-            raise SetsockoptEINVALError()
+            raise SetsockoptError(SetsockoptEINVALError())
         elif errno == errno.ENOPROTOOPT:
-            raise SetsockoptENOPROTOOPTError()
+            raise SetsockoptError(SetsockoptENOPROTOOPTError())
         elif errno == errno.ENOTSOCK:
-            raise SetsockoptENOTSOCKError()
+            raise SetsockoptError(SetsockoptENOTSOCKError())
         else:
-            raise Error(
+            raise SetsockoptError(Error(
                 "SetsockoptError: An error occurred while setting the socket option. Error code: ",
                 errno,
-            )
+            ))
 
 
 fn _getsockopt[
@@ -430,20 +427,20 @@ fn getsockopt(
     if result == -1:
         var errno = get_errno()
         if errno == errno.EBADF:
-            raise GetsockoptEBADFError()
+            raise GetsockoptError(GetsockoptEBADFError())
         elif errno == errno.EFAULT:
-            raise GetsockoptEFAULTError()
+            raise GetsockoptError(GetsockoptEFAULTError())
         elif errno == errno.EINVAL:
-            raise GetsockoptEINVALError()
+            raise GetsockoptError(GetsockoptEINVALError())
         elif errno == errno.ENOPROTOOPT:
-            raise GetsockoptENOPROTOOPTError()
+            raise GetsockoptError(GetsockoptENOPROTOOPTError())
         elif errno == errno.ENOTSOCK:
-            raise GetsockoptENOTSOCKError()
+            raise GetsockoptError(GetsockoptENOTSOCKError())
         else:
-            raise Error(
+            raise GetsockoptError(Error(
                 "GetsockoptError: An error occurred while getting the socket option. Error code: ",
                 errno,
-            )
+            ))
 
     return option_value.bitcast[Int]().take_pointee()
 
@@ -502,19 +499,19 @@ fn getsockname(socket: FileDescriptor, mut address: SocketAddress) raises Getsoc
     * Reference: https://man7.org/linux/man-pages/man3/getsockname.3p.html .
     """
     var sockaddr_size = address.SIZE
-    var result = _getsockname(socket.value, address.unsafe_ptr(), Pointer(to=sockaddr_size))
+    var result = _getsockname(Int32(socket.value), address.unsafe_ptr(), Pointer(to=sockaddr_size))
     if result == -1:
         var errno = get_errno()
         if errno == errno.EBADF:
-            raise GetsocknameEBADFError()
+            raise GetsocknameError(GetsocknameEBADFError())
         elif errno == errno.EFAULT:
-            raise GetsocknameEFAULTError()
+            raise GetsocknameError(GetsocknameEFAULTError())
         elif errno == errno.EINVAL:
-            raise GetsocknameEINVALError()
+            raise GetsocknameError(GetsocknameEINVALError())
         elif errno == errno.ENOBUFS:
-            raise GetsocknameENOBUFSError()
+            raise GetsocknameError(GetsocknameENOBUFSError())
         elif errno == errno.ENOTSOCK:
-            raise GetsocknameENOTSOCKError()
+            raise GetsocknameError(GetsocknameENOTSOCKError())
 
 
 fn _getpeername[
@@ -573,24 +570,24 @@ fn getpeername(file_descriptor: FileDescriptor) raises GetpeernameError -> Socke
     var remote_address = SocketAddress()
     var sockaddr_size = remote_address.SIZE
     var result = _getpeername(
-        file_descriptor.value,
+        Int32(file_descriptor.value),
         remote_address.unsafe_ptr(),
         Pointer(to=sockaddr_size),
     )
     if result == -1:
         var errno = get_errno()
         if errno == errno.EBADF:
-            raise GetpeernameEBADFError()
+            raise GetpeernameError(GetpeernameEBADFError())
         elif errno == errno.EFAULT:
-            raise GetpeernameEFAULTError()
+            raise GetpeernameError(GetpeernameEFAULTError())
         elif errno == errno.EINVAL:
-            raise GetpeernameEINVALError()
+            raise GetpeernameError(GetpeernameEINVALError())
         elif errno == errno.ENOBUFS:
-            raise GetpeernameENOBUFSError()
+            raise GetpeernameError(GetpeernameENOBUFSError())
         elif errno == errno.ENOTCONN:
-            raise GetpeernameENOTCONNError()
+            raise GetpeernameError(GetpeernameENOTCONNError())
         elif errno == errno.ENOTSOCK:
-            raise GetpeernameENOTSOCKError()
+            raise GetpeernameError(GetpeernameENOTSOCKError())
 
     return remote_address^
 
@@ -655,29 +652,29 @@ fn bind(socket: FileDescriptor, mut address: SocketAddress) raises BindError:
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/bind.3p.html .
     """
-    var result = _bind(socket.value, Pointer(to=address.as_sockaddr_in()), address.SIZE)
+    var result = _bind(Int32(socket.value), Pointer(to=address.as_sockaddr_in()), address.SIZE)
     if result == -1:
         var errno = get_errno()
         if errno == errno.EACCES:
-            raise BindEACCESError()
+            raise BindError(BindEACCESError())
         elif errno == errno.EADDRINUSE:
-            raise BindEADDRINUSEError()
+            raise BindError(BindEADDRINUSEError())
         elif errno == errno.EBADF:
-            raise BindEBADFError()
+            raise BindError(BindEBADFError())
         elif errno == errno.EINVAL:
-            raise BindEINVALError()
+            raise BindError(BindEINVALError())
         elif errno == errno.ENOTSOCK:
-            raise BindENOTSOCKError()
+            raise BindError(BindENOTSOCKError())
 
         # The following errors are specific to UNIX domain (AF_UNIX) sockets. TODO: Pass address_family when unix sockets supported.
         # if address_family == AF_UNIX:
         #     if errno == errno.EACCES:
         #       raise BindEACCESError()
 
-        raise Error(
+        raise BindError(Error(
             "bind: An error occurred while binding the socket. Error code: ",
             errno,
-        )
+        ))
 
 
 fn _listen(socket: c_int, backlog: c_int) -> c_int:
@@ -723,17 +720,17 @@ fn listen(socket: FileDescriptor, backlog: c_int) raises ListenError:
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/listen.3p.html .
     """
-    var result = _listen(socket.value, backlog)
+    var result = _listen(Int32(socket.value), backlog)
     if result == -1:
         var errno = get_errno()
         if errno == errno.EADDRINUSE:
-            raise ListenEADDRINUSEError()
+            raise ListenError(ListenEADDRINUSEError())
         elif errno == errno.EBADF:
-            raise ListenEBADFError()
+            raise ListenError(ListenEBADFError())
         elif errno == errno.ENOTSOCK:
-            raise ListenENOTSOCKError()
+            raise ListenError(ListenENOTSOCKError())
         elif errno == errno.EOPNOTSUPP:
-            raise ListenEOPNOTSUPPError()
+            raise ListenError(ListenEOPNOTSUPPError())
 
 
 fn _accept[
@@ -797,38 +794,37 @@ fn accept(socket: FileDescriptor) raises AcceptError -> FileDescriptor:
     var remote_address = sockaddr()
     # TODO: Should this be sizeof sockaddr?
     var buffer_size = socklen_t(size_of[socklen_t]())
-    var result = _accept(socket.value, Pointer(to=remote_address), Pointer(to=buffer_size))
+    var result = _accept(Int32(socket.value), Pointer(to=remote_address), Pointer(to=buffer_size))
     if result == -1:
         var errno = get_errno()
         if errno in [errno.EAGAIN, errno.EWOULDBLOCK]:
-            raise AcceptEAGAINError()
+            raise AcceptError(AcceptEAGAINError())
         elif errno == errno.EBADF:
-            raise AcceptEBADFError()
+            raise AcceptError(AcceptEBADFError())
         elif errno == errno.ECONNABORTED:
-            raise AcceptECONNABORTEDError()
+            raise AcceptError(AcceptECONNABORTEDError())
         elif errno == errno.EFAULT:
-            raise AcceptEFAULTError()
+            raise AcceptError(AcceptEFAULTError())
         elif errno == errno.EINTR:
-            raise AcceptEINTRError()
+            raise AcceptError(AcceptEINTRError())
         elif errno == errno.EINVAL:
-            raise AcceptEINVALError()
+            raise AcceptError(AcceptEINVALError())
         elif errno == errno.EMFILE:
-            raise AcceptEMFILEError()
+            raise AcceptError(AcceptEMFILEError())
         elif errno == errno.ENFILE:
-            raise AcceptENFILEError()
+            raise AcceptError(AcceptENFILEError())
         elif errno in [errno.ENOBUFS, errno.ENOMEM]:
-            raise AcceptENOBUFSError()
+            raise AcceptError(AcceptENOBUFSError())
         elif errno == errno.ENOTSOCK:
-            raise AcceptENOTSOCKError()
+            raise AcceptError(AcceptENOTSOCKError())
         elif errno == errno.EOPNOTSUPP:
-            raise AcceptEOPNOTSUPPError()
+            raise AcceptError(AcceptEOPNOTSUPPError())
         elif errno == errno.EPROTO:
-            raise AcceptEPROTOError()
+            raise AcceptError(AcceptEPROTOError())
 
-        @parameter
-        if CompilationTarget.is_linux():
+        comptime if CompilationTarget.is_linux():
             if errno == errno.EPERM:
-                raise AcceptEPERMError()
+                raise AcceptError(AcceptEPERMError())
 
     return FileDescriptor(Int(result))
 
@@ -897,33 +893,33 @@ fn connect(socket: FileDescriptor, mut address: SocketAddress) raises ConnectErr
     if result == -1:
         var errno = get_errno()
         if errno == errno.EACCES:
-            raise ConnectEACCESError()
+            raise ConnectError(ConnectEACCESError())
         elif errno == errno.EADDRINUSE:
-            raise ConnectEADDRINUSEError()
+            raise ConnectError(ConnectEADDRINUSEError())
         elif errno == errno.EAGAIN:
-            raise ConnectEAGAINError()
+            raise ConnectError(ConnectEAGAINError())
         elif errno == errno.EALREADY:
-            raise ConnectEALREADYError()
+            raise ConnectError(ConnectEALREADYError())
         elif errno == errno.EBADF:
-            raise ConnectEBADFError()
+            raise ConnectError(ConnectEBADFError())
         elif errno == errno.ECONNREFUSED:
-            raise ConnectECONNREFUSEDError()
+            raise ConnectError(ConnectECONNREFUSEDError())
         elif errno == errno.EFAULT:
-            raise ConnectEFAULTError()
+            raise ConnectError(ConnectEFAULTError())
         elif errno == errno.EINPROGRESS:
-            raise ConnectEINPROGRESSError()
+            raise ConnectError(ConnectEINPROGRESSError())
         elif errno == errno.EINTR:
-            raise ConnectEINTRError()
+            raise ConnectError(ConnectEINTRError())
         elif errno == errno.EISCONN:
-            raise ConnectEISCONNError()
+            raise ConnectError(ConnectEISCONNError())
         elif errno == errno.ENETUNREACH:
-            raise ConnectENETUNREACHError()
+            raise ConnectError(ConnectENETUNREACHError())
         elif errno == errno.ENOTSOCK:
-            raise ConnectENOTSOCKError()
+            raise ConnectError(ConnectENOTSOCKError())
         elif errno == errno.EAFNOSUPPORT:
-            raise ConnectEAFNOSUPPORTError()
+            raise ConnectError(ConnectEAFNOSUPPORTError())
         elif errno == errno.ETIMEDOUT:
-            raise ConnectETIMEDOUTError()
+            raise ConnectError(ConnectETIMEDOUTError())
 
 
 fn _recv(
@@ -986,28 +982,28 @@ fn recv[
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/recv.3p.html .
     """
-    var result = _recv(socket.value, buffer.unsafe_ptr().bitcast[c_void](), length, flags)
+    var result = _recv(Int32(socket.value), buffer.unsafe_ptr().bitcast[c_void](), length, flags)
     if result == -1:
         var errno = get_errno()
         if errno in [errno.EAGAIN, errno.EWOULDBLOCK]:
-            raise RecvEAGAINError()
+            raise RecvError(RecvEAGAINError())
         elif errno == errno.EBADF:
-            raise RecvEBADFError()
+            raise RecvError(RecvEBADFError())
         elif errno == errno.ECONNREFUSED:
-            raise RecvECONNREFUSEDError()
+            raise RecvError(RecvECONNREFUSEDError())
         elif errno == errno.EFAULT:
-            raise RecvEFAULTError()
+            raise RecvError(RecvEFAULTError())
         elif errno == errno.EINTR:
-            raise RecvEINTRError()
+            raise RecvError(RecvEINTRError())
         elif errno == errno.ENOTCONN:
-            raise RecvENOTCONNError()
+            raise RecvError(RecvENOTCONNError())
         elif errno == errno.ENOTSOCK:
-            raise RecvENOTSOCKError()
+            raise RecvError(RecvENOTSOCKError())
         else:
-            raise Error(
+            raise RecvError(Error(
                 "RecvError: An error occurred while attempting to receive data from the socket. Error code: ",
                 errno,
-            )
+            ))
 
     return UInt(result)
 
@@ -1112,34 +1108,34 @@ fn recvfrom[
     if result == -1:
         var errno = get_errno()
         if errno in [errno.EAGAIN, errno.EWOULDBLOCK]:
-            raise RecvfromEAGAINError()
+            raise RecvfromError(RecvfromEAGAINError())
         elif errno == errno.EBADF:
-            raise RecvfromEBADFError()
+            raise RecvfromError(RecvfromEBADFError())
         elif errno == errno.ECONNRESET:
-            raise RecvfromECONNRESETError()
+            raise RecvfromError(RecvfromECONNRESETError())
         elif errno == errno.EINTR:
-            raise RecvfromEINTRError()
+            raise RecvfromError(RecvfromEINTRError())
         elif errno == errno.EINVAL:
-            raise RecvfromEINVALError()
+            raise RecvfromError(RecvfromEINVALError())
         elif errno == errno.ENOTCONN:
-            raise RecvfromENOTCONNError()
+            raise RecvfromError(RecvfromENOTCONNError())
         elif errno == errno.ENOTSOCK:
-            raise RecvfromENOTSOCKError()
+            raise RecvfromError(RecvfromENOTSOCKError())
         elif errno == errno.EOPNOTSUPP:
-            raise RecvfromEOPNOTSUPPError()
+            raise RecvfromError(RecvfromEOPNOTSUPPError())
         elif errno == errno.ETIMEDOUT:
-            raise RecvfromETIMEDOUTError()
+            raise RecvfromError(RecvfromETIMEDOUTError())
         elif errno == errno.EIO:
-            raise RecvfromEIOError()
+            raise RecvfromError(RecvfromEIOError())
         elif errno == errno.ENOBUFS:
-            raise RecvfromENOBUFSError()
+            raise RecvfromError(RecvfromENOBUFSError())
         elif errno == errno.ENOMEM:
-            raise RecvfromENOMEMError()
+            raise RecvfromError(RecvfromENOMEMError())
         else:
-            raise Error(
+            raise RecvfromError(Error(
                 "RecvfromError: An error occurred while attempting to receive data from the socket. Error code: ",
                 errno,
-            )
+            ))
 
     return UInt(result)
 
@@ -1220,42 +1216,42 @@ fn send[
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/send.3p.html .
     """
-    var result = _send(socket.value, buffer.unsafe_ptr().bitcast[c_void](), length, flags)
+    var result = _send(Int32(socket.value), buffer.unsafe_ptr().bitcast[c_void](), length, flags)
     if result == -1:
         var errno = get_errno()
         if errno in [errno.EAGAIN, errno.EWOULDBLOCK]:
-            raise SendEAGAINError()
+            raise SendError(SendEAGAINError())
         elif errno == errno.EBADF:
-            raise SendEBADFError()
+            raise SendError(SendEBADFError())
         elif errno == errno.ECONNRESET:
-            raise SendECONNRESETError()
+            raise SendError(SendECONNRESETError())
         elif errno == errno.EDESTADDRREQ:
-            raise SendEDESTADDRREQError()
+            raise SendError(SendEDESTADDRREQError())
         elif errno == errno.ECONNREFUSED:
-            raise SendECONNREFUSEDError()
+            raise SendError(SendECONNREFUSEDError())
         elif errno == errno.EFAULT:
-            raise SendEFAULTError()
+            raise SendError(SendEFAULTError())
         elif errno == errno.EINTR:
-            raise SendEINTRError()
+            raise SendError(SendEINTRError())
         elif errno == errno.EINVAL:
-            raise SendEINVALError()
+            raise SendError(SendEINVALError())
         elif errno == errno.EISCONN:
-            raise SendEISCONNError()
+            raise SendError(SendEISCONNError())
         elif errno == errno.ENOBUFS:
-            raise SendENOBUFSError()
+            raise SendError(SendENOBUFSError())
         elif errno == errno.ENOMEM:
-            raise SendENOMEMError()
+            raise SendError(SendENOMEMError())
         elif errno == errno.ENOTCONN:
-            raise SendENOTCONNError()
+            raise SendError(SendENOTCONNError())
         elif errno == errno.ENOTSOCK:
-            raise SendENOTSOCKError()
+            raise SendError(SendENOTSOCKError())
         elif errno == errno.EOPNOTSUPP:
-            raise SendEOPNOTSUPPError()
+            raise SendError(SendEOPNOTSUPPError())
         else:
-            raise Error(
+            raise SendError(Error(
                 "SendError: An error occurred while attempting to send data to the socket. Error code: ",
                 errno,
-            )
+            ))
 
     return UInt(result)
 
@@ -1354,52 +1350,52 @@ fn sendto[
     if result == -1:
         var errno = get_errno()
         if errno == errno.EAFNOSUPPORT:
-            raise SendtoEAFNOSUPPORTError()
+            raise SendtoError(SendtoEAFNOSUPPORTError())
         elif errno in [errno.EAGAIN, errno.EWOULDBLOCK]:
-            raise SendtoEAGAINError()
+            raise SendtoError(SendtoEAGAINError())
         elif errno == errno.EBADF:
-            raise SendtoEBADFError()
+            raise SendtoError(SendtoEBADFError())
         elif errno == errno.ECONNRESET:
-            raise SendtoECONNRESETError()
+            raise SendtoError(SendtoECONNRESETError())
         elif errno == errno.EINTR:
-            raise SendtoEINTRError()
+            raise SendtoError(SendtoEINTRError())
         elif errno == errno.EMSGSIZE:
-            raise SendtoEMSGSIZEError()
+            raise SendtoError(SendtoEMSGSIZEError())
         elif errno == errno.ENOTCONN:
-            raise SendtoENOTCONNError()
+            raise SendtoError(SendtoENOTCONNError())
         elif errno == errno.ENOTSOCK:
-            raise SendtoENOTSOCKError()
+            raise SendtoError(SendtoENOTSOCKError())
         elif errno == errno.EPIPE:
-            raise SendtoEPIPEError()
+            raise SendtoError(SendtoEPIPEError())
         elif errno == errno.EACCES:
-            raise SendtoEACCESError()
+            raise SendtoError(SendtoEACCESError())
         elif errno == errno.EDESTADDRREQ:
-            raise SendtoEDESTADDRREQError()
+            raise SendtoError(SendtoEDESTADDRREQError())
         elif errno == errno.EHOSTUNREACH:
-            raise SendtoEHOSTUNREACHError()
+            raise SendtoError(SendtoEHOSTUNREACHError())
         elif errno == errno.EINVAL:
-            raise SendtoEINVALError()
+            raise SendtoError(SendtoEINVALError())
         elif errno == errno.EIO:
-            raise SendtoEIOError()
+            raise SendtoError(SendtoEIOError())
         elif errno == errno.EISCONN:
-            raise SendtoEISCONNError()
+            raise SendtoError(SendtoEISCONNError())
         elif errno == errno.ENETDOWN:
-            raise SendtoENETDOWNError()
+            raise SendtoError(SendtoENETDOWNError())
         elif errno == errno.ENETUNREACH:
-            raise SendtoENETUNREACHError()
+            raise SendtoError(SendtoENETUNREACHError())
         elif errno == errno.ENOBUFS:
-            raise SendtoENOBUFSError()
+            raise SendtoError(SendtoENOBUFSError())
         elif errno == errno.ENOMEM:
-            raise SendtoENOMEMError()
+            raise SendtoError(SendtoENOMEMError())
         elif errno == errno.ELOOP:
-            raise SendtoELOOPError()
+            raise SendtoError(SendtoELOOPError())
         elif errno == errno.ENAMETOOLONG:
-            raise SendtoENAMETOOLONGError()
+            raise SendtoError(SendtoENAMETOOLONGError())
         else:
-            raise Error(
+            raise SendtoError(Error(
                 "SendtoError: An error occurred while attempting to send data to the socket. Error code: ",
                 errno,
-            )
+            ))
 
     return UInt(result)
 
@@ -1447,17 +1443,17 @@ fn shutdown(socket: FileDescriptor, how: ShutdownOption) raises ShutdownError:
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/shutdown.3p.html .
     """
-    var result = _shutdown(socket.value, how.value)
+    var result = _shutdown(Int32(socket.value), how.value)
     if result == -1:
         var errno = get_errno()
         if errno == errno.EBADF:
-            raise ShutdownEBADFError()
+            raise ShutdownError(ShutdownEBADFError())
         elif errno == errno.EINVAL:
-            raise ShutdownEINVALError()
+            raise ShutdownError(ShutdownEINVALError())
         elif errno == errno.ENOTCONN:
-            raise ShutdownENOTCONNError()
+            raise ShutdownError(ShutdownENOTCONNError())
         elif errno == errno.ENOTSOCK:
-            raise ShutdownENOTSOCKError()
+            raise ShutdownError(ShutdownENOTSOCKError())
 
 
 fn _close(fildes: c_int) -> c_int:
@@ -1505,13 +1501,13 @@ fn close(file_descriptor: FileDescriptor) raises CloseError:
     #### Notes:
     * Reference: https://man7.org/linux/man-pages/man3/close.3p.html .
     """
-    if _close(file_descriptor.value) == -1:
+    if _close(Int32(file_descriptor.value)) == -1:
         var errno = get_errno()
         if errno == errno.EBADF:
-            raise CloseEBADFError()
+            raise CloseError(CloseEBADFError())
         elif errno == errno.EINTR:
-            raise CloseEINTRError()
+            raise CloseError(CloseEINTRError())
         elif errno == errno.EIO:
-            raise CloseEIOError()
+            raise CloseError(CloseEIOError())
         elif errno in [errno.ENOSPC, errno.EDQUOT]:
-            raise CloseENOSPCError()
+            raise CloseError(CloseENOSPCError())

@@ -3,8 +3,7 @@ from utils import Variant
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct InvalidCookieError(Movable, Stringable, Writable):
+struct InvalidCookieError(Movable, Stringable, Writable, TrivialRegisterPassable):
     """Error raised when a cookie is invalid."""
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -100,29 +99,29 @@ struct Cookie(Copyable):
     fn __str__(self) -> String:
         return String.write("Name: ", self.name, " Value: ", self.value)
 
-    fn __copyinit__(out self: Cookie, existing: Cookie):
-        self.name = existing.name
-        self.value = existing.value
-        self.max_age = existing.max_age
-        self.expires = existing.expires.copy()
-        self.domain = existing.domain
-        self.path = existing.path
-        self.secure = existing.secure
-        self.http_only = existing.http_only
-        self.same_site = existing.same_site
-        self.partitioned = existing.partitioned
+    fn __copyinit__(out self: Cookie, copy: Cookie):
+        self.name = copy.name
+        self.value = copy.value
+        self.max_age = copy.max_age
+        self.expires = copy.expires.copy()
+        self.domain = copy.domain
+        self.path = copy.path
+        self.secure = copy.secure
+        self.http_only = copy.http_only
+        self.same_site = copy.same_site
+        self.partitioned = copy.partitioned
 
-    fn __moveinit__(out self: Cookie, deinit existing: Cookie):
-        self.name = existing.name^
-        self.value = existing.value^
-        self.max_age = existing.max_age^
-        self.expires = existing.expires.copy()
-        self.domain = existing.domain^
-        self.path = existing.path^
-        self.secure = existing.secure
-        self.http_only = existing.http_only
-        self.same_site = existing.same_site^
-        self.partitioned = existing.partitioned
+    fn __moveinit__(out self: Cookie, deinit take: Cookie):
+        self.name = take.name
+        self.value = take.value
+        self.max_age = take.max_age
+        self.expires = take.expires.copy()
+        self.domain = take.domain
+        self.path = take.path
+        self.secure = take.secure
+        self.http_only = take.http_only
+        self.same_site = take.same_site
+        self.partitioned = take.partitioned
 
     fn clear_cookie(mut self):
         self.max_age = Optional[Duration](None)

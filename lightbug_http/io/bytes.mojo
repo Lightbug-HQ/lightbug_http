@@ -11,7 +11,7 @@ comptime Bytes = List[Byte]
 
 @always_inline
 fn byte[s: StringSlice]() -> Byte:
-    __comptime_assert len(s) == 1, "StringSlice must be of length 1 to convert to Byte."
+    comptime assert len(s) == 1, "StringSlice must be of length 1 to convert to Byte."
     return s.as_bytes()[0]
 
 
@@ -32,7 +32,7 @@ struct ByteWriter(Writer):
         self._inner = Bytes(capacity=capacity)
 
     @always_inline
-    fn write_bytes(mut self, bytes: Span[Byte]) -> None:
+    fn write_string(mut self, bytes: Span[Byte]) -> None:
         """Writes the contents of `bytes` into the internal buffer.
 
         Args:
@@ -58,8 +58,7 @@ struct ByteWriter(Writer):
             args: The data to write.
         """
 
-        @parameter
-        for i in range(args.__len__()):
+        comptime for i in range(args.__len__()):
             args[i].write_to(self)
 
     @always_inline
@@ -306,46 +305,6 @@ struct ByteReader[origin: ImmutOrigin](Copyable, Sized):
     fn consume(var self, bytes_len: Int = -1) -> Bytes:
         return Bytes(self^._inner[self.read_pos : self.read_pos + len(self) + 1])
 
-
-fn memmove[
-    T: Copyable, dest_origin: MutOrigin, src_origin: MutOrigin
-](dest: UnsafePointer[T, dest_origin], src: UnsafePointer[T, src_origin], count: Int,):
-    """
-    Copies count elements from src to dest, handling overlapping memory regions safely.
-    """
-    if count <= 0:
-        return
-
-    if dest == src:
-        return
-
-    # Check if memory regions overlap
-    var dest_addr = Int(dest)
-    var src_addr = Int(src)
-    var element_size = size_of[T]()
-    var total_bytes = count * element_size
-
-    var dest_end = dest_addr + total_bytes
-    var src_end = src_addr + total_bytes
-
-    # Check for overlap: regions overlap if one starts before the other ends
-    var overlaps = (dest_addr < src_end) and (src_addr < dest_end)
-
-    if not overlaps:
-        # No overlap - use fast memcpy
-        memcpy(dest=dest, src=src, count=count)
-    elif dest_addr < src_addr:
-        # Destination is before source - copy forwards (left to right)
-        for i in range(count):
-            (dest + i).init_pointee_copy((src + i)[])
-    else:
-        # Destination is after source - copy backwards (right to left)
-        var i = count - 1
-        while i >= 0:
-            (dest + i).init_pointee_copy((src + i)[])
-            i -= 1
-
-
 fn create_string_from_ptr[origin: ImmutOrigin](ptr: UnsafePointer[UInt8, origin], length: Int) -> String:
     """Create a String from a pointer and length.
 
@@ -360,7 +319,7 @@ fn create_string_from_ptr[origin: ImmutOrigin](ptr: UnsafePointer[UInt8, origin]
     # for i in range(length):
     #     buf.append(ptr[i])
 
-    result.write_bytes(Span(ptr=ptr, length=length))
+    result.write_string(StringSlice(unsafe_from_utf8=Span(ptr=ptr, length=length)))
 
     return result^
 

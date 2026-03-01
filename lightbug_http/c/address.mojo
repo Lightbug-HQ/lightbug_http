@@ -1,11 +1,10 @@
-from sys.ffi import c_int
+from ffi import c_int
 
 from lightbug_http.c.aliases import ExternalImmutUnsafePointer, ExternalMutUnsafePointer, c_void
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct AddressInformation(Copyable, Equatable, Stringable, Writable):
+struct AddressInformation(Copyable, Equatable, Stringable, Writable, TrivialRegisterPassable):
     var value: c_int
     comptime AI_PASSIVE = Self(1)
     comptime AI_CANONNAME = Self(2)
@@ -43,8 +42,7 @@ struct AddressInformation(Copyable, Equatable, Stringable, Writable):
 # TODO: These might vary on each platform...we should confirm this.
 # Taken from: https://github.com/openbsd/src/blob/master/sys/sys/socket.h#L250
 @fieldwise_init
-@register_passable("trivial")
-struct AddressFamily(Copyable, Equatable, Stringable, Writable):
+struct AddressFamily(Copyable, Equatable, Stringable, Writable, TrivialRegisterPassable):
     var value: c_int
     comptime AF_UNSPEC = Self(0)
     comptime AF_INET = Self(2)
@@ -73,8 +71,7 @@ struct AddressFamily(Copyable, Equatable, Stringable, Writable):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct AddressLength(Copyable, Equatable, Stringable, Writable):
+struct AddressLength(Copyable, Equatable, Stringable, Writable, TrivialRegisterPassable):
     var value: Int
     comptime INET_ADDRSTRLEN = Self(16)
     comptime INET6_ADDRSTRLEN = Self(46)

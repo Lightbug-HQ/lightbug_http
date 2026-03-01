@@ -41,8 +41,7 @@ comptime default_tcp_keep_alive = Duration(15 * 1000 * 1000 * 1000)  # 15 second
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct AddressParseError(CustomError):
+struct AddressParseError(CustomError, TrivialRegisterPassable):
     comptime message = "ListenerError: Failed to parse listen address"
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -53,8 +52,7 @@ struct AddressParseError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SocketCreationError(CustomError):
+struct SocketCreationError(CustomError, TrivialRegisterPassable):
     comptime message = "ListenerError: Failed to create socket"
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -65,8 +63,7 @@ struct SocketCreationError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct BindFailedError(CustomError):
+struct BindFailedError(CustomError, TrivialRegisterPassable):
     comptime message = "ListenerError: Failed to bind socket to address"
 
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -77,8 +74,7 @@ struct BindFailedError(CustomError):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ListenFailedError(CustomError):
+struct ListenFailedError(CustomError, TrivialRegisterPassable):
     comptime message = "ListenerError: Failed to listen on socket"
 
     fn write_to[W: Writer, //](self, mut writer: W):

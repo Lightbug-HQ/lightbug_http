@@ -1,4 +1,4 @@
-from sys.ffi import c_uint
+from ffi import c_uint
 from sys.info import CompilationTarget
 
 from lightbug_http.address import (
@@ -63,20 +63,17 @@ from utils import Variant
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct SocketClosedError(Movable):
+struct SocketClosedError(Movable, TrivialRegisterPassable):
     pass
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct EOF(Movable):
+struct EOF(Movable, TrivialRegisterPassable):
     pass
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct InvalidCloseErrorConversionError(Movable, Stringable, Writable):
+struct InvalidCloseErrorConversionError(Movable, Stringable, Writable, TrivialRegisterPassable):
     fn write_to[W: Writer, //](self, mut writer: W):
         writer.write("InvalidCloseErrorConversionError: Cannot convert EBADF to FatalCloseError")
 
@@ -608,7 +605,7 @@ struct Socket[
         Raises:
             SetsockoptError: If setting the socket option fails.
         """
-        setsockopt(self.fd, SOL_SOCKET, option_name.value, option_value)
+        setsockopt(self.fd, SOL_SOCKET, option_name.value, Int32(option_value))
 
     fn connect(mut self, mut ip_address: String, port: UInt16) raises -> None:
         """Connect to a remote socket at address.
@@ -821,7 +818,7 @@ struct Socket[
         """
         # SO_RCVTIMEO requires a timeval struct: {tv_sec: Int64, tv_usec: Int64}
         # (16 bytes on both macOS and Linux 64-bit).
-        var timeval = InlineArray[Int64, 2](seconds, 0)
+        var timeval: InlineArray[Int64, 2] = [seconds, 0]
         _ = _setsockopt(
             self.fd.value,
             SOL_SOCKET,

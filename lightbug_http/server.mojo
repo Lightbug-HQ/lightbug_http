@@ -192,8 +192,7 @@ struct ConnectionProvision(Movable):
 
 
 @fieldwise_init
-@register_passable("trivial")
-struct ProvisionPoolExhaustedError(CustomError):
+struct ProvisionPoolExhaustedError(CustomError, TrivialRegisterPassable):
     comptime message = "ProvisionError: Connection provision pool exhausted"
 
     fn write_to[W: Writer, //](self, mut writer: W):
