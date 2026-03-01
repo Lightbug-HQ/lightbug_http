@@ -1,7 +1,7 @@
 import sys
 from sys import size_of
 
-from lightbug_http.io.bytes import Bytes, memmove
+from lightbug_http.io.bytes import Bytes
 from lightbug_http.strings import BytesConstant
 from memory import memcpy
 
@@ -129,18 +129,16 @@ struct HTTPChunkedDecoder(Defaultable):
                 var avail = buffer_len - src
                 if avail < self.bytes_left_in_chunk:
                     if dst != src:
-                        memmove(buf.unsafe_ptr() + dst, buf.unsafe_ptr() + src, avail)
+                        for _i in range(avail):
+                            buf[dst + _i] = buf[src + _i]
                     src += avail
                     dst += avail
                     self.bytes_left_in_chunk -= avail
                     break
 
                 if dst != src:
-                    memmove(
-                        buf.unsafe_ptr() + dst,
-                        buf.unsafe_ptr() + src,
-                        self.bytes_left_in_chunk,
-                    )
+                    for _i in range(self.bytes_left_in_chunk):
+                        buf[dst + _i] = buf[src + _i]
 
                 src += self.bytes_left_in_chunk
                 dst += self.bytes_left_in_chunk
@@ -197,7 +195,8 @@ struct HTTPChunkedDecoder(Defaultable):
 
         # Move remaining data to beginning of buffer
         if dst != src and src < buffer_len:
-            memmove(buf.unsafe_ptr() + dst, buf.unsafe_ptr() + src, buffer_len - src)
+            for _i in range(buffer_len - src):
+                buf[dst + _i] = buf[src + _i]
 
         var new_bufsz = dst
 
