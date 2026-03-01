@@ -1,8 +1,6 @@
 from sys.ffi import c_uint
 from sys.info import CompilationTarget
 
-from lightbug_http.c.aliases import c_void
-
 from lightbug_http.address import (
     Addr,
     NetworkType,
@@ -13,6 +11,7 @@ from lightbug_http.address import (
     get_ip_address,
 )
 from lightbug_http.c.address import AddressFamily, AddressLength
+from lightbug_http.c.aliases import c_void
 from lightbug_http.c.network import InetNtopError, InetPtonError, SocketAddress, inet_pton
 from lightbug_http.c.socket import (
     SOL_SOCKET,

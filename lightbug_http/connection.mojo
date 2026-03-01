@@ -371,7 +371,7 @@ struct TCPConnection[network: NetworkType = NetworkType.tcp4]:
         """
         var total_sent: UInt = 0
         while total_sent < UInt(len(buf)):
-            var sent = self.socket.send(buf[Int(total_sent):])
+            var sent = self.socket.send(buf[Int(total_sent) :])
             total_sent += sent
         return total_sent
 
