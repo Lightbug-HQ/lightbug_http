@@ -361,7 +361,9 @@ fn encode_latin1_header_value(value: String) -> List[UInt8]:
                 var b4 = utf8[i + 3]
                 if b2 >= 0x80 and b2 <= 0xBF and b3 >= 0x80 and b3 <= 0xBF and b4 >= 0x80 and b4 <= 0xBF:
                     seq_len = 4
-                    codepoint = ((Int(b) & 0x07) << 18) | ((Int(b2) & 0x3F) << 12) | ((Int(b3) & 0x3F) << 6) | (Int(b4) & 0x3F)
+                    codepoint = (
+                        ((Int(b) & 0x07) << 18) | ((Int(b2) & 0x3F) << 12) | ((Int(b3) & 0x3F) << 6) | (Int(b4) & 0x3F)
+                    )
 
             if seq_len > 0 and codepoint <= 0xFF:
                 out.append(UInt8(codepoint))

@@ -1,0 +1,17 @@
+[workspace]
+authors = ["Mikhail Tavarez <miktavarez@gmail.com>"]
+channels = ["https://conda.modular.com/max", "https://repo.prefix.dev/modular-community", "https://repo.prefix.dev/mojo-community", "conda-forge"]
+name = "echo_server"
+platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
+version = "0.1.0"
+preview = ["pixi-build"]
+
+[tasks]
+server = "mojo run server.mojo"
+client = "mojo run client.mojo"
+
+[dependencies]
+mojo = ">=0.26.1.0,<0.26.2.0"
+curl_wrapper = { git = "https://github.com/thatstoasty/mojo-curl.git", branch = "main", subdirectory = "shim" }
+floki = ">=0.1.0,<0.2"
+lightbug_http = ">=0.26.1.2,<0.26.2.0"

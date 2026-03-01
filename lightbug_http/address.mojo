@@ -424,8 +424,6 @@ fn is_ipv6(network: NetworkType) -> Bool:
     return network in (NetworkType.tcp6, NetworkType.udp6, NetworkType.ip6)
 
 
-
-
 @fieldwise_init
 struct ParseEmptyAddressError(CustomError, TrivialRegisterPassable):
     comptime message = "ParseError: Failed to parse address: received empty address string."
@@ -534,8 +532,6 @@ struct ParseIPProtocolPortError(CustomError, TrivialRegisterPassable):
 
     fn __str__(self) -> String:
         return Self.message
-
-
 
 
 @fieldwise_init

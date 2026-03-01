@@ -32,11 +32,11 @@ Lightbug currently has the following features:
  - [x] Pure Mojo HTTP 1.1 server with no Python dependencies. Everything is fully typed, with no `def` functions used
  - [x] Cookie support
 
- ### Check Out These Mojo Libraries:
+### Check Out These Mojo Libraries:
 
-- Logging - [@toasty/stump](https://github.com/thatstoasty/stump)
-- CLI and Terminal - [@toasty/prism](https://github.com/thatstoasty/prism), [@toasty/mog](https://github.com/thatstoasty/mog)
-- Date/Time - [@mojoto/morrow](https://github.com/mojoto/morrow.mojo) and [@toasty/small_time](https://github.com/thatstoasty/small_time)
+- HTTP Client - [@thatstoasty/floki](https://github.com/thatstoasty/floki)
+- CLI and Terminal - [@thatstoasty/prism](https://github.com/thatstoasty/prism), [@thatstoasty/mog](https://github.com/thatstoasty/mog)
+- Date/Time - [@mojoto/morrow](https://github.com/mojoto/morrow.mojo) and [@thatstoasty/small_time](https://github.com/thatstoasty/small_time)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -175,6 +175,11 @@ struct Welcome(HTTPService):
 
         return NotFound(req.uri.path)
 ```
+
+<!-- Examples -->
+## Examples
+
+Check out the examples directory for more example services built with Lightbug, including an echo server and client implementation!
 
 <!-- ROADMAP -->
 ## Roadmap
