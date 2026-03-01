@@ -23,11 +23,12 @@ fn JsonOK(body: String) -> HTTPResponse:
     return OK(body, "application/json")
 
 
-fn JsonOK[T: JsonSerializable](value: T) -> HTTPResponse:
+fn JsonOK[T: AnyType](value: T) -> HTTPResponse:
     """Return a 200 OK response, serializing the value to JSON.
 
     Parameters:
-        T: A type that implements JsonSerializable.
+        T: Any struct type. Types with fields that have non-trivial destructors
+           must also conform to Defaultable.
 
     Args:
         value: The value to serialize to JSON.
@@ -50,11 +51,12 @@ fn json_decode(req: HTTPRequest) raises -> JSON:
     return parse(req.get_body())
 
 
-fn json_decode[T: JsonDeserializable](req: HTTPRequest) raises -> T:
+fn json_decode[T: Movable & ImplicitlyDestructible](req: HTTPRequest) raises -> T:
     """Deserialize the request body into a typed struct.
 
     Parameters:
-        T: A type that implements JsonDeserializable (must also be Defaultable).
+        T: Any struct conforming to Movable & ImplicitlyDestructible. Types with
+           fields that have non-trivial destructors must also conform to Defaultable.
 
     Args:
         req: The HTTP request to deserialize JSON from.
