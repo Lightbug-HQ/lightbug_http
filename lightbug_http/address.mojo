@@ -586,7 +586,7 @@ fn parse_ipv6_bracketed_address[
     Returns:
         Tuple of (host, colon_index_offset).
     """
-    if address[0:1] != "[":
+    if address[0:1] != StringSlice("["):
         return address, UInt16(0)
 
     var end_bracket_index = address.find("]")
@@ -597,7 +597,7 @@ fn parse_ipv6_bracketed_address[
         raise ParseError(ParseMissingPortError())
 
     var colon_index = end_bracket_index + 1
-    if address[colon_index : colon_index + 1] != ":":
+    if address[colon_index : colon_index + 1] != StringSlice(":"):
         raise ParseError(ParseMissingPortError())
 
     return address[1:end_bracket_index], UInt16(end_bracket_index + 1)

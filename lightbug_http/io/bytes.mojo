@@ -11,7 +11,7 @@ comptime Bytes = List[Byte]
 
 @always_inline
 fn byte[s: StringSlice]() -> Byte:
-    __comptime_assert len(s) == 1, "StringSlice must be of length 1 to convert to Byte."
+    comptime assert len(s) == 1, "StringSlice must be of length 1 to convert to Byte."
     return s.as_bytes()[0]
 
 

@@ -251,7 +251,7 @@ struct OwningList[T: Movable & ImplicitlyDestructible](Boolable, Movable, Sized)
         var new_data = alloc[Self.T](new_capacity)
 
         @parameter
-        if Self.T.__moveinit__is_trivial:
+        if Self.T.__move_ctor_is_trivial:
             memcpy(dest=new_data, src=self.data, count=len(self))
         else:
             for i in range(len(self)):
