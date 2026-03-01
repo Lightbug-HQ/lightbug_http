@@ -58,8 +58,7 @@ struct ByteWriter(Writer):
             args: The data to write.
         """
 
-        @parameter
-        for i in range(args.__len__()):
+        comptime for i in range(args.__len__()):
             args[i].write_to(self)
 
     @always_inline

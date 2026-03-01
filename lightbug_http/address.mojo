@@ -661,14 +661,12 @@ fn parse_address[
 
     if address == AddressConstants.LOCALHOST:
 
-        @parameter
-        if network.is_ipv4():
+        comptime if network.is_ipv4():
             return HostPort(AddressConstants.IPV4_LOCALHOST, DEFAULT_IP_PORT)
         elif network.is_ipv6():
             return HostPort(AddressConstants.IPV6_LOCALHOST, DEFAULT_IP_PORT)
 
-    @parameter
-    if network.is_ip_protocol():
+    comptime if network.is_ip_protocol():
         if network == NetworkType.ip6 and address.find(":") != -1:
             return HostPort(String(address), DEFAULT_IP_PORT)
 
@@ -699,8 +697,7 @@ fn parse_address[
     port = parse_port(address[colon_index + 1 :])
     if host == AddressConstants.LOCALHOST:
 
-        @parameter
-        if network.is_ipv4():
+        comptime if network.is_ipv4():
             return HostPort(AddressConstants.IPV4_LOCALHOST, port)
         elif network.is_ipv6():
             return HostPort(AddressConstants.IPV6_LOCALHOST, port)
@@ -740,8 +737,7 @@ fn binary_ip_to_string[address_family: AddressFamily](ip_address: UInt32) raises
         The IP address as a string.
     """
 
-    @parameter
-    if address_family == AddressFamily.AF_INET:
+    comptime if address_family == AddressFamily.AF_INET:
         return inet_ntop[address_family, AddressLength.INET_ADDRSTRLEN](ip_address)
     else:
         return inet_ntop[address_family, AddressLength.INET6_ADDRSTRLEN](ip_address)

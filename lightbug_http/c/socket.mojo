@@ -822,8 +822,7 @@ fn accept(socket: FileDescriptor) raises AcceptError -> FileDescriptor:
         elif errno == errno.EPROTO:
             raise AcceptError(AcceptEPROTOError())
 
-        @parameter
-        if CompilationTarget.is_linux():
+        comptime if CompilationTarget.is_linux():
             if errno == errno.EPERM:
                 raise AcceptError(AcceptEPERMError())
 

@@ -402,8 +402,7 @@ fn inet_pton[address_family: AddressFamily](var src: String) raises InetPtonErro
     """
     var ip_buffer: ExternalMutUnsafePointer[c_void]
 
-    @parameter
-    if address_family == AddressFamily.AF_INET6:
+    comptime if address_family == AddressFamily.AF_INET6:
         ip_buffer = stack_allocation[16, c_void]()
     else:
         ip_buffer = stack_allocation[4, c_void]()
