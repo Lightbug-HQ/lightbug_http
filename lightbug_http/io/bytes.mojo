@@ -32,7 +32,7 @@ struct ByteWriter(Writer):
         self._inner = Bytes(capacity=capacity)
 
     @always_inline
-    fn write_bytes(mut self, bytes: Span[Byte]) -> None:
+    fn write_string(mut self, bytes: Span[Byte]) -> None:
         """Writes the contents of `bytes` into the internal buffer.
 
         Args:
@@ -360,7 +360,7 @@ fn create_string_from_ptr[origin: ImmutOrigin](ptr: UnsafePointer[UInt8, origin]
     # for i in range(length):
     #     buf.append(ptr[i])
 
-    result.write_bytes(Span(ptr=ptr, length=length))
+    result.write_string(StringSlice(unsafe_from_utf8=Span(ptr=ptr, length=length)))
 
     return result^
 

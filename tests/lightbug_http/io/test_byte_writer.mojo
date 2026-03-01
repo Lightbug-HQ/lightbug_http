@@ -25,7 +25,7 @@ def test_consuming_write():
 def test_write():
     var w = ByteWriter()
     w.write("Hello", ", ")
-    w.write_bytes("World!".as_bytes())
+    w.write_string("World!".as_bytes())
     var result: List[Byte] = [
         72,
         101,
